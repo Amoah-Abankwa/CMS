@@ -1,0 +1,196 @@
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+/// A food vendor on campus. Customers see only APPROVED vendors.
+model Vendor {
+  id                 String         @id @default(uuid()) @db.Uuid
+  ownerId            String         @db.Uuid
+  owner              User           @relation("VendorOwner", fields: [ownerId], references: [id])
+  name               String         @unique
+  description        String?
+  location           String
+  phone              String
+  /// { "1": [["07:00","14:00"], ["17:00","21:00"]], ... } by weekday, 0 = Sunday.
+  openingHours       Json
+  /// The vendor can pause orders when busy, whatever the hours say.
+  paused             Boolean        @default(false)
+  acceptsOnline      Boolean        @default(true)
+  acceptsPayOnPickup Boolean        @default(true)
+  offersPickup       Boolean        @default(true)
+  offersDelivery     Boolean        @default(false)
+  /// Deliveries go to the campus dispatcher pool instead of the vendor's own staff (online payment only).
+  useDispatchers     Boolean        @default(false)
+  deliveryFee        Int            @default(0)
+  deliveryNote       String?
+  minimumOrder       Int            @default(0)
+  prepMinutes        Int            @default(20)
+  /// Where Finance sends payouts for online sales.
+  payoutNetwork      String?
+  payoutNumber       String?
+  payoutName         String?
+  status             VendorStatus   @default(PENDING)
+  statusNote         String?
+  reviewedAt         DateTime?
+  reviewedById       String?        @db.Uuid
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  categories         MenuCategory[]
+  items              MenuItem[]
+  orders             FoodOrder[]
+  payouts            VendorPayout[]
+}
+
+model MenuCategory {
+  id       String     @id @default(uuid()) @db.Uuid
+  vendorId String     @db.Uuid
+  vendor   Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name     String
+  position Int        @default(0)
+  items    MenuItem[]
+
+  @@unique([vendorId, name])
+}
+
+/// Price in pesewas.
+model MenuItem {
+  id          String        @id @default(uuid()) @db.Uuid
+  vendorId    String        @db.Uuid
+  vendor      Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  categoryId  String?       @db.Uuid
+  category    MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  price       Int
+  isAvailable Boolean       @default(true)
+  tags        String[]
+  position    Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([vendorId, isAvailable])
+}
+
+enum FulfilmentType {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentOption {
+  ONLINE
+  ON_PICKUP
+}
+
+enum FoodOrderStatus {
+  PENDING_PAYMENT
+  PLACED
+  ACCEPTED
+  READY
+  OUT_FOR_DELIVERY
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+/// Amounts in pesewas. Item names and prices are copied at order time so later menu changes never alter an order.
+model FoodOrder {
+  id               String          @id @default(uuid()) @db.Uuid
+  number           Int             @unique @default(autoincrement())
+  vendorId         String          @db.Uuid
+  vendor           Vendor          @relation(fields: [vendorId], references: [id])
+  customerId       String          @db.Uuid
+  customer         User            @relation("FoodCustomer", fields: [customerId], references: [id])
+  status           FoodOrderStatus
+  fulfilment       FulfilmentType
+  /// Fixed when the order is placed, so later changes to the vendor's setting do not affect it.
+  viaDispatcher    Boolean         @default(false)
+  delivery         Delivery?
+  deliveryAddress  String?
+  deliveryNote     String?
+  paymentOption    PaymentOption
+  subtotal         Int
+  deliveryFee      Int
+  total            Int
+  commission       Int             @default(0)
+  /// Shown to the customer; the vendor enters it to complete the handover.
+  pickupCode       String
+  note             String?
+  paid             Boolean         @default(false)
+  placedAt         DateTime?
+  acceptedAt       DateTime?
+  readyAt          DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  cancelledBy      String?
+  cancelReason     String?
+  estimatedReadyAt DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  items            FoodOrderItem[]
+  payments         Payment[]
+
+  @@index([vendorId, status])
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model FoodOrderItem {
+  id         String    @id @default(uuid()) @db.Uuid
+  orderId    String    @db.Uuid
+  order      FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String?   @db.Uuid
+  name       String
+  unitPrice  Int
+  quantity   Int
+  lineTotal  Int
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+/// A payment through a provider (Paystack, or the demo provider). Reusable for fees, hostel fees and fines later.
+model Payment {
+  id           String        @id @default(uuid()) @db.Uuid
+  reference    String        @unique
+  provider     String
+  purpose      String
+  userId       String        @db.Uuid
+  user         User          @relation("PaymentUser", fields: [userId], references: [id])
+  orderId      String?       @db.Uuid
+  order        FoodOrder?    @relation(fields: [orderId], references: [id])
+  /// What a non-order payment is for: a StudentBill (FEES) or a DuesLevy (DUES).
+  subjectId    String?       @db.Uuid
+  amount       Int
+  currency     String        @default("GHS")
+  status       PaymentStatus @default(PENDING)
+  channel      String?
+  providerData Json?
+  paidAt       DateTime?
+  refundedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status, createdAt])
+}
+
+/// Money Finance has sent a vendor for their online sales over a period.
+model VendorPayout {
+  id           String   @id @default(uuid()) @db.Uuid
+  vendorId     String   @db.Uuid
+  vendor       Vendor   @relation(fields: [vendorId], references: [id])
+  periodFrom   DateTime
+  periodTo     DateTime
+  amount       Int
+  reference    String?
+  note         String?
+  recordedById String   @db.Uuid
+  createdAt    DateTime @default(now())
+}

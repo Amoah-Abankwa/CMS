@@ -1,0 +1,188 @@
+enum HostelKind {
+  UNIVERSITY
+  PRIVATE
+}
+
+enum HostelGender {
+  MALE
+  FEMALE
+  MIXED
+}
+
+enum HostelVerification {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+/// University hostels are single-gender. Private hostels may be mixed and need verifying before students see them.
+model Hostel {
+  id               String             @id @default(uuid()) @db.Uuid
+  kind             HostelKind
+  name             String             @unique
+  gender           HostelGender
+  location         String?
+  digitalAddress   String?
+  distanceNote     String?
+  description      String?
+  facilities       String[]
+  contactPhone     String?
+  isActive         Boolean            @default(true)
+  ownerId          String?            @db.Uuid
+  owner            User?              @relation("HostelOwner", fields: [ownerId], references: [id])
+  verification     HostelVerification @default(APPROVED)
+  verificationNote String?
+  verifiedAt       DateTime?
+  verifiedById     String?            @db.Uuid
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  rooms            Room[]
+  roomTypes        PrivateRoomType[]
+}
+
+/// A room in a university hostel. Price per semester in pesewas.
+model Room {
+  id               String           @id @default(uuid()) @db.Uuid
+  hostelId         String           @db.Uuid
+  hostel           Hostel           @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  number           String
+  floor            String?
+  capacity         Int
+  roomType         String
+  pricePerSemester Int
+  isActive         Boolean          @default(true)
+  notes            String?
+  allocations      RoomAllocation[]
+
+  @@unique([hostelId, number])
+}
+
+/// The application window and acceptance period for a semester.
+model AccommodationRound {
+  semesterId     String    @id @db.Uuid
+  semester       Semester  @relation(fields: [semesterId], references: [id])
+  opensAt        DateTime
+  closesAt       DateTime
+  acceptanceDays Int       @default(5)
+  lastRunAt      DateTime?
+  lastPublishedAt DateTime?
+}
+
+enum HostelApplicationStatus {
+  SUBMITTED
+  WITHDRAWN
+  ALLOCATED
+  UNPLACED
+}
+
+model HostelApplication {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  semesterId           String                  @db.Uuid
+  studentId            String                  @db.Uuid
+  student              User                    @relation("HostelApplicant", fields: [studentId], references: [id])
+  /// [{ hostelId, roomType | null }] in order of preference, up to 3.
+  preferences          Json
+  acceptAny            Boolean                 @default(false)
+  /// The student's own description of a medical or disability need. Only the Hostel Office sees it.
+  specialNeeds         String?
+  specialNeedsApproved Boolean                 @default(false)
+  status               HostelApplicationStatus @default(SUBMITTED)
+  submittedAt          DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@unique([semesterId, studentId])
+  @@index([semesterId, status])
+}
+
+enum AllocationStatus {
+  PROVISIONAL
+  OFFERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum AllocationSource {
+  AUTO
+  MANUAL
+}
+
+/// A bed for a student in a semester. PROVISIONAL, OFFERED and ACCEPTED hold the bed.
+model RoomAllocation {
+  id              String           @id @default(uuid()) @db.Uuid
+  semesterId      String           @db.Uuid
+  studentId       String           @db.Uuid
+  student         User             @relation("RoomAllocationStudent", fields: [studentId], references: [id])
+  roomId          String           @db.Uuid
+  room            Room             @relation(fields: [roomId], references: [id])
+  status          AllocationStatus
+  source          AllocationSource
+  preferenceRank  Int?
+  offeredAt       DateTime?
+  acceptBy        DateTime?
+  respondedAt     DateTime?
+  cancelReason    String?
+  createdById     String?          @db.Uuid
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([roomId, status])
+  @@index([semesterId, studentId])
+  @@index([status, acceptBy])
+}
+
+/// A kind of room a private hostel offers, e.g. "2 in a room, self-contained". Price per semester in pesewas.
+model PrivateRoomType {
+  id               String           @id @default(uuid()) @db.Uuid
+  hostelId         String           @db.Uuid
+  hostel           Hostel           @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  name             String
+  bedsPerRoom      Int
+  pricePerSemester Int
+  availableBeds    Int
+  description      String?
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  bookings         PrivateBooking[]
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model PrivateBooking {
+  id          String          @id @default(uuid()) @db.Uuid
+  semesterId  String          @db.Uuid
+  studentId   String          @db.Uuid
+  student     User            @relation("PrivateBookingStudent", fields: [studentId], references: [id])
+  roomTypeId  String          @db.Uuid
+  roomType    PrivateRoomType @relation(fields: [roomTypeId], references: [id])
+  status      BookingStatus   @default(REQUESTED)
+  message     String?
+  ownerNote   String?
+  respondedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([roomTypeId, status])
+  @@index([semesterId, studentId])
+}
+
+/// A student living off campus (family, rented room) tells the university where.
+model ResidenceDeclaration {
+  studentId      String   @db.Uuid
+  student        User     @relation("ResidenceStudent", fields: [studentId], references: [id])
+  semesterId     String   @db.Uuid
+  address        String
+  digitalAddress String?
+  landmark       String?
+  updatedAt      DateTime @updatedAt
+
+  @@id([studentId, semesterId])
+}

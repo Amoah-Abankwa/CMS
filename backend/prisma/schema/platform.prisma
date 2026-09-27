@@ -1,0 +1,95 @@
+enum AuditResult {
+  SUCCESS
+  FAILURE
+}
+
+/// Append-only. Revoke UPDATE and DELETE on this table in the migration (see docs).
+model AuditLog {
+  id            String      @id @default(uuid()) @db.Uuid
+  occurredAt    DateTime    @default(now())
+  actorId       String?     @db.Uuid
+  actorLabel    String?
+  actorRoleKey  String?
+  logGroup      String?
+  action        String
+  module        String
+  targetType    String?
+  targetId      String?
+  result        AuditResult @default(SUCCESS)
+  before        Json?
+  after         Json?
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?
+  correlationId String?
+
+  @@index([actorId, occurredAt])
+  @@index([logGroup, occurredAt])
+  @@index([module, action])
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model NotificationTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventKey     String   @unique
+  emailSubject String
+  emailBody    String
+  smsBody      String
+  inAppTitle   String
+  inAppBody    String
+  updatedAt    DateTime @updatedAt
+}
+
+model Notification {
+  id         String                 @id @default(uuid()) @db.Uuid
+  userId     String                 @db.Uuid
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventKey   String
+  title      String
+  body       String
+  link       String?
+  readAt     DateTime?
+  createdAt  DateTime               @default(now())
+  deliveries NotificationDelivery[]
+
+  @@index([userId, readAt])
+}
+
+model NotificationDelivery {
+  id                String              @id @default(uuid()) @db.Uuid
+  notificationId    String              @db.Uuid
+  notification      Notification        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  channel           NotificationChannel
+  destination       String
+  subject           String?
+  /// Rendered message. Replaced with "[redacted]" after the final attempt when sensitive = true.
+  content           String
+  sensitive         Boolean             @default(false)
+  status            DeliveryStatus      @default(QUEUED)
+  providerMessageId String?
+  attempts          Int                 @default(0)
+  lastError         String?
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([status, channel])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

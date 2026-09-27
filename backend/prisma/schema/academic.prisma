@@ -1,0 +1,97 @@
+model School {
+  id          String       @id @default(uuid()) @db.Uuid
+  code        String       @unique
+  name        String
+  isDemo      Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  departments Department[]
+}
+
+model Department {
+  id         String         @id @default(uuid()) @db.Uuid
+  code       String         @unique
+  name       String
+  schoolId   String         @db.Uuid
+  school     School         @relation(fields: [schoolId], references: [id])
+  isDemo     Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  programmes Programme[]
+  staff      StaffProfile[]
+  courses    Course[]
+  associations   AssociationDepartment[]
+}
+
+model Programme {
+  id             String           @id @default(uuid()) @db.Uuid
+  code           String           @unique
+  name           String
+  departmentId   String           @db.Uuid
+  department     Department       @relation(fields: [departmentId], references: [id])
+  levelCode      String
+  level          ProgrammeLevel   @relation(fields: [levelCode], references: [code])
+  durationYears  Int
+  isActive       Boolean          @default(true)
+  isDemo         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  students       StudentProfile[]
+  curriculum     ProgrammeCourse[]
+  feeSchedules   FeeSchedule[]
+}
+
+model AcademicYear {
+  id        String     @id @default(uuid()) @db.Uuid
+  label     String     @unique
+  startDate DateTime   @db.Date
+  endDate   DateTime   @db.Date
+  isCurrent Boolean    @default(false)
+  semesters Semester[]
+}
+
+model Semester {
+  id             String       @id @default(uuid()) @db.Uuid
+  academicYearId String       @db.Uuid
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  number         Int
+  startDate      DateTime     @db.Date
+  endDate        DateTime     @db.Date
+  isCurrent      Boolean      @default(false)
+  /// Students can build and submit course registration only inside this window.
+  registrationOpensAt  DateTime?
+  registrationClosesAt DateTime?
+  minCredits     Int          @default(12)
+  maxCredits     Int          @default(24)
+  offerings      CourseOffering[]
+  registrations  CourseRegistration[]
+  examTimetable  ExamTimetable?
+  clearances     FinancialClearance[]
+  examHolds      ExamHold[]
+  eligibilityList ExamEligibilityList?
+  devotionServices DevotionService[]
+  devotionResults  DevotionResult[]
+  accommodationRound AccommodationRound?
+  feeSchedules   FeeSchedule[]
+  studentBills   StudentBill[]
+  duesLevies     DuesLevy[]
+
+  @@unique([academicYearId, number])
+}
+
+model Course {
+  id           String     @id @default(uuid()) @db.Uuid
+  code         String     @unique
+  title        String
+  creditHours  Int
+  level        Int
+  semesterNo   Int
+  departmentId String     @db.Uuid
+  department   Department @relation(fields: [departmentId], references: [id])
+  isActive     Boolean    @default(true)
+  isDemo       Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  offerings    CourseOffering[]
+  curriculum   ProgrammeCourse[]
+}

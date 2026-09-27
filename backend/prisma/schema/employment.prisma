@@ -1,0 +1,157 @@
+// Student employment (Phase 8): campus jobs, and student dispatchers paid per delivery.
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum JobPayUnit {
+  HOUR
+  MONTH
+  TASK
+}
+
+enum JobApplicationStatus {
+  SUBMITTED
+  SHORTLISTED
+  HIRED
+  REJECTED
+  WITHDRAWN
+  ENDED
+}
+
+/// An on-campus job for students, posted by Career Services on behalf of a unit.
+model Job {
+  id           String           @id @default(uuid()) @db.Uuid
+  title        String
+  /// The office or department the student works for, e.g. "University Library".
+  unit         String
+  description  String
+  hoursPerWeek Int
+  payRate      Int
+  payUnit      JobPayUnit
+  positions    Int              @default(1)
+  /// A higher minimum than the university's, if the job needs one.
+  minCgpa      Float?
+  closesAt     DateTime
+  status       JobStatus        @default(DRAFT)
+  supervisorId String?          @db.Uuid
+  supervisor   User?            @relation("JobSupervisor", fields: [supervisorId], references: [id])
+  createdById  String           @db.Uuid
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  applications JobApplication[]
+
+  @@index([status, closesAt])
+}
+
+model JobApplication {
+  id           String               @id @default(uuid()) @db.Uuid
+  jobId        String               @db.Uuid
+  job          Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  studentId    String               @db.Uuid
+  student      User                 @relation("JobApplicant", fields: [studentId], references: [id])
+  status       JobApplicationStatus @default(SUBMITTED)
+  statement    String
+  availability String?
+  /// CGPA when they applied, for the record. Eligibility is always checked afresh.
+  cgpaAtApply  Float?
+  decisionNote String?
+  decidedById  String?              @db.Uuid
+  decidedAt    DateTime?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@unique([jobId, studentId])
+  @@index([studentId, status])
+}
+
+enum DispatcherStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+  ENDED
+}
+
+enum DispatcherTransport {
+  WALKING
+  BICYCLE
+  MOTORBIKE
+}
+
+/// A student's application to deliver, and their standing once approved. One per student.
+model DispatcherProfile {
+  id            String              @id @default(uuid()) @db.Uuid
+  studentId     String              @unique @db.Uuid
+  student       User                @relation("Dispatcher", fields: [studentId], references: [id])
+  status        DispatcherStatus    @default(PENDING)
+  statement     String
+  transport     DispatcherTransport @default(WALKING)
+  payoutNetwork String
+  payoutNumber  String
+  payoutName    String
+  cgpaAtApply   Float?
+  /// Taking deliveries right now. Switched off automatically if they stop checking in.
+  online        Boolean             @default(false)
+  lastSeenAt    DateTime?
+  statusNote    String?
+  reviewedById  String?             @db.Uuid
+  reviewedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  deliveries    Delivery[]
+  payouts       DispatcherPayout[]
+
+  @@index([status, online])
+}
+
+enum DispatchDeliveryStatus {
+  WAITING
+  ASSIGNED
+  PICKED_UP
+  DELIVERED
+  CANCELLED
+}
+
+/// A food order handed to the campus dispatcher pool.
+model Delivery {
+  id           String             @id @default(uuid()) @db.Uuid
+  orderId      String             @unique @db.Uuid
+  order        FoodOrder          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dispatcherId String?            @db.Uuid
+  dispatcher   DispatcherProfile? @relation(fields: [dispatcherId], references: [id])
+  status       DispatchDeliveryStatus @default(WAITING)
+  /// What the dispatcher earns, fixed when the delivery is offered.
+  fee          Int
+  offeredAt    DateTime           @default(now())
+  assignedAt   DateTime?
+  pickedUpAt   DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  /// Set once the vendor has been told nobody has taken it.
+  waitAlertAt  DateTime?
+  problemNote  String?
+  problemAt    DateTime?
+
+  @@index([status, offeredAt])
+  @@index([dispatcherId, status])
+}
+
+model DispatcherPayout {
+  id           String            @id @default(uuid()) @db.Uuid
+  dispatcherId String            @db.Uuid
+  dispatcher   DispatcherProfile @relation(fields: [dispatcherId], references: [id])
+  periodFrom   DateTime
+  periodTo     DateTime
+  amount       Int
+  reference    String?
+  note         String?
+  recordedById String            @db.Uuid
+  createdAt    DateTime          @default(now())
+
+  @@index([dispatcherId, periodFrom])
+}

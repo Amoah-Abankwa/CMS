@@ -1,0 +1,196 @@
+// School fees and departmental dues.
+
+/// What students in a semester are charged. programmeId and level narrow who it is for; the most
+/// specific schedule that fits a student is used.
+model FeeSchedule {
+  id          String            @id @default(uuid()) @db.Uuid
+  semesterId  String            @db.Uuid
+  semester    Semester          @relation(fields: [semesterId], references: [id])
+  name        String
+  programmeId String?           @db.Uuid
+  programme   Programme?        @relation(fields: [programmeId], references: [id])
+  level       Int?
+  createdById String            @db.Uuid
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  lines       FeeScheduleLine[]
+  bills       StudentBill[]
+
+  @@index([semesterId])
+}
+
+model FeeScheduleLine {
+  id         String      @id @default(uuid()) @db.Uuid
+  scheduleId String      @db.Uuid
+  schedule   FeeSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  name       String
+  amount     Int
+  position   Int         @default(0)
+}
+
+/// A student's bill for a semester. Lines are copied when issued, so later schedule changes do not
+/// alter bills already sent.
+model StudentBill {
+  id          String          @id @default(uuid()) @db.Uuid
+  studentId   String          @db.Uuid
+  student     User            @relation("BillStudent", fields: [studentId], references: [id])
+  semesterId  String          @db.Uuid
+  semester    Semester        @relation(fields: [semesterId], references: [id])
+  scheduleId  String?         @db.Uuid
+  schedule    FeeSchedule?    @relation(fields: [scheduleId], references: [id])
+  /// [{ name, amount }]
+  lines       Json
+  charged     Int
+  issuedById  String          @db.Uuid
+  issuedAt    DateTime        @default(now())
+  adjustments FeeAdjustment[]
+  payments    FeePayment[]
+
+  @@unique([studentId, semesterId])
+  @@index([semesterId])
+}
+
+/// A scholarship or waiver (negative) or an extra charge (positive), always with a reason.
+model FeeAdjustment {
+  id          String      @id @default(uuid()) @db.Uuid
+  billId      String      @db.Uuid
+  bill        StudentBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  amount      Int
+  reason      String
+  createdById String      @db.Uuid
+  createdAt   DateTime    @default(now())
+}
+
+enum FeePaymentMethod {
+  ONLINE
+  BANK
+  MOBILE_MONEY
+  CHEQUE
+}
+
+model FeePayment {
+  id             String           @id @default(uuid()) @db.Uuid
+  billId         String           @db.Uuid
+  bill           StudentBill      @relation(fields: [billId], references: [id])
+  amount         Int
+  method         FeePaymentMethod
+  /// Bank teller or slip number, mobile money transaction ID, or the Paystack reference. Unique per method so a slip cannot be recorded twice.
+  reference      String
+  receiptNumber  String           @unique
+  paidOn         DateTime         @db.Date
+  recordedById   String           @db.Uuid
+  createdAt      DateTime         @default(now())
+  reversedAt     DateTime?
+  reversedById   String?          @db.Uuid
+  reversalReason String?
+
+  @@unique([method, reference])
+  @@index([billId])
+}
+
+/// A departmental students' association such as EHASSA or BACA.
+model Association {
+  id            String                  @id @default(uuid()) @db.Uuid
+  code          String                  @unique
+  name          String
+  description   String?
+  payoutNetwork String?
+  payoutNumber  String?
+  payoutName    String?
+  isActive      Boolean                 @default(true)
+  receiptSeq    Int                     @default(0)
+  createdAt     DateTime                @default(now())
+  departments   AssociationDepartment[]
+  officers      AssociationOfficer[]
+  levies        DuesLevy[]
+  payouts       DuesPayout[]
+}
+
+model AssociationDepartment {
+  associationId String      @db.Uuid
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  departmentId  String      @db.Uuid
+  department    Department  @relation(fields: [departmentId], references: [id])
+
+  @@id([associationId, departmentId])
+  @@index([departmentId])
+}
+
+enum AssociationOffice {
+  PRESIDENT
+  TREASURER
+}
+
+/// An elected officer for a term, recorded by the Dean of Students office after the election.
+model AssociationOfficer {
+  id            String            @id @default(uuid()) @db.Uuid
+  associationId String            @db.Uuid
+  association   Association       @relation(fields: [associationId], references: [id])
+  studentId     String            @db.Uuid
+  student       User              @relation("AssociationOfficer", fields: [studentId], references: [id])
+  office        AssociationOffice
+  startsOn      DateTime          @db.Date
+  endsOn        DateTime          @db.Date
+  endedAt       DateTime?
+  endReason     String?
+  appointedById String            @db.Uuid
+  createdAt     DateTime          @default(now())
+
+  @@index([associationId, endedAt])
+  @@index([studentId])
+}
+
+/// Dues set by the officers for a semester.
+model DuesLevy {
+  id            String        @id @default(uuid()) @db.Uuid
+  associationId String        @db.Uuid
+  association   Association   @relation(fields: [associationId], references: [id])
+  semesterId    String        @db.Uuid
+  semester      Semester      @relation(fields: [semesterId], references: [id])
+  title         String
+  amount        Int
+  dueOn         DateTime      @db.Date
+  isOpen        Boolean       @default(true)
+  createdById   String        @db.Uuid
+  createdAt     DateTime      @default(now())
+  payments      DuesPayment[]
+
+  @@index([associationId, semesterId])
+}
+
+enum DuesMethod {
+  ONLINE
+  CASH
+}
+
+model DuesPayment {
+  id            String     @id @default(uuid()) @db.Uuid
+  levyId        String     @db.Uuid
+  levy          DuesLevy   @relation(fields: [levyId], references: [id])
+  studentId     String     @db.Uuid
+  student       User       @relation("DuesPayer", fields: [studentId], references: [id])
+  amount        Int
+  method        DuesMethod
+  receiptNumber String     @unique
+  /// Paystack reference for online payments.
+  reference     String?    @unique
+  recordedById  String     @db.Uuid
+  createdAt     DateTime   @default(now())
+  voidedAt      DateTime?
+  voidedById    String?    @db.Uuid
+  voidReason    String?
+
+  @@index([levyId, studentId])
+}
+
+/// Online dues collected by the university and paid out to the association by Finance.
+model DuesPayout {
+  id            String      @id @default(uuid()) @db.Uuid
+  associationId String      @db.Uuid
+  association   Association @relation(fields: [associationId], references: [id])
+  amount        Int
+  reference     String?
+  note          String?
+  recordedById  String      @db.Uuid
+  createdAt     DateTime    @default(now())
+}

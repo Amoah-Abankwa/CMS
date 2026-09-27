@@ -1,0 +1,213 @@
+enum UserType {
+  STUDENT
+  STAFF
+  PARTNER
+}
+
+enum AccountStatus {
+  /// Created by the Registry or a Super Admin; the owner has not chosen a password yet.
+  PENDING_SETUP
+  ACTIVE
+  LOCKED
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+model User {
+  id                  String          @id @default(uuid()) @db.Uuid
+  type                UserType
+  status              AccountStatus   @default(PENDING_SETUP)
+  firstName           String
+  middleName          String?
+  lastName            String
+  email               String?         @unique
+  phone               String?
+  /// Present for students only. Immutable once assigned.
+  indexNumber         String?         @unique
+  /// Null until the owner completes account setup from the emailed link.
+  passwordHash        String?
+  mustChangePassword  Boolean         @default(false)
+  failedLoginCount    Int             @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  primaryRoleKey      String?
+  isDemo              Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  deletedAt           DateTime?
+
+  studentProfile      StudentProfile?
+  staffProfile        StaffProfile?
+  mfaFactor           MfaFactor?
+  recoveryCodes       RecoveryCode[]
+  sessions            Session[]
+  resetCodes          PasswordResetCode[]
+  setupTokens         AccountSetupToken[]
+  roles               UserRole[]
+  developerGrants     DeveloperAccessGrant[] @relation("GrantSubject")
+  developerGrantsMade DeveloperAccessGrant[] @relation("GrantActor")
+  preference          UserPreference?
+  notifications       Notification[]
+  teaching            OfferingLecturer[]
+  registrations       CourseRegistration[] @relation("RegistrationStudent")
+  registrationReviews CourseRegistration[] @relation("RegistrationReviewer")
+  marks               AssessmentMark[]     @relation("MarkStudent")
+  results             CourseResult[]       @relation("ResultStudent")
+  invigilations       ExamInvigilator[]    @relation("Invigilator")
+  clearances          FinancialClearance[] @relation("ClearanceStudent")
+  examHolds           ExamHold[]           @relation("HoldStudent")
+  eligibilities       ExamEligibility[]    @relation("EligibilityStudent")
+  attendance          AttendanceRecord[]   @relation("AttendanceStudent")
+  excuses             AttendanceExcuse[]   @relation("ExcuseStudent")
+  devotion            DevotionRecord[]     @relation("DevotionStudent")
+  devotionResults     DevotionResult[]     @relation("DevotionResultStudent")
+  ownedHostels        Hostel[]             @relation("HostelOwner")
+  hostelApplications  HostelApplication[]  @relation("HostelApplicant")
+  roomAllocations     RoomAllocation[]     @relation("RoomAllocationStudent")
+  privateBookings     PrivateBooking[]     @relation("PrivateBookingStudent")
+  residenceDeclarations ResidenceDeclaration[] @relation("ResidenceStudent")
+  loans               Loan[]               @relation("LoanBorrower")
+  libraryReservations LibraryReservation[] @relation("ReservationBorrower")
+  libraryFines        LibraryFine[]        @relation("FineBorrower")
+  vendors             Vendor[]             @relation("VendorOwner")
+  foodOrders          FoodOrder[]          @relation("FoodCustomer")
+  payments            Payment[]            @relation("PaymentUser")
+  supervisedJobs      Job[]                @relation("JobSupervisor")
+  jobApplications     JobApplication[]     @relation("JobApplicant")
+  dispatcherProfile   DispatcherProfile?   @relation("Dispatcher")
+  bills               StudentBill[]        @relation("BillStudent")
+  associationOffices  AssociationOfficer[] @relation("AssociationOfficer")
+  duesPayments        DuesPayment[]        @relation("DuesPayer")
+
+  @@index([type, status])
+}
+
+model StudentProfile {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @unique @db.Uuid
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programmeId      String        @db.Uuid
+  programme        Programme     @relation(fields: [programmeId], references: [id])
+  levelCode        String
+  admissionYear    Int
+  currentLevel     Int           @default(100)
+  dateOfBirth      DateTime?     @db.Date
+  gender           String?
+  nationality      String?
+  externalRef      String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([programmeId])
+  @@index([admissionYear, levelCode])
+}
+
+model StaffProfile {
+  id            String      @id @default(uuid()) @db.Uuid
+  userId        String      @unique @db.Uuid
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staffNumber   String      @unique
+  title         String?
+  departmentId  String?     @db.Uuid
+  department    Department? @relation(fields: [departmentId], references: [id])
+  isTeaching    Boolean     @default(false)
+  externalRef   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model MfaFactor {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @db.Uuid
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// AES-256-GCM encrypted TOTP secret (iv:tag:ciphertext, hex)
+  secretEncrypted String
+  confirmedAt     DateTime?
+  lastUsedStep    BigInt?
+  createdAt       DateTime  @default(now())
+}
+
+model RecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  activeRoleKey    String?
+  mfaVerifiedAt    DateTime?
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastSeenAt       DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model UserPreference {
+  userId           String          @id @db.Uuid
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme            ThemePreference @default(SYSTEM)
+  sidebarCollapsed Boolean         @default(false)
+  updatedAt        DateTime        @updatedAt
+}
+
+model ProgrammeLevel {
+  code        String   @id
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  programmes  Programme[]
+}
+
+model IndexNumberCounter {
+  admissionYear Int
+  levelCode     String
+  lastValue     Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@id([admissionYear, levelCode])
+}
+
+/// One-time link emailed to a new account so its owner can choose a password. Stored hashed.
+model AccountSetupToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}

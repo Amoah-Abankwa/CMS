@@ -1,0 +1,145 @@
+model ExamVenue {
+  id        String        @id @default(uuid()) @db.Uuid
+  name      String        @unique
+  capacity  Int
+  location  String?
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  sessions  ExamSession[]
+}
+
+enum ExamTimetableStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// One exam timetable per semester. Students only ever see `publishedSnapshot`.
+model ExamTimetable {
+  id                String              @id @default(uuid()) @db.Uuid
+  semesterId        String              @unique @db.Uuid
+  semester          Semester            @relation(fields: [semesterId], references: [id])
+  status            ExamTimetableStatus @default(DRAFT)
+  publishedVersion  Int                 @default(0)
+  publishedAt       DateTime?
+  /// Papers as last published, keyed by offering id.
+  publishedSnapshot Json?
+  updatedAt         DateTime            @updatedAt
+  sessions          ExamSession[]
+}
+
+/// A scheduled exam paper for one course offering.
+model ExamSession {
+  id              String            @id @default(uuid()) @db.Uuid
+  timetableId     String            @db.Uuid
+  timetable       ExamTimetable     @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  offeringId      String            @unique @db.Uuid
+  offering        CourseOffering    @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  startsAt        DateTime
+  durationMinutes Int
+  venueId         String?           @db.Uuid
+  venue           ExamVenue?        @relation(fields: [venueId], references: [id])
+  notes           String?
+  updatedAt       DateTime          @updatedAt
+  invigilators    ExamInvigilator[]
+
+  @@index([timetableId, startsAt])
+}
+
+model ExamInvigilator {
+  sessionId String      @db.Uuid
+  session   ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String      @db.Uuid
+  user      User        @relation("Invigilator", fields: [userId], references: [id])
+
+  @@id([sessionId, userId])
+  @@index([userId])
+}
+
+/// Set by the Finance Office. One row per student per semester.
+model FinancialClearance {
+  studentId   String   @db.Uuid
+  student     User     @relation("ClearanceStudent", fields: [studentId], references: [id])
+  semesterId  String   @db.Uuid
+  semester    Semester @relation(fields: [semesterId], references: [id])
+  cleared     Boolean
+  /// MANUAL: decided by Finance by hand (never changed automatically). FEES: from the fee payment rule.
+  source      ClearanceSource @default(MANUAL)
+  note        String?
+  updatedById String   @db.Uuid
+  updatedAt   DateTime @updatedAt
+
+  @@id([studentId, semesterId])
+}
+
+enum ClearanceSource {
+  MANUAL
+  FEES
+}
+
+enum ExamHoldCategory {
+  DISCIPLINARY
+  ACADEMIC_MISCONDUCT
+  ADMINISTRATIVE
+  OTHER
+}
+
+/// Blocks a student from sitting one paper, or every paper when offeringId is null.
+model ExamHold {
+  id          String           @id @default(uuid()) @db.Uuid
+  studentId   String           @db.Uuid
+  student     User             @relation("HoldStudent", fields: [studentId], references: [id])
+  semesterId  String           @db.Uuid
+  semester    Semester         @relation(fields: [semesterId], references: [id])
+  offeringId  String?          @db.Uuid
+  offering    CourseOffering?  @relation(fields: [offeringId], references: [id])
+  category    ExamHoldCategory
+  /// Internal. Students only see the category.
+  reason      String
+  placedById  String           @db.Uuid
+  createdAt   DateTime         @default(now())
+  liftedAt    DateTime?
+  liftedById  String?          @db.Uuid
+  liftReason  String?
+
+  @@index([semesterId, liftedAt])
+  @@index([studentId])
+}
+
+enum EligibilityStatus {
+  ELIGIBLE
+  NOT_ELIGIBLE
+}
+
+/// Per-semester record of when the eligibility list was generated and published.
+model ExamEligibilityList {
+  semesterId       String    @id @db.Uuid
+  semester         Semester  @relation(fields: [semesterId], references: [id])
+  generatedAt      DateTime?
+  publishedAt      DateTime?
+  publishedVersion Int       @default(0)
+}
+
+/// Working decision plus the last published copy, which is what the student sees.
+model ExamEligibility {
+  id               String             @id @default(uuid()) @db.Uuid
+  semesterId       String             @db.Uuid
+  studentId        String             @db.Uuid
+  student          User               @relation("EligibilityStudent", fields: [studentId], references: [id])
+  offeringId       String             @db.Uuid
+  offering         CourseOffering     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  status           EligibilityStatus
+  /// Reason codes from the rules, e.g. ["FEES_NOT_CLEARED"].
+  reasons          Json
+  overrideStatus   EligibilityStatus?
+  overrideReason   String?
+  overriddenById   String?            @db.Uuid
+  overriddenAt     DateTime?
+  publishedStatus  EligibilityStatus?
+  publishedReasons Json?
+  publishedAt      DateTime?
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([semesterId, studentId, offeringId])
+  @@index([semesterId, status])
+}

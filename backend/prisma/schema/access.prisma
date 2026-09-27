@@ -1,0 +1,59 @@
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  name        String
+  description String?
+  logGroup    String
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  roleId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  /// Optional scope, e.g. "department:<uuid>" or "hostel:<uuid>"
+  scope     String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, roleId, scope])
+}
+
+/// Developer access is disabled by default. Only a Super Admin can create or revoke a grant.
+model DeveloperAccessGrant {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation("GrantSubject", fields: [userId], references: [id], onDelete: Cascade)
+  grantedById String    @db.Uuid
+  grantedBy   User      @relation("GrantActor", fields: [grantedById], references: [id])
+  reason      String
+  enabledAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  revokedById String?   @db.Uuid
+  revokeReason String?
+
+  @@index([userId, revokedAt])
+}

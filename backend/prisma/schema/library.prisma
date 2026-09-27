@@ -1,0 +1,148 @@
+/// A book or other item in the catalogue. Physical copies are LibraryCopy rows.
+model LibraryTitle {
+  id           String               @id @default(uuid()) @db.Uuid
+  title        String
+  subtitle     String?
+  authors      String[]
+  isbn         String?              @unique
+  publisher    String?
+  year         Int?
+  edition      String?
+  callNumber   String?
+  subjects     String[]
+  description  String?
+  /// Lower-case title, authors, ISBN, call number and subjects, for partial-match search.
+  searchText   String               @default("")
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  copies       LibraryCopy[]
+  reservations LibraryReservation[]
+
+  @@index([title])
+}
+
+enum CopyStatus {
+  AVAILABLE
+  ON_LOAN
+  ON_HOLD
+  LOST
+  DAMAGED
+  WITHDRAWN
+}
+
+model LibraryCopy {
+  id          String               @id @default(uuid()) @db.Uuid
+  titleId     String               @db.Uuid
+  title       LibraryTitle         @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  /// The accession number printed on the barcode label.
+  barcode     String               @unique
+  shelf       String?
+  /// Reference copies stay in the library.
+  isReference Boolean              @default(false)
+  status      CopyStatus           @default(AVAILABLE)
+  notes       String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  loans       Loan[]
+  holds       LibraryReservation[]
+
+  @@index([titleId, status])
+}
+
+enum LoanStatus {
+  ACTIVE
+  RETURNED
+  LOST
+}
+
+model Loan {
+  id                 String       @id @default(uuid()) @db.Uuid
+  copyId             String       @db.Uuid
+  copy               LibraryCopy  @relation(fields: [copyId], references: [id])
+  borrowerId         String       @db.Uuid
+  borrower           User         @relation("LoanBorrower", fields: [borrowerId], references: [id])
+  issuedAt           DateTime     @default(now())
+  dueAt              DateTime
+  returnedAt         DateTime?
+  renewals           Int          @default(0)
+  status             LoanStatus   @default(ACTIVE)
+  issuedById         String?      @db.Uuid
+  returnedById       String?      @db.Uuid
+  dueReminderSentAt  DateTime?
+  overdueNoticeCount Int          @default(0)
+  lastOverdueNoticeAt DateTime?
+  fines              LibraryFine[]
+
+  @@index([borrowerId, status])
+  @@index([status, dueAt])
+}
+
+enum ReservationStatus {
+  WAITING
+  READY
+  COLLECTED
+  CANCELLED
+  EXPIRED
+}
+
+/// A place in the queue for a title. When READY, a copy is kept for the borrower until expiresAt.
+model LibraryReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  titleId     String            @db.Uuid
+  title       LibraryTitle      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  borrowerId  String            @db.Uuid
+  borrower    User              @relation("ReservationBorrower", fields: [borrowerId], references: [id])
+  status      ReservationStatus @default(WAITING)
+  copyId      String?           @db.Uuid
+  copy        LibraryCopy?      @relation(fields: [copyId], references: [id])
+  readyAt     DateTime?
+  expiresAt   DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime          @default(now())
+
+  @@index([titleId, status, createdAt])
+  @@index([borrowerId, status])
+}
+
+enum FineReason {
+  OVERDUE
+  LOST
+  DAMAGED
+}
+
+/// Amounts in pesewas. Outstanding = amount - paid - waived.
+model LibraryFine {
+  id         String        @id @default(uuid()) @db.Uuid
+  borrowerId String        @db.Uuid
+  borrower   User          @relation("FineBorrower", fields: [borrowerId], references: [id])
+  loanId     String?       @db.Uuid
+  loan       Loan?         @relation(fields: [loanId], references: [id])
+  reason     FineReason
+  amount     Int
+  paid       Int           @default(0)
+  waived     Int           @default(0)
+  note       String?
+  createdAt  DateTime      @default(now())
+  settledAt  DateTime?
+  payments   FinePayment[]
+
+  @@index([borrowerId, settledAt])
+}
+
+enum FinePaymentMethod {
+  CASH
+  MOBILE_MONEY
+  WAIVER
+}
+
+model FinePayment {
+  id            String            @id @default(uuid()) @db.Uuid
+  fineId        String            @db.Uuid
+  fine          LibraryFine       @relation(fields: [fineId], references: [id], onDelete: Cascade)
+  amount        Int
+  method        FinePaymentMethod
+  receiptNumber String?
+  note          String?
+  recordedById  String            @db.Uuid
+  createdAt     DateTime          @default(now())
+}

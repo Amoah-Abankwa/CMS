@@ -1,0 +1,75 @@
+/// One morning devotion. Times are copied from the rules when the service is created,
+/// so changing the rules later never changes how past services were scored.
+model DevotionService {
+  id            String           @id @default(uuid()) @db.Uuid
+  date          DateTime         @unique @db.Date
+  semesterId    String           @db.Uuid
+  semester      Semester         @relation(fields: [semesterId], references: [id])
+  opensAt       DateTime
+  startsAt      DateTime
+  lateFrom      DateTime
+  endsAt        DateTime
+  theme         String?
+  speaker       String?
+  /// Key for rotating check-in codes. Cleared when the service closes.
+  checkInSecret String?
+  cancelledAt   DateTime?
+  cancelReason  String?
+  closedAt      DateTime?
+  createdById   String           @db.Uuid
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  records       DevotionRecord[]
+
+  @@index([semesterId, date])
+  @@index([endsAt, closedAt])
+}
+
+enum DevotionStatus {
+  EARLY
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+enum DevotionSource {
+  SELF_CHECK_IN
+  DOOR
+  CORRECTION
+  CLOSE
+  EXCUSE
+}
+
+model DevotionRecord {
+  serviceId    String          @db.Uuid
+  service      DevotionService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  studentId    String          @db.Uuid
+  student      User            @relation("DevotionStudent", fields: [studentId], references: [id])
+  status       DevotionStatus
+  source       DevotionSource
+  arrivedAt    DateTime?
+  recordedById String?         @db.Uuid
+  note         String?
+  updatedAt    DateTime        @updatedAt
+
+  @@id([serviceId, studentId])
+  @@index([studentId])
+}
+
+/// Semester total out of the configured marks, fixed when the Chaplaincy finalises the semester.
+model DevotionResult {
+  studentId     String   @db.Uuid
+  student       User     @relation("DevotionResultStudent", fields: [studentId], references: [id])
+  semesterId    String   @db.Uuid
+  semester      Semester @relation(fields: [semesterId], references: [id])
+  score         Float
+  totalMarks    Float
+  early         Int
+  late          Int
+  absent        Int
+  excused       Int
+  finalizedAt   DateTime
+  finalizedById String   @db.Uuid
+
+  @@id([studentId, semesterId])
+}

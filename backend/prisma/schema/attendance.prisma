@@ -1,0 +1,95 @@
+enum ClassSessionKind {
+  LECTURE
+  TUTORIAL
+  PRACTICAL
+}
+
+/// One meeting of a class. Attendance counts once `attendanceTakenAt` is set.
+model ClassSession {
+  id                String             @id @default(uuid()) @db.Uuid
+  offeringId        String             @db.Uuid
+  offering          CourseOffering     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  startsAt          DateTime
+  durationMinutes   Int
+  kind              ClassSessionKind   @default(LECTURE)
+  topic             String?
+  venue             String?
+  createdById       String             @db.Uuid
+  cancelledAt       DateTime?
+  cancelReason      String?
+  /// Random key for rotating check-in codes. Cleared when check-in closes.
+  checkInSecret     String?
+  checkInOpenedAt   DateTime?
+  checkInClosesAt   DateTime?
+  attendanceTakenAt DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  records           AttendanceRecord[]
+
+  @@index([offeringId, startsAt])
+  @@index([checkInClosesAt])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+enum AttendanceSource {
+  LECTURER
+  CHECK_IN
+  EXCUSE
+}
+
+model AttendanceRecord {
+  sessionId   String           @db.Uuid
+  session     ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId   String           @db.Uuid
+  student     User             @relation("AttendanceStudent", fields: [studentId], references: [id])
+  status      AttendanceStatus
+  source      AttendanceSource
+  checkedInAt DateTime?
+  markedById  String?          @db.Uuid
+  updatedAt   DateTime         @updatedAt
+
+  @@id([sessionId, studentId])
+  @@index([studentId])
+}
+
+enum ExcuseCategory {
+  MEDICAL
+  BEREAVEMENT
+  OFFICIAL_DUTY
+  OTHER
+}
+
+/// Absence excused for a date range, e.g. a medical excuse from the clinic.
+model AttendanceExcuse {
+  id           String         @id @default(uuid()) @db.Uuid
+  studentId    String         @db.Uuid
+  student      User           @relation("ExcuseStudent", fields: [studentId], references: [id])
+  fromDate     DateTime       @db.Date
+  toDate       DateTime       @db.Date
+  category     ExcuseCategory
+  /// Internal. Never shown to lecturers or students' classmates.
+  note         String
+  recordedById String         @db.Uuid
+  createdAt    DateTime       @default(now())
+  revokedAt    DateTime?
+  revokedById  String?        @db.Uuid
+  revokeReason String?
+
+  @@index([studentId, fromDate, toDate])
+}
+
+/// Remembers that a student was warned about low attendance in a course, so they are warned once.
+model AttendanceWarning {
+  studentId  String   @db.Uuid
+  offeringId String   @db.Uuid
+  percent    Float
+  warnedAt   DateTime @default(now())
+
+  @@id([studentId, offeringId])
+}

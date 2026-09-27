@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Flat, solid design tokens. No gradients anywhere in this product. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #eef1f5;
+  --text: #16202c;
+  --muted: #56616f;
+  --border: #d9dee5;
+  --primary: #1d4e89;
+  --primary-hover: #173f70;
+  --primary-fg: #ffffff;
+  --primary-soft: #e6eef8;
+  --success: #1f7a4d;
+  --success-soft: #e5f3ec;
+  --warning: #8a6414;
+  --warning-soft: #f7efdc;
+  --danger: #b42318;
+  --danger-soft: #fbe9e7;
+  --focus: #1d4e89;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0f1620;
+  --surface: #16202c;
+  --surface-muted: #1d2936;
+  --text: #e6eaf0;
+  --muted: #9aa6b4;
+  --border: #2b3847;
+  --primary: #7eaee6;
+  --primary-hover: #9bc1ee;
+  --primary-fg: #0f1620;
+  --primary-soft: #1b2e45;
+  --success: #6cc79a;
+  --success-soft: #16301f;
+  --warning: #e0b957;
+  --warning-soft: #33290f;
+  --danger: #f08a80;
+  --danger-soft: #3a1a17;
+  --focus: #9bc1ee;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-public-sans), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+}

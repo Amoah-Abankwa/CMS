@@ -1,0 +1,25 @@
+{
+  "name": "anu-platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "npm run build --workspace=@anu/shared",
+    "dev": "npm run build --workspace=@anu/shared && npm run dev --workspace=@anu/backend & npm run dev --workspace=@anu/frontend",
+    "dev:backend": "npm run build --workspace=@anu/shared && npm run dev --workspace=@anu/backend",
+    "dev:frontend": "npm run dev --workspace=@anu/frontend",
+    "build": "npm run build --workspace=@anu/shared && npm run build --workspace=@anu/backend && npm run build --workspace=@anu/frontend",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "db:generate": "npm run prisma:generate --workspace=@anu/backend",
+    "db:migrate": "npm run prisma:migrate --workspace=@anu/backend",
+    "db:deploy": "npm run prisma:deploy --workspace=@anu/backend",
+    "db:seed": "npm run prisma:seed --workspace=@anu/backend"
+  }
+}

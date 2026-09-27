@@ -1,0 +1,128 @@
+/// A version of the grading scale. Saving changes creates a new version and deactivates the old one,
+/// so published results always keep the grade they were given.
+model GradingScale {
+  id            String      @id @default(uuid()) @db.Uuid
+  version       Int         @unique
+  name          String
+  passMark      Float
+  maxGradePoint Float       @default(4)
+  isActive      Boolean     @default(false)
+  createdById   String?     @db.Uuid
+  createdAt     DateTime    @default(now())
+  bands         GradeBand[]
+  sheets        ResultSheet[]
+}
+
+/// Applies to totals at or above minScore, down to the next band's minimum.
+model GradeBand {
+  id         String       @id @default(uuid()) @db.Uuid
+  scaleId    String       @db.Uuid
+  scale      GradingScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  letter     String
+  minScore   Float
+  gradePoint Float
+  isPass     Boolean
+  remark     String?
+
+  @@unique([scaleId, letter])
+  @@unique([scaleId, minScore])
+}
+
+enum AssessmentKind {
+  CONTINUOUS
+  EXAM
+}
+
+/// One component of a course's assessment, e.g. "Mid-semester test", worth `weight` percent of the final mark.
+model Assessment {
+  id             String           @id @default(uuid()) @db.Uuid
+  offeringId     String           @db.Uuid
+  offering       CourseOffering   @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  name           String
+  kind           AssessmentKind
+  weight         Float
+  /// Marks are entered out of this, e.g. a test marked out of 30.
+  maxScore       Float
+  position       Int
+  /// Continuous assessment only: when the lecturer last shared these marks with students.
+  releasedAt     DateTime?
+  marksUpdatedAt DateTime?
+  createdAt      DateTime         @default(now())
+  marks          AssessmentMark[]
+
+  @@index([offeringId])
+}
+
+model AssessmentMark {
+  assessmentId String     @db.Uuid
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentId    String     @db.Uuid
+  student      User       @relation("MarkStudent", fields: [studentId], references: [id])
+  /// Null with absent = false means not entered yet. Rows are never deleted once shared.
+  score          Float?
+  absent         Boolean    @default(false)
+  /// What students see: a copy taken when the lecturer last shared this assessment.
+  releasedScore  Float?
+  releasedAbsent Boolean    @default(false)
+  releasedAt     DateTime?
+  enteredById    String     @db.Uuid
+  updatedAt      DateTime   @updatedAt
+
+  @@id([assessmentId, studentId])
+  @@index([studentId])
+}
+
+enum ResultSheetStatus {
+  DRAFT
+  SUBMITTED
+  HOD_APPROVED
+  DEAN_APPROVED
+  PUBLISHED
+}
+
+/// The approval record for one course offering's results.
+model ResultSheet {
+  id               String            @id @default(uuid()) @db.Uuid
+  offeringId       String            @unique @db.Uuid
+  offering         CourseOffering    @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  status           ResultSheetStatus @default(DRAFT)
+  scaleId          String?           @db.Uuid
+  scale            GradingScale?     @relation(fields: [scaleId], references: [id])
+  submittedAt      DateTime?
+  submittedById    String?           @db.Uuid
+  hodApprovedAt    DateTime?
+  hodApprovedById  String?           @db.Uuid
+  deanApprovedAt   DateTime?
+  deanApprovedById String?           @db.Uuid
+  publishedAt      DateTime?
+  publishedById    String?           @db.Uuid
+  returnNote       String?
+  returnedAt       DateTime?
+  returnedById     String?           @db.Uuid
+  updatedAt        DateTime          @updatedAt
+  results          CourseResult[]
+
+  @@index([status])
+}
+
+/// A student's final result in one course, calculated when the lecturer submits and frozen through approval.
+model CourseResult {
+  id         String      @id @default(uuid()) @db.Uuid
+  sheetId    String      @db.Uuid
+  sheet      ResultSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  studentId  String      @db.Uuid
+  student    User        @relation("ResultStudent", fields: [studentId], references: [id])
+  credits    Int
+  caScore    Float
+  examScore  Float
+  /// Whole-number total out of 100 used for grading.
+  total      Int
+  grade      String
+  gradePoint Float
+  isPass     Boolean
+  /// Missed an exam component. Graded "IC" and left out of the GPA until resolved.
+  incomplete Boolean     @default(false)
+
+  @@unique([sheetId, studentId])
+  @@index([studentId])
+}

@@ -1,0 +1,88 @@
+/// Which courses a programme's students take at each level and semester.
+model ProgrammeCourse {
+  programmeId String    @db.Uuid
+  programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  courseId    String    @db.Uuid
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  level       Int
+  semesterNo  Int
+  isElective  Boolean   @default(false)
+
+  @@id([programmeId, courseId])
+  @@index([programmeId, level, semesterNo])
+}
+
+/// A course running in a particular semester.
+model CourseOffering {
+  id         String               @id @default(uuid()) @db.Uuid
+  courseId   String               @db.Uuid
+  course     Course               @relation(fields: [courseId], references: [id])
+  semesterId String               @db.Uuid
+  semester   Semester             @relation(fields: [semesterId], references: [id])
+  /// Optional seat limit. Null means no limit.
+  capacity   Int?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  lecturers   OfferingLecturer[]
+  items       CourseRegistrationItem[]
+  assessments   Assessment[]
+  resultSheet   ResultSheet?
+  examSession   ExamSession?
+  examHolds     ExamHold[]
+  eligibilities ExamEligibility[]
+  classSessions ClassSession[]
+
+  @@unique([courseId, semesterId])
+  @@index([semesterId])
+}
+
+model OfferingLecturer {
+  offeringId String         @db.Uuid
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  userId     String         @db.Uuid
+  user       User           @relation(fields: [userId], references: [id])
+  /// The lecturer responsible for the course. Exactly one per offering when any are assigned.
+  isLead     Boolean        @default(false)
+  assignedAt DateTime       @default(now())
+
+  @@id([offeringId, userId])
+  @@index([userId])
+}
+
+enum RegistrationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+/// A student's course registration for one semester.
+model CourseRegistration {
+  id           String                   @id @default(uuid()) @db.Uuid
+  studentId    String                   @db.Uuid
+  student      User                     @relation("RegistrationStudent", fields: [studentId], references: [id])
+  semesterId   String                   @db.Uuid
+  semester     Semester                 @relation(fields: [semesterId], references: [id])
+  status       RegistrationStatus       @default(DRAFT)
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?                  @db.Uuid
+  reviewedBy   User?                    @relation("RegistrationReviewer", fields: [reviewedById], references: [id])
+  reviewNote   String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  items        CourseRegistrationItem[]
+
+  @@unique([studentId, semesterId])
+  @@index([semesterId, status])
+}
+
+model CourseRegistrationItem {
+  registrationId String             @db.Uuid
+  registration   CourseRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  offeringId     String             @db.Uuid
+  offering       CourseOffering     @relation(fields: [offeringId], references: [id])
+
+  @@id([registrationId, offeringId])
+  @@index([offeringId])
+}
