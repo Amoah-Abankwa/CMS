@@ -13,10 +13,17 @@ model LibraryTitle {
   description  String?
   /// Lower-case title, authors, ISBN, call number and subjects, for partial-match search.
   searchText   String               @default("")
+  /// E-book on a licensed platform the university subscribes to.
+  ebookUrl     String?
+  /// A PDF the library has the right to share, stored privately in Cloudinary.
+  ebookDocumentId String?           @db.Uuid
+  ebookDocument   StoredDocument?   @relation(fields: [ebookDocumentId], references: [id])
+  ebookOpens   Int                  @default(0)
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
   copies       LibraryCopy[]
   reservations LibraryReservation[]
+  readingItems ReadingListItem[]
 
   @@index([title])
 }
@@ -148,4 +155,80 @@ model FinePayment {
   note          String?
   recordedById  String            @db.Uuid
   createdAt     DateTime          @default(now())
+}
+
+/// A graduation clearance certificate, issued by the Librarian when the student has nothing out and owes nothing.
+model LibraryClearance {
+  id                String    @id @default(uuid()) @db.Uuid
+  studentId         String    @db.Uuid
+  student           User      @relation("LibraryClearanceStudent", fields: [studentId], references: [id])
+  certificateNumber String    @unique
+  clearedById       String    @db.Uuid
+  note              String?
+  createdAt         DateTime  @default(now())
+  revokedAt         DateTime?
+  revokeReason      String?
+
+  @@index([studentId])
+}
+
+enum IllStatus {
+  REQUESTED
+  ORDERED
+  ARRIVED
+  ON_LOAN
+  RETURNED
+  REJECTED
+  CANCELLED
+}
+
+/// A book borrowed from another library for a member.
+model InterLibraryLoan {
+  id             String    @id @default(uuid()) @db.Uuid
+  requesterId    String    @db.Uuid
+  requester      User      @relation("IllRequester", fields: [requesterId], references: [id])
+  title          String
+  authors        String?
+  isbn           String?
+  lendingLibrary String?
+  neededBy       DateTime? @db.Date
+  note           String?
+  status         IllStatus @default(REQUESTED)
+  dueDate        DateTime? @db.Date
+  librarianNote  String?
+  updatedById    String?   @db.Uuid
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([requesterId])
+}
+
+/// A course's reading list, kept per course so it carries over from semester to semester.
+model ReadingList {
+  id          String            @id @default(uuid()) @db.Uuid
+  courseId    String            @unique @db.Uuid
+  course      Course            @relation(fields: [courseId], references: [id])
+  updatedById String            @db.Uuid
+  updatedAt   DateTime          @updatedAt
+  items       ReadingListItem[]
+}
+
+enum ReadingImportance {
+  ESSENTIAL
+  RECOMMENDED
+}
+
+model ReadingListItem {
+  id         String            @id @default(uuid()) @db.Uuid
+  listId     String            @db.Uuid
+  list       ReadingList       @relation(fields: [listId], references: [id], onDelete: Cascade)
+  /// A book in the catalogue, or else a free citation (article, chapter, website).
+  titleId    String?           @db.Uuid
+  title      LibraryTitle?     @relation(fields: [titleId], references: [id])
+  citation   String?
+  url        String?
+  importance ReadingImportance @default(RECOMMENDED)
+  note       String?
+  position   Int               @default(0)
 }

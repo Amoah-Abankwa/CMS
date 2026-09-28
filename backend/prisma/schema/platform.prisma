@@ -98,6 +98,7 @@ enum DocumentPurpose {
   HOSTEL_FORM
   HOSTEL_FORM_SUBMISSION
   EXCUSE
+  EBOOK
 }
 
 /// A private document stored in Cloudinary (type "authenticated"). Nobody can open it without a
@@ -114,4 +115,28 @@ model StoredDocument {
   formTemplates     HostelFormTemplate[]
   formSubmissions   HostelFormSubmission[]
   excuseRequests    ExcuseRequest[]
+  ebookTitles       LibraryTitle[]
+}
+
+enum ImportType {
+  STRUCTURE
+  COURSES
+  STAFF
+  STUDENTS
+  RESULTS
+}
+
+/// One file imported from the previous system: who, what, and how it went.
+model ImportBatch {
+  id          String     @id @default(uuid()) @db.Uuid
+  type        ImportType
+  fileName    String
+  totalRows   Int
+  created     Int        @default(0)
+  updated     Int        @default(0)
+  failed      Int        @default(0)
+  createdById String     @db.Uuid
+  createdAt   DateTime   @default(now())
+  finishedAt  DateTime?
+  setupSentAt DateTime?
 }

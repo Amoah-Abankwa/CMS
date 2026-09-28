@@ -41,9 +41,14 @@ model Hostel {
   updatedAt        DateTime           @updatedAt
   rooms            Room[]
   roomTypes        PrivateRoomType[]
+  /// Private hostels: where Finance sends online fees (mobile money), set by the owner.
+  payoutNetwork    String?
+  payoutNumber     String?
+  payoutName       String?
   hostelFees       HostelFee[]
   ownerPayouts     HostelOwnerPayout[]
   formTemplates    HostelFormTemplate[]
+  complaints       HostelComplaint[]
 }
 
 /// A room in a university hostel. Price per semester in pesewas.
@@ -89,6 +94,8 @@ model HostelApplication {
   /// [{ hostelId, roomType | null }] in order of preference, up to 3.
   preferences          Json
   acceptAny            Boolean                 @default(false)
+  /// Index number of the student they want to share a room with; honoured only if that student names them too.
+  roommateIndex        String?
   /// The student's own description of a medical or disability need. Only the Hostel Office sees it.
   specialNeeds         String?
   specialNeedsApproved Boolean                 @default(false)
@@ -307,4 +314,42 @@ model HostelFormSubmission {
   updatedAt    DateTime             @updatedAt
 
   @@unique([templateId, studentId, semesterId])
+}
+
+enum ComplaintCategory {
+  SAFETY
+  CLEANLINESS
+  WATER_POWER
+  OWNER_CONDUCT
+  PRICING
+  OTHER
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+/// A student's complaint about a private hostel, handled by the Hostel Office. The owner sees it, but
+/// not who made it unless the student agrees.
+model HostelComplaint {
+  id            String            @id @default(uuid()) @db.Uuid
+  hostelId      String            @db.Uuid
+  hostel        Hostel            @relation(fields: [hostelId], references: [id])
+  studentId     String            @db.Uuid
+  student       User              @relation("HostelComplaintStudent", fields: [studentId], references: [id])
+  category      ComplaintCategory
+  description   String
+  shareName     Boolean           @default(false)
+  status        ComplaintStatus   @default(OPEN)
+  officeNote    String?
+  ownerResponse String?
+  ownerRespondedAt DateTime?
+  handledById   String?           @db.Uuid
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([hostelId, status])
 }

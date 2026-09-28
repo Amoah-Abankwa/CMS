@@ -100,4 +100,5 @@ model Course {
   updatedAt    DateTime   @updatedAt
   offerings    CourseOffering[]
   curriculum   ProgrammeCourse[]
+  readingList    ReadingList?
 }

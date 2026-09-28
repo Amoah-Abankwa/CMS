@@ -97,6 +97,8 @@ model ResultSheet {
   publishedAt      DateTime?
   publishedById    String?           @db.Uuid
   returnNote       String?
+  /// Results brought over from the previous system (not entered on the platform).
+  importedAt     DateTime?
   returnedAt       DateTime?
   returnedById     String?           @db.Uuid
   updatedAt        DateTime          @updatedAt

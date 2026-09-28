@@ -127,6 +127,9 @@ model FeePayment {
 /// A departmental students' association such as EHASSA or BACA.
 model Association {
   id            String                  @id @default(uuid()) @db.Uuid
+  /// The Head of Department (of one of its departments) who serves as patron and sets the association's dues.
+  patronId      String?                 @db.Uuid
+  patron        User?                   @relation("AssociationPatron", fields: [patronId], references: [id])
   code          String                  @unique
   name          String
   description   String?
@@ -241,4 +244,22 @@ model ExchangeRate {
   createdAt      DateTime @default(now())
 
   @@index([effectiveFrom])
+}
+
+/// A semester's instalment plan, set by the Finance Office: [{ dueDate, cumulativePercent }].
+model FeeInstalmentPlan {
+  semesterId  String   @id @db.Uuid
+  instalments Json
+  updatedById String   @db.Uuid
+  updatedAt   DateTime @updatedAt
+}
+
+/// A late payment charge added for a missed instalment, so each is charged at most once.
+model FeeLateCharge {
+  billId          String   @db.Uuid
+  instalmentIndex Int
+  adjustmentId    String   @db.Uuid
+  createdAt       DateTime @default(now())
+
+  @@id([billId, instalmentIndex])
 }

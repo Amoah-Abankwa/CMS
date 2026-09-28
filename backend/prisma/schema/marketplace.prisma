@@ -42,6 +42,7 @@ model Vendor {
   items              MenuItem[]
   orders             FoodOrder[]
   payouts            VendorPayout[]
+  mealPlans          MealPlan[]
 }
 
 model MenuCategory {
@@ -121,6 +122,13 @@ model FoodOrder {
   paidVia          String?
   paidReference    String?
   paidMarkedAt     DateTime?
+  /// A time the customer chose for later today or the next two days; empty means as soon as possible.
+  scheduledFor     DateTime?
+  /// A meal plan meal used on this order, and the amount it covered.
+  mealPlanPurchaseId String?     @db.Uuid
+  mealPlanPurchase   MealPlanPurchase? @relation(fields: [mealPlanPurchaseId], references: [id])
+  mealCredit       Int             @default(0)
+  rating           OrderRating?
   delivery         Delivery?
   deliveryAddress  String?
   deliveryNote     String?
@@ -207,4 +215,100 @@ model VendorPayout {
   note         String?
   recordedById String   @db.Uuid
   createdAt    DateTime @default(now())
+}
+
+/// A customer's rating of a completed order: the vendor, and the campus dispatcher if one delivered it.
+model OrderRating {
+  id              String    @id @default(uuid()) @db.Uuid
+  orderId         String    @unique @db.Uuid
+  order           FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId        String    @db.Uuid
+  customerId      String    @db.Uuid
+  vendorStars     Int
+  vendorComment   String?
+  dispatcherId    String?   @db.Uuid
+  dispatcherStars Int?
+  hiddenAt        DateTime?
+  hiddenById      String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+
+  @@index([vendorId])
+  @@index([dispatcherId])
+}
+
+/// A bundle of meals a vendor sells, used one per order on the eligible dishes.
+model MealPlan {
+  id              String             @id @default(uuid()) @db.Uuid
+  vendorId        String             @db.Uuid
+  vendor          Vendor             @relation(fields: [vendorId], references: [id])
+  name            String
+  meals           Int
+  price           Int
+  validDays       Int
+  eligibleItemIds String[]           @db.Uuid
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  purchases       MealPlanPurchase[]
+}
+
+enum MealPlanStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  USED_UP
+  EXPIRED
+  CANCELLED
+}
+
+model MealPlanPurchase {
+  id         String         @id @default(uuid()) @db.Uuid
+  planId     String         @db.Uuid
+  plan       MealPlan       @relation(fields: [planId], references: [id])
+  customerId String         @db.Uuid
+  mealsTotal Int
+  mealsLeft  Int
+  price      Int
+  status     MealPlanStatus @default(PENDING_PAYMENT)
+  paidAt     DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime       @default(now())
+  orders     FoodOrder[]
+
+  @@index([customerId, status])
+}
+
+enum TransferPurpose {
+  VENDOR
+  DISPATCHER
+  ASSOCIATION
+  HOSTEL_OWNER
+  PAYROLL
+}
+
+enum TransferStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+/// A payout sent through Paystack Transfers to a mobile money number. The payout record in the
+/// relevant settlement is created only once Paystack reports the transfer succeeded.
+model Transfer {
+  id            String          @id @default(uuid()) @db.Uuid
+  purpose       TransferPurpose
+  subjectId     String          @db.Uuid
+  amount        Int
+  network       String
+  number        String
+  name          String
+  reference     String          @unique
+  transferCode  String?
+  status        TransferStatus  @default(PENDING)
+  failureReason String?
+  /// Extra details the payout record needs, e.g. the settlement period.
+  meta          Json?
+  createdById   String          @db.Uuid
+  createdAt     DateTime        @default(now())
+  completedAt   DateTime?
+
+  @@index([purpose, subjectId])
 }

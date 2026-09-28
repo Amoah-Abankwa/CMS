@@ -21,6 +21,10 @@ enum ThemePreference {
 
 model User {
   id                  String          @id @default(uuid()) @db.Uuid
+  /// The import that created this account, if it came from the previous system.
+  importBatchId       String?              @db.Uuid
+  /// Cloudinary public id of the profile photo.
+  photoId             String?
   type                UserType
   status              AccountStatus   @default(PENDING_SETUP)
   firstName           String
@@ -92,6 +96,10 @@ model User {
   hostelForms         HostelFormSubmission[] @relation("HostelFormStudent")
   excuseRequests      ExcuseRequest[]      @relation("ExcuseRequestStudent")
   devotionExemptions  DevotionExemption[]  @relation("DevotionExemptionStudent")
+  libraryClearances   LibraryClearance[]   @relation("LibraryClearanceStudent")
+  interLibraryLoans   InterLibraryLoan[]   @relation("IllRequester")
+  hostelComplaints    HostelComplaint[]    @relation("HostelComplaintStudent")
+  patronOf            Association[]        @relation("AssociationPatron")
 
   @@index([type, status])
 }

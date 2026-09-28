@@ -2,8 +2,17 @@
 
 enum JobStatus {
   DRAFT
+  /// Posted by a staff member or lecturer; Career Services approves before students see it.
+  PENDING_REVIEW
   OPEN
   CLOSED
+}
+
+enum JobKind {
+  CAMPUS_JOB
+  INTERNSHIP
+  TEACHING_ASSISTANT
+  RESEARCH_ASSISTANT
 }
 
 enum JobPayUnit {
@@ -24,6 +33,11 @@ enum JobApplicationStatus {
 /// An on-campus job for students, posted by Career Services on behalf of a unit.
 model Job {
   id           String           @id @default(uuid()) @db.Uuid
+  kind         JobKind   @default(CAMPUS_JOB)
+  /// Internships: the organisation offering it, where, and an external page to apply on (if not through the platform).
+  organisation String?
+  location     String?
+  applyUrl     String?
   title        String
   /// The office or department the student works for, e.g. "University Library".
   unit         String
@@ -48,6 +62,11 @@ model Job {
 
 model JobApplication {
   id           String               @id @default(uuid()) @db.Uuid
+  /// Where pay for this job is sent (mobile money), entered by the student once hired.
+  payoutNetwork String?
+  payoutNumber  String?
+  payoutName    String?
+  timesheets    Timesheet[]
   jobId        String               @db.Uuid
   job          Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
   studentId    String               @db.Uuid
@@ -98,6 +117,11 @@ model DispatcherProfile {
   /// Taking deliveries right now. Switched off automatically if they stop checking in.
   online        Boolean             @default(false)
   lastSeenAt    DateTime?
+  /// Shared by the dispatcher's phone only while carrying an order; cleared when nothing is in hand.
+  lastLat        Float?
+  lastLng        Float?
+  lastAccuracy   Float?
+  lastLocationAt DateTime?
   statusNote    String?
   reviewedById  String?             @db.Uuid
   reviewedAt    DateTime?
@@ -162,4 +186,48 @@ model DispatcherPayout {
   createdAt    DateTime          @default(now())
 
   @@index([dispatcherId, periodFrom])
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+  PAID
+}
+
+/// A hired student's month of work on a job: hours (hourly jobs), tasks (per-task jobs), or a
+/// confirmation (monthly jobs). Approved by the supervisor, then paid by Finance.
+model Timesheet {
+  id            String           @id @default(uuid()) @db.Uuid
+  applicationId String           @db.Uuid
+  application   JobApplication   @relation(fields: [applicationId], references: [id])
+  /// YYYY-MM
+  period        String
+  status        TimesheetStatus  @default(DRAFT)
+  amount        Int              @default(0)
+  note          String?
+  submittedAt   DateTime?
+  approvedById  String?          @db.Uuid
+  approvedAt    DateTime?
+  returnNote    String?
+  paidAt        DateTime?
+  paidReference String?
+  paidById      String?          @db.Uuid
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  entries       TimesheetEntry[]
+
+  @@unique([applicationId, period])
+  @@index([status])
+}
+
+model TimesheetEntry {
+  id          String    @id @default(uuid()) @db.Uuid
+  timesheetId String    @db.Uuid
+  timesheet   Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+  date        DateTime  @db.Date
+  /// Hours (hourly jobs, quarter hours) or tasks (per-task jobs).
+  quantity    Float
+  note        String?
 }
