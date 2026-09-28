@@ -1,3 +1,6 @@
+import { RequireRecentMfa } from '../../common/decorators/require-recent-mfa.decorator';
+import { AccountStatusDto } from '../staff/dto/staff.dto';
+import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { PERMISSIONS } from '@anu/shared';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -32,5 +35,13 @@ export class StudentsController {
   @RequirePermission(PERMISSIONS.STUDENTS_READ)
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.students.get(id);
+  }
+
+  @Post(':id/status')
+  @HttpCode(200)
+  @RequirePermission(PERMISSIONS.STUDENTS_REGISTER)
+  @RequireRecentMfa()
+  setStatus(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AccountStatusDto) {
+    return this.students.setStatus(actor, id, dto.status, dto.reason);
   }
 }

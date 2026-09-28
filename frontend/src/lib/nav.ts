@@ -1,4 +1,4 @@
-import { Banknote, Landmark, Users2, Bike, Wallet, UserRoundCheck, Activity, Award, Ban, BedDouble, ChefHat, HandCoins, Store, Utensils, UtensilsCrossed, BookCopy, BookMarked, Coins, ScanBarcode, TimerOff, Wrench, Bell, Building, Home, MapPinned, Shuffle, BadgeCheck, Church, MonitorPlay, SlidersHorizontal, Trophy, ChartColumn, ClipboardPen, Hospital, Settings2, UserCheck, Building2, CalendarClock, ClipboardList, Receipt, BookOpenCheck, FileCheck2, Scale, BriefcaseBusiness, CalendarRange, ClipboardCheck, Code2, History, LayoutDashboard, Library, ListChecks, ScrollText, ShieldCheck, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { Coins, ArrowLeftRight, BadgeAlert, FilePenLine, ClipboardList as RegisterIcon, Images, UserCheck, Network, Hash, Tags, Banknote, Landmark, Users2, Receipt, Bike, Wallet, UserRoundCheck, Activity, Award, Ban, BedDouble, ChefHat, HandCoins, Store, Utensils, UtensilsCrossed, BookCopy, BookMarked, ScanBarcode, TimerOff, Wrench, Bell, Building, Home, MapPinned, Shuffle, BadgeCheck, Church, MonitorPlay, SlidersHorizontal, Trophy, ChartColumn, ClipboardPen, Hospital, Settings2, Building2, CalendarClock, ClipboardList, BookOpenCheck, FileCheck2, Scale, BriefcaseBusiness, CalendarRange, ClipboardCheck, Code2, History, LayoutDashboard, Library, ListChecks, ScrollText, ShieldCheck, UserPlus, Users, type LucideIcon, FileText, DoorOpen, HeartOff } from 'lucide-react';
 import { PERMISSIONS } from '@anu/shared';
 
 export interface NavItem {
@@ -33,11 +33,15 @@ export const NAV: NavSection[] = [
       { href: '/food', label: 'Food', icon: Utensils, audience: 'MEMBER' },
       { href: '/fees', label: 'Fees', icon: Banknote, audience: 'STUDENT' },
       { href: '/dues', label: 'Departmental dues', icon: Receipt, audience: 'STUDENT' },
+      { href: '/excuses', label: 'Excuse requests', icon: FileText, audience: 'STUDENT' },
       { href: '/association', label: 'Association dues', icon: Users2, permission: PERMISSIONS.DUES_COLLECT },
       { href: '/jobs', label: 'Campus jobs', icon: BriefcaseBusiness, audience: 'STUDENT' },
       { href: '/dispatch', label: 'Deliveries', icon: Bike, permission: PERMISSIONS.DISPATCH_DELIVER },
       { href: '/dispatch/earnings', label: 'My earnings', icon: Wallet, permission: PERMISSIONS.DISPATCH_DELIVER },
       { href: '/my-hostel', label: 'My hostel', icon: Home, permission: PERMISSIONS.PRIVATE_HOSTEL_OWN },
+      { href: '/my-hostel/photos', label: 'Hostel photos', icon: Images, permission: PERMISSIONS.PRIVATE_HOSTEL_OWN },
+      { href: '/my-hostel/fees', label: 'Hostel fees', icon: Coins, permission: PERMISSIONS.PRIVATE_HOSTEL_OWN },
+      { href: '/my-hostel/residents', label: 'Residents', icon: DoorOpen, permission: PERMISSIONS.PRIVATE_HOSTEL_OWN },
       { href: '/notifications', label: 'Notifications', icon: Bell },
       { href: '/activity', label: 'My activity', icon: History },
       { href: '/account', label: 'Account and security', icon: ShieldCheck },
@@ -52,6 +56,8 @@ export const NAV: NavSection[] = [
     items: [
       { href: '/academics/offerings', label: 'Course offerings', icon: Library, permission: PERMISSIONS.OFFERINGS_MANAGE },
       { href: '/academics/registrations', label: 'Registration approvals', icon: ClipboardCheck, permission: PERMISSIONS.REGISTRATIONS_REVIEW },
+      { href: '/academics/dues-marker', label: 'Dues on exam registers', icon: BadgeAlert, permission: PERMISSIONS.RESULTS_APPROVE_DEPARTMENT },
+      { href: '/academics/advisors', label: 'Academic advisors', icon: UserCheck, permission: PERMISSIONS.ADVISORS_ASSIGN },
       {
         href: '/academics/results',
         label: 'Results approval',
@@ -73,10 +79,20 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    label: 'Registry',
+    items: [
+      { href: '/registry/structure', label: 'Academic structure', icon: Network, permission: PERMISSIONS.ACADEMICS_MANAGE },
+      { href: '/registry/programme-types', label: 'Programme types', icon: Hash, permission: PERMISSIONS.ACADEMICS_MANAGE },
+    ],
+  },
+  {
     label: 'Fees',
     items: [
       { href: '/finance/fees', label: 'Student fees', icon: Banknote, permission: PERMISSIONS.FEES_MANAGE },
       { href: '/finance/fees/setup', label: 'Fee set-up', icon: Landmark, permission: PERMISSIONS.FEES_MANAGE },
+      { href: '/finance/fees/items', label: 'Fee items', icon: Tags, permission: PERMISSIONS.FEES_MANAGE },
+      { href: '/finance/fees/rates', label: 'Exchange rates', icon: ArrowLeftRight, permission: PERMISSIONS.FEES_MANAGE },
+      { href: '/finance/hostel-owners', label: 'Hostel owner payouts', icon: Coins, permission: PERMISSIONS.FEES_MANAGE },
       { href: '/finance/dues', label: 'Dues payouts', icon: Receipt, permission: PERMISSIONS.FEES_MANAGE },
       { href: '/student-affairs/associations', label: 'Departmental associations', icon: Users2, permission: PERMISSIONS.ASSOCIATIONS_MANAGE },
     ],
@@ -111,6 +127,8 @@ export const NAV: NavSection[] = [
     items: [
       { href: '/hostels', label: 'University hostels', icon: Building, permission: PERMISSIONS.HOSTELS_MANAGE },
       { href: '/hostels/allocation', label: 'Applications and allocation', icon: Shuffle, permission: PERMISSIONS.HOSTELS_MANAGE },
+      { href: '/hostels/fees', label: 'Hall fees', icon: Coins, permission: PERMISSIONS.HOSTELS_MANAGE },
+      { href: '/hostels/residents', label: 'Hall residents', icon: DoorOpen, permission: PERMISSIONS.HOSTELS_MANAGE },
       { href: '/hostels/private', label: 'Private hostels', icon: BadgeCheck, permission: PERMISSIONS.HOSTELS_MANAGE },
       { href: '/residence', label: 'Where students live', icon: MapPinned, permission: PERMISSIONS.ACCOMMODATION_READ },
     ],
@@ -121,17 +139,20 @@ export const NAV: NavSection[] = [
       { href: '/chaplaincy/services', label: 'Devotion services', icon: MonitorPlay, permission: PERMISSIONS.DEVOTION_MANAGE },
       { href: '/chaplaincy/scores', label: 'Devotion scores', icon: Trophy, permission: PERMISSIONS.DEVOTION_READ },
       { href: '/chaplaincy/rules', label: 'Devotion rules', icon: SlidersHorizontal, permission: PERMISSIONS.DEVOTION_MANAGE },
+      { href: '/chaplaincy/exemptions', label: 'Devotion exemptions', icon: HeartOff, permission: PERMISSIONS.DEVOTION_MANAGE },
     ],
   },
   {
     label: 'Student services',
-    items: [{ href: '/attendance/excuses', label: 'Excused absences', icon: Hospital, permission: PERMISSIONS.ATTENDANCE_EXCUSES_MANAGE }],
+    items: [{ href: '/attendance/excuses', label: 'Excused absences', icon: Hospital, permission: PERMISSIONS.ATTENDANCE_EXCUSES_MANAGE }, { href: '/attendance/excuse-requests', label: 'Excuse requests', icon: FileText, permission: PERMISSIONS.ATTENDANCE_EXCUSES_MANAGE }],
   },
   {
     label: 'Examinations',
     items: [
       { href: '/exams/timetable', label: 'Exam timetable', icon: CalendarClock, permission: PERMISSIONS.EXAMS_MANAGE },
       { href: '/exams/eligibility', label: 'Exam eligibility', icon: ClipboardList, permission: PERMISSIONS.EXAMS_MANAGE },
+      { href: '/exams/register', label: 'Exam register', icon: RegisterIcon, audience: 'STAFF' },
+      { href: '/results/amendments', label: 'Result amendments', icon: FilePenLine, audience: 'STAFF' },
       { href: '/exams/venues', label: 'Exam venues', icon: Building2, permission: PERMISSIONS.EXAMS_MANAGE },
       { href: '/exams/clearance', label: 'Fee clearance', icon: Receipt, permission: PERMISSIONS.FINANCE_CLEARANCE_MANAGE },
       { href: '/exams/holds', label: 'Exam holds', icon: Ban, permission: PERMISSIONS.EXAM_HOLDS_MANAGE },

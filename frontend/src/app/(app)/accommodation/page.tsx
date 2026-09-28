@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/states';
@@ -10,7 +11,7 @@ export default function AccommodationPage() {
   return (
     <>
       <PageHeader title="Accommodation" description="Apply for a university hostel, find a verified private hostel, or tell us where you live." />
-      {isStudent ? <MyAccommodation /> : <EmptyState title="This page is for students" />}
+      {isStudent ? <Suspense fallback={null}><MyAccommodation /></Suspense> : <EmptyState title="This page is for students" />}
     </>
   );
 }

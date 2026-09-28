@@ -21,6 +21,8 @@ model Hostel {
   id               String             @id @default(uuid()) @db.Uuid
   kind             HostelKind
   name             String             @unique
+  /// Cloudinary public ids of photos (private hostels), first is the cover.
+  photoIds      String[]           @default([])
   gender           HostelGender
   location         String?
   digitalAddress   String?
@@ -39,6 +41,9 @@ model Hostel {
   updatedAt        DateTime           @updatedAt
   rooms            Room[]
   roomTypes        PrivateRoomType[]
+  hostelFees       HostelFee[]
+  ownerPayouts     HostelOwnerPayout[]
+  formTemplates    HostelFormTemplate[]
 }
 
 /// A room in a university hostel. Price per semester in pesewas.
@@ -128,6 +133,13 @@ model RoomAllocation {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  /// Check-in and check-out at the hostel, recorded by the Hostel Manager (halls) or the owner (private).
+  checkedInAt    DateTime?
+  checkedInById  String?   @db.Uuid
+  checkInNote    String?
+  checkedOutAt   DateTime?
+  checkedOutById String?   @db.Uuid
+  checkOutNote   String?
   @@index([roomId, status])
   @@index([semesterId, studentId])
   @@index([status, acceptBy])
@@ -170,6 +182,13 @@ model PrivateBooking {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  /// Check-in and check-out at the hostel, recorded by the Hostel Manager (halls) or the owner (private).
+  checkedInAt    DateTime?
+  checkedInById  String?   @db.Uuid
+  checkInNote    String?
+  checkedOutAt   DateTime?
+  checkedOutById String?   @db.Uuid
+  checkOutNote   String?
   @@index([roomTypeId, status])
   @@index([semesterId, studentId])
 }
@@ -185,4 +204,107 @@ model ResidenceDeclaration {
   updatedAt      DateTime @updatedAt
 
   @@id([studentId, semesterId])
+}
+
+/// What a student owes for their place this semester: a university room (price once accepted) or a
+/// private hostel bed (price once the owner accepts). Paid online or recorded in cash by the Hostel
+/// Manager or owner, each payment with a receipt.
+model HostelFee {
+  id           String             @id @default(uuid()) @db.Uuid
+  studentId    String             @db.Uuid
+  student      User               @relation("HostelFeeStudent", fields: [studentId], references: [id])
+  semesterId   String             @db.Uuid
+  hostelId     String             @db.Uuid
+  hostel       Hostel             @relation(fields: [hostelId], references: [id])
+  allocationId String?            @unique @db.Uuid
+  bookingId    String?            @unique @db.Uuid
+  description  String
+  /// Cedis (pesewas). Zero once the place is given up; payments above it are shown as a refund due.
+  amount       Int
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  payments     HostelFeePayment[]
+
+  @@index([semesterId, hostelId])
+  @@index([studentId])
+}
+
+enum HostelPaymentMethod {
+  ONLINE
+  CASH
+  MOBILE_MONEY
+  BANK
+}
+
+model HostelFeePayment {
+  id             String              @id @default(uuid()) @db.Uuid
+  feeId          String              @db.Uuid
+  fee            HostelFee           @relation(fields: [feeId], references: [id])
+  amount         Int
+  method         HostelPaymentMethod
+  /// Paystack reference (online) or the MoMo / bank transaction ID.
+  reference      String?             @unique
+  receiptNumber  String              @unique
+  paidOn         DateTime            @db.Date
+  recordedById   String              @db.Uuid
+  createdAt      DateTime            @default(now())
+  reversedAt     DateTime?
+  reversedById   String?             @db.Uuid
+  reversalReason String?
+
+  @@index([feeId])
+}
+
+/// Online private-hostel fees collected by the university and paid out to the owner by Finance.
+model HostelOwnerPayout {
+  id           String   @id @default(uuid()) @db.Uuid
+  hostelId     String   @db.Uuid
+  hostel       Hostel   @relation(fields: [hostelId], references: [id])
+  amount       Int
+  reference    String?
+  note         String?
+  recordedById String   @db.Uuid
+  createdAt    DateTime @default(now())
+}
+
+/// A form students must complete for a hostel: tenancy agreement, registration form and so on.
+/// hostelId empty means every university hall.
+model HostelFormTemplate {
+  id          String                 @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  hostelId    String?                @db.Uuid
+  hostel      Hostel?                @relation(fields: [hostelId], references: [id])
+  documentId  String                 @db.Uuid
+  document    StoredDocument         @relation(fields: [documentId], references: [id])
+  isActive    Boolean                @default(true)
+  createdById String                 @db.Uuid
+  createdAt   DateTime               @default(now())
+  submissions HostelFormSubmission[]
+}
+
+enum FormSubmissionStatus {
+  SUBMITTED
+  ACCEPTED
+  RETURNED
+}
+
+/// A student's signed copy of a hostel form for a semester. Uploading again replaces it.
+model HostelFormSubmission {
+  id           String               @id @default(uuid()) @db.Uuid
+  templateId   String               @db.Uuid
+  template     HostelFormTemplate   @relation(fields: [templateId], references: [id])
+  studentId    String               @db.Uuid
+  student      User                 @relation("HostelFormStudent", fields: [studentId], references: [id])
+  semesterId   String               @db.Uuid
+  documentId   String               @db.Uuid
+  document     StoredDocument       @relation(fields: [documentId], references: [id])
+  status       FormSubmissionStatus @default(SUBMITTED)
+  note         String?
+  reviewedById String?              @db.Uuid
+  reviewedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@unique([templateId, studentId, semesterId])
 }

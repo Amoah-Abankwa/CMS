@@ -142,9 +142,9 @@ export interface DispatchState {
   profile: { online: boolean; transport: Transport };
   maxActive: number;
   feePerDelivery: number;
-  available: Array<{ id: string; fee: number; offeredAt: string; number: number; vendor: { name: string; location: string }; area: string; items: number }>;
+  available: Array<{ id: string; fee: number; feeSettlement?: 'UNIVERSITY' | 'VENDOR' | 'CUSTOMER'; offeredAt: string; number: number; vendor: { name: string; location: string }; area: string; items: number }>;
   mine: Array<{
-    id: string; status: Extract<DeliveryStatus, 'ASSIGNED' | 'PICKED_UP'>; fee: number; assignedAt: string | null; pickedUpAt: string | null; problemNote: string | null;
+    id: string; status: Extract<DeliveryStatus, 'ASSIGNED' | 'PICKED_UP'>; fee: number; feeSettlement?: 'UNIVERSITY' | 'VENDOR' | 'CUSTOMER'; assignedAt: string | null; pickedUpAt: string | null; problemNote: string | null;
     order: {
       id: string; number: number; deliveryAddress: string | null; deliveryNote: string | null; total: number;
       vendor: { name: string; location: string; phone: string };

@@ -1,3 +1,4 @@
+import { HostelFeesService } from './hostel-fees.service';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
@@ -15,6 +16,7 @@ export class OwnerService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly hostelFees: HostelFeesService,
   ) {}
 
   hostels(user: AuthUser) {
@@ -103,6 +105,7 @@ export class OwnerService {
       },
       link: '/accommodation',
     });
+    await this.hostelFees.syncBooking(id);
     return { ok: true };
   }
 

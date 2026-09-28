@@ -21,6 +21,7 @@ const COLUMNS = [
 
 /** The vendor's live board. Refreshes every 10 seconds. */
 export function OrdersBoard() {
+  const [paying, setPaying] = useState<Order | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -87,6 +88,8 @@ export function OrdersBoard() {
                     {o.fulfilment === 'DELIVERY' ? `Deliver to ${o.deliveryAddress}${o.deliveryNote ? ` (${o.deliveryNote})` : ''}` : 'Pickup'}. {formatCedis(o.total)}, {o.paymentOption === 'ONLINE' ? 'paid online' : 'collect payment'}.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    {o.paymentOption === 'ON_PICKUP' && !o.paid && <Button variant="secondary" size="sm" onClick={() => setPaying(o)}>Mark paid</Button>}
+                    {o.paymentOption === 'ON_PICKUP' && o.paid && <Badge tone="success">Paid{o.paidVia === 'MOMO' ? ' by MoMo' : o.paidVia === 'CASH' ? ' in cash' : ''}</Badge>}
                     {o.status === 'PLACED' && (
                       <>
                         <Button size="sm" loading={busy === o.id + 'ACCEPTED'} onClick={() => act(o, 'ACCEPTED').catch(() => undefined)}>Accept</Button>
@@ -125,6 +128,7 @@ export function OrdersBoard() {
         )}
       </section>
 
+      {paying && <MarkPaidDialog order={paying} onClose={() => setPaying(null)} onDone={() => { setPaying(null); void load(); }} />}
       <ActionDialog target={dialog} onClose={() => setDialog(null)} onSubmit={(value) => {
         if (!dialog) return Promise.resolve();
         const { order, kind } = dialog;
@@ -192,5 +196,24 @@ function DispatchLine({ order }: { order: Order }) {
       <p className="rounded bg-primary-soft px-2 py-1 text-xs">{text[d.status] ?? ''}</p>
       {d.problemNote && d.status !== 'CANCELLED' && <p className="rounded bg-warning-soft px-2 py-1 text-xs">Dispatcher reports: {d.problemNote}. Call them, or cancel the order if it cannot be delivered.</p>}
     </div>
+  );
+}
+
+function MarkPaidDialog({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: () => void }) {
+  const [via, setVia] = useState<'CASH' | 'MOMO'>('MOMO');
+  const [ref, setRef] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Dialog open onClose={onClose} title={`Order #${order.number} paid?`} description={`${formatCedis(order.total)} from ${order.customer.firstName}. They are told you have received it.`}>
+      <div className="flex flex-col gap-4">
+        {error && <Alert tone="danger">{error}</Alert>}
+        <div className="flex gap-2">
+          <Button variant={via === 'MOMO' ? 'primary' : 'secondary'} size="sm" onClick={() => setVia('MOMO')}>MoMo</Button>
+          <Button variant={via === 'CASH' ? 'primary' : 'secondary'} size="sm" onClick={() => setVia('CASH')}>Cash</Button>
+        </div>
+        {via === 'MOMO' && <Field label="MoMo transaction ID (optional)" htmlFor="mp-ref"><Input id="mp-ref" value={ref} maxLength={60} onChange={(e) => setRef(e.target.value)} /></Field>}
+        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={() => foodApi.markPaid(order.id, via, ref.trim() || undefined).then(onDone).catch((err) => setError(errorMessage(err)))}>Mark paid</Button></div>
+      </div>
+    </Dialog>
   );
 }

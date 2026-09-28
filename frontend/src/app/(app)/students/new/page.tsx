@@ -15,7 +15,11 @@ export default function RegisterStudentPage() {
 
   return (
     <RequirePermission permission={PERMISSIONS.STUDENTS_REGISTER}>
-      <PageHeader title="Register a student" description="Creates the student account and assigns the next index number for the programme level and admission year." />
+      <PageHeader
+        title="Register a student"
+        description="Creates the student account and assigns the next index number for the programme level and admission year."
+      />
+
       <Card>
         <CardBody>
           {result ? (
@@ -27,7 +31,10 @@ export default function RegisterStudentPage() {
               }}
             />
           ) : (
-            <RegisterStudentForm key={formKey} onRegistered={setResult} />
+            <RegisterStudentForm
+              key={formKey}
+              onRegisteredAction={setResult}
+            />
           )}
         </CardBody>
       </Card>

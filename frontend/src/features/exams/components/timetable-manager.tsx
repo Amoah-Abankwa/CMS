@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState, Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
+import { api, errorMessage } from '@/lib/axios';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useSemesters } from '@/features/academics/use-semesters';
@@ -87,6 +87,13 @@ export function TimetableManager() {
         </Button>
       </section>
 
+      {published && (
+        <section className="flex flex-wrap items-center gap-2 print:hidden">
+          <Button variant="secondary" size="sm" onClick={() => api.post<{ seated: number; papers: number; overfull: string[] }>(`/exams/timetables/${view.timetable.id}/seats`).then((r) => { setNotice(`Seats numbered for ${r.data.seated} candidates across ${r.data.papers} papers.${r.data.overfull.length ? ` Over capacity: ${r.data.overfull.join('; ')}.` : ''}`); }).catch((err) => setError(errorMessage(err)))}>Number seats</Button>
+          <Button variant="secondary" size="sm" onClick={() => api.post<{ invigilators: number }>(`/exams/timetables/${view.timetable.id}/notify-invigilators`).then((r) => setNotice(`Duty lists sent to ${r.data.invigilators} invigilators by email, SMS and in-app.`)).catch((err) => setError(errorMessage(err)))}>Send invigilator duties</Button>
+          <span className="text-xs text-muted">Number seats after registrations are approved; run it again after changes. Invigilators mark attendance under Exam register.</span>
+        </section>
+      )}
       {notice && <Alert tone="success">{notice}</Alert>}
       {error && <Alert tone="danger">{error}</Alert>}
 

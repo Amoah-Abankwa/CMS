@@ -40,7 +40,8 @@ export class DevotionServicesService implements OnModuleInit {
   }
 
   expectedWhere(semesterId: string): Prisma.UserWhereInput {
-    return { type: 'STUDENT', status: 'ACTIVE', registrations: { some: { semesterId, status: 'APPROVED' } } };
+    // Weekend students are exempt from morning devotion.
+    return { type: 'STUDENT', status: 'ACTIVE', registrations: { some: { semesterId, status: 'APPROVED' } }, studentProfile: { programme: { level: { mode: { not: 'WEEKEND' } } } }, devotionExemptions: { none: { semesterId } } };
   }
 
   async list(semesterId?: string) {

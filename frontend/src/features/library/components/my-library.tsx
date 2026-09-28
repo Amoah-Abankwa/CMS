@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatCedis } from '@anu/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EmptyState, Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
+import { api, errorMessage } from '@/lib/axios';
 import { cn } from '@/lib/cn';
 import { byLine, dueLabel, FINE_REASON, libraryApi, type BorrowerSummary } from '../api';
 import { CatalogueSearch } from './catalogue-search';
+import { usePaymentReturn } from '@/features/fees/components/use-payment-return';
 
 const TABS = [
   { value: 'loans', label: 'My books' },
@@ -20,6 +21,8 @@ const TABS = [
 ] as const;
 
 export function MyLibrary() {
+  const [reloadKey, setReloadKey] = useState(0);
+  const paymentNotice = usePaymentReturn(useCallback(() => setReloadKey((k) => k + 1), []));
   const [data, setData] = useState<BorrowerSummary | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]['value']>('loans');
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export function MyLibrary() {
   const load = () => libraryApi.mine().then(setData).catch((err) => setError(errorMessage(err)));
   useEffect(() => {
     void load();
-  }, []);
+  }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (key: string, fn: () => Promise<string>) => {
     setBusy(key);
@@ -52,6 +55,7 @@ export function MyLibrary() {
 
   return (
     <div className="flex flex-col gap-4">
+      {paymentNotice && <Alert tone={paymentNotice.tone}>{paymentNotice.text}</Alert>}
       <dl className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border border-border bg-surface px-4 py-3"><dt className="text-xs text-muted">Books out</dt><dd className="text-2xl font-semibold tabular-nums">{data.loans.length} <span className="text-sm font-normal text-muted">of {data.rules.maxItems}</span></dd></div>
         <div className="rounded-lg border border-border bg-surface px-4 py-3"><dt className="text-xs text-muted">Loan length</dt><dd className="text-2xl font-semibold tabular-nums">{data.rules.loanDays} <span className="text-sm font-normal text-muted">days</span></dd></div>
@@ -120,13 +124,13 @@ export function MyLibrary() {
 
       {tab === 'fines' && (
         <Card>
-          <CardHeader title="Fines" description={`Late books are fined ${formatCedis(data.policy.finePerDay)} a day. Pay at the library desk. Borrowing stops when you owe ${formatCedis(data.policy.blockAtFines)} or more.`} />
+          <CardHeader title="Fines" description={`Late books are fined ${formatCedis(data.policy.finePerDay)} a day. Pay online, or at the library desk. Borrowing stops when you owe ${formatCedis(data.policy.blockAtFines)} or more.`} />
           {data.fines.length === 0 ? <CardBody><p className="text-sm text-muted">You owe nothing.</p></CardBody> : (
             <ul className="divide-y divide-border">
               {data.fines.map((f) => (
                 <li key={f.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm sm:px-5">
                   <span>{FINE_REASON[f.reason]}{f.note ? `: ${f.note}` : ''}{f.paid || f.waived ? <span className="block text-xs text-muted">{formatCedis(f.amount)} charged, {formatCedis(f.paid + f.waived)} paid or waived</span> : null}</span>
-                  <span className="font-medium tabular-nums">{formatCedis(f.outstanding)}</span>
+                  <span className="flex items-center gap-2"><span className="font-medium tabular-nums">{formatCedis(f.outstanding)}</span>{f.outstanding > 0 && <Button size="sm" variant="secondary" onClick={() => api.post<{ paymentUrl: string }>(`/me/library/fines/${f.id}/pay-online`).then((r) => { window.location.href = r.data.paymentUrl; }).catch(() => undefined)}>Pay online</Button>}</span>
                 </li>
               ))}
             </ul>

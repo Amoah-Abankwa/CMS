@@ -126,7 +126,12 @@ export class LibraryController {
 
 @Controller('me/library')
 export class MyLibraryController {
-  constructor(private readonly borrower: BorrowerService) {}
+  constructor(private readonly borrower: BorrowerService, private readonly finesService: FinesService) {}
+
+  @Post('fines/:id/pay-online') @HttpCode(200)
+  payFineOnline(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.finesService.payOnline(u, id);
+  }
 
   @Get()
   mine(@CurrentUser() u: AuthUser) {

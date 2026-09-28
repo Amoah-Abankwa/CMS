@@ -30,8 +30,10 @@ for path in ui + messages:
         if path in ui and not path.endswith('.css'):
             # Allowed: a translucent black scrim behind dialogs (right in both themes), and
             # print-only borders (paper is always white).
-            hit = PALETTE.search(re.sub(r'(?:backdrop:)?bg-black/\d+', '', line))
-            if hit and ('print:' in line) and all(m.startswith(('border-black',)) for m in PALETTE.findall(line)):
+            # print: classes only apply on paper, which is always white.
+            hit = PALETTE.search(re.sub(r'print:[\w/-]+|(?:backdrop:)?bg-black/\d+', '', line))
+            # An element hidden on screen and shown only when printing.
+            if hit and re.search(r'\bhidden\b', line) and 'print:block' in line:
                 hit = None
             if hit:
                 problems.append(f'Fixed colour (breaks dark mode): {rel}:{n}: {hit.group(0)}')

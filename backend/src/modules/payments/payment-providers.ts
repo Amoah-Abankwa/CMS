@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 export interface InitializeInput {
   reference: string;
   amount: number;
+  currency: 'GHS' | 'USD';
   email: string;
   callbackUrl: string;
   metadata: Record<string, string>;
@@ -20,7 +21,7 @@ export interface VerifyResult {
 export interface PaymentProvider {
   readonly name: 'demo' | 'paystack';
   initialize(input: InitializeInput): Promise<{ authorizationUrl: string }>;
-  verify(reference: string, stored: { amount: number; providerData: unknown }): Promise<VerifyResult>;
+  verify(reference: string, stored: { amount: number; currency: string; providerData: unknown }): Promise<VerifyResult>;
   refund(reference: string, amount: number): Promise<'REFUNDED' | 'REFUND_PENDING'>;
   /** True if the webhook body really came from the provider. */
   verifyWebhook(rawBody: Buffer, signature: string | undefined): boolean;
@@ -38,9 +39,9 @@ export class DemoPaymentProvider implements PaymentProvider {
     return { authorizationUrl: `${this.webOrigin}/pay/demo?reference=${encodeURIComponent(input.reference)}&next=${encodeURIComponent(input.callbackUrl)}` };
   }
 
-  async verify(_reference: string, stored: { amount: number; providerData: unknown }): Promise<VerifyResult> {
+  async verify(_reference: string, stored: { amount: number; currency: string; providerData: unknown }): Promise<VerifyResult> {
     const outcome = (stored.providerData as { demoOutcome?: string } | null)?.demoOutcome;
-    return { status: outcome === 'success' ? 'success' : outcome === 'failed' ? 'failed' : 'pending', amount: stored.amount, currency: 'GHS', channel: 'demo', paidAt: new Date() };
+    return { status: outcome === 'success' ? 'success' : outcome === 'failed' ? 'failed' : 'pending', amount: stored.amount, currency: stored.currency, channel: 'demo', paidAt: new Date() };
   }
 
   async refund() {
@@ -79,7 +80,7 @@ export class PaystackPaymentProvider implements PaymentProvider {
       body: JSON.stringify({
         email: input.email,
         amount: input.amount,
-        currency: 'GHS',
+        currency: input.currency,
         reference: input.reference,
         callback_url: input.callbackUrl,
         channels: ['mobile_money', 'card'],

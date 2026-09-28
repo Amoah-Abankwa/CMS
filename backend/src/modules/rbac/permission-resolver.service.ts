@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DEVELOPER_ONLY_PERMISSIONS, ROLE_KEYS } from '@anu/shared';
+import { ADD_ON_ROLES, DEVELOPER_ONLY_PERMISSIONS, IS_ADD_ON_ROLE, ROLE_KEYS, type RoleKey } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
 @Injectable()
@@ -15,7 +15,10 @@ export class PermissionResolverService {
     return !!grant;
   }
 
-  /** Roles the user can switch into. Developer only appears while a Super Admin grant is active. */
+  /**
+   * Roles the user can switch into. Developer only appears while a Super Admin grant is active.
+   * Add-on roles (such as Student Dispatcher) are never switched into; they extend another role.
+   */
   async availableRoles(userId: string) {
     const now = new Date();
     const rows = await this.prisma.userRole.findMany({
@@ -24,7 +27,7 @@ export class PermissionResolverService {
     });
     const developerActive = await this.hasActiveDeveloperGrant(userId);
     const seen = new Set<string>();
-    const roles = rows.map((r) => r.role).filter((r) => r.key !== ROLE_KEYS.DEVELOPER && !seen.has(r.key) && !!seen.add(r.key));
+    const roles = rows.map((r) => r.role).filter((r) => r.key !== ROLE_KEYS.DEVELOPER && !IS_ADD_ON_ROLE(r.key) && !seen.has(r.key) && !!seen.add(r.key));
     if (developerActive) {
       const dev = await this.prisma.role.findUnique({ where: { key: ROLE_KEYS.DEVELOPER }, select: { key: true, name: true, logGroup: true } });
       if (dev) roles.push(dev);
@@ -32,7 +35,7 @@ export class PermissionResolverService {
     return roles;
   }
 
-  /** Permissions come from the session's active role only. */
+  /** Permissions come from the session's active role, plus any add-on roles the user holds for it. */
   async permissionsFor(userId: string, activeRoleKey: string | null): Promise<Set<string>> {
     if (!activeRoleKey) return new Set();
     const developerActive = await this.hasActiveDeveloperGrant(userId);
@@ -52,6 +55,14 @@ export class PermissionResolverService {
       select: { role: { select: { permissions: { select: { permission: { select: { key: true } } } } } } },
     });
     const keys = new Set(userRole?.role.permissions.map((p) => p.permission.key) ?? []);
+    const addOns = userRole ? ADD_ON_ROLES[activeRoleKey as RoleKey] : undefined;
+    if (addOns?.length) {
+      const extra = await this.prisma.userRole.findMany({
+        where: { userId, role: { key: { in: addOns } }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        select: { role: { select: { permissions: { select: { permission: { select: { key: true } } } } } } },
+      });
+      for (const r of extra) for (const p of r.role.permissions) keys.add(p.permission.key);
+    }
     for (const p of DEVELOPER_ONLY_PERMISSIONS) keys.delete(p);
     return keys;
   }

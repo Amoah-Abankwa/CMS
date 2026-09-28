@@ -13,10 +13,14 @@ import { EmptyState, Spinner } from '@/components/ui/states';
 import { errorMessage } from '@/lib/axios';
 import { fullName } from '@/lib/format';
 import { studentsApi, type StudentRow } from '../api';
+import { AccountAccess } from '@/features/staff/components/account-access';
+import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
 
 const PAGE_SIZE = 20;
 
 export function StudentsList() {
+  const [account, setAccount] = useState<StudentRow | null>(null);
   const canRegister = useAuthStore((st) => st.can(PERMISSIONS.STUDENTS_REGISTER));
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -84,6 +88,7 @@ export function StudentsList() {
                       <span className="flex flex-col items-start gap-1.5">
                         <AccountStatusBadge status={s.status} />
                         {s.status === 'PENDING_SETUP' && canRegister && <ResendSetupButton send={() => studentsApi.resendSetup(s.id)} />}
+                        {canRegister && s.status !== 'PENDING_SETUP' && <Button variant="ghost" size="sm" onClick={() => setAccount(s)}>Account</Button>}
                       </span>
                     </td>
                   </tr>
@@ -114,6 +119,11 @@ export function StudentsList() {
             <Pagination page={page} pageSize={PAGE_SIZE} total={data.total} onChange={setPage} />
           </div>
         </div>
+      )}
+      {account && (
+        <Dialog open onClose={() => setAccount(null)} title={`${account.firstName} ${account.lastName}`} description={`${account.indexNumber}. Suspending signs them out everywhere; their records are kept.`}>
+          <AccountAccess member={account} isSelf={false} save={studentsApi.setStatus} onChanged={(status) => { setData((d) => (d ? { ...d, items: d.items.map((x) => (x.id === account.id ? { ...x, status } : x)) } : d)); setAccount(null); }} />
+        </Dialog>
       )}
     </div>
   );

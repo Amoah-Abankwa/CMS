@@ -122,7 +122,50 @@ model CourseResult {
   isPass     Boolean
   /// Missed an exam component. Graded "IC" and left out of the GPA until resolved.
   incomplete Boolean     @default(false)
+  /// Morning devotion score added to the total (out of 5), when devotion counts in course totals.
+  devotionScore  Float?
+  /// Weekend students are exempt from devotion; their course marks out of 95 were scaled to 100.
+  devotionExempt Boolean  @default(false)
+  amendments ResultAmendment[]
 
   @@unique([sheetId, studentId])
   @@index([studentId])
+}
+
+enum AmendmentStatus {
+  REQUESTED
+  HOD_APPROVED
+  DEAN_APPROVED
+  APPLIED
+  REJECTED
+}
+
+/// A correction to a published result, approved along the same chain as the results themselves:
+/// Head of Department, then Dean, then published by the Exams Office or Registrar.
+model ResultAmendment {
+  id               String          @id @default(uuid()) @db.Uuid
+  resultId         String          @db.Uuid
+  result           CourseResult    @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  reason           String
+  /// The result as it stood when the amendment was requested.
+  before           Json
+  newCaScore       Float
+  newExamScore     Float
+  /// The result as applied.
+  after            Json?
+  status           AmendmentStatus @default(REQUESTED)
+  requestedById    String          @db.Uuid
+  requestedAt      DateTime        @default(now())
+  hodApprovedById  String?         @db.Uuid
+  hodApprovedAt    DateTime?
+  deanApprovedById String?         @db.Uuid
+  deanApprovedAt   DateTime?
+  appliedById      String?         @db.Uuid
+  appliedAt        DateTime?
+  rejectedById     String?         @db.Uuid
+  rejectedAt       DateTime?
+  rejectNote       String?
+
+  @@index([status])
+  @@index([resultId])
 }

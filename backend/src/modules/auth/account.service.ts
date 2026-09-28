@@ -10,7 +10,7 @@ import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
 import { MfaService } from './mfa.service';
 import { AccountSetupService } from '../account-setup/account-setup.service';
-import { RESET_CODE_MAX_ATTEMPTS, RESET_CODE_MINUTES } from './auth.constants';
+import { RESET_CODE_MAX_ATTEMPTS, RESET_CODE_MINUTES, RESET_CODES_PER_HOUR } from './auth.constants';
 
 @Injectable()
 export class AccountService {
@@ -90,6 +90,12 @@ export class AccountService {
     }
     if (!user || user.status !== 'ACTIVE') {
       await this.audit.record({ action: 'auth.password.reset_requested', module: 'auth', result: 'FAILURE', metadata: { identifier } });
+      return;
+    }
+    // Stops someone who knows an index number from flooding that student with SMS and email.
+    const recent = await this.prisma.passwordResetCode.count({ where: { userId: user.id, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
+    if (recent >= RESET_CODES_PER_HOUR) {
+      await this.audit.record({ action: 'auth.password.reset_throttled', module: 'auth', result: 'FAILURE', actor: { id: user.id, label: identifier, roleKey: user.primaryRoleKey } });
       return;
     }
     const code = generateNumericCode(6);

@@ -1,3 +1,4 @@
+import { INDEX_NUMBER_INPUT } from '@anu/shared';
 import { z } from 'zod';
 
 export const studentLoginSchema = z.object({
@@ -5,7 +6,7 @@ export const studentLoginSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^ANU\d{2}[0-9A-Z]{1,3}\d{5}$/, 'Enter your index number, for example ANU25400001.'),
+    .regex(INDEX_NUMBER_INPUT, 'Enter your index number as it appears on your ID card.'),
   password: z.string().min(1, 'Enter your password.'),
 });
 

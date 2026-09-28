@@ -118,7 +118,7 @@ export function MyResults() {
                           <span className="font-mono">{c.code}</span> {c.title}
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums">{c.credits}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '—' : c.total}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '—' : c.total}{!c.incomplete && (c.devotionExempt ? <span className="block text-xs text-muted">scaled from 95</span> : c.devotionScore != null ? <span className="block text-xs text-muted">incl. devotion {c.devotionScore.toFixed(2)}</span> : null)}</td>
                         <td className={cn('px-4 py-2 font-medium', c.incomplete ? 'text-warning' : !c.isPass && 'text-danger')}>{c.grade}</td>
                         <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '—' : c.gradePoint.toFixed(1)}</td>
                       </tr>

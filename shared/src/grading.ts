@@ -96,3 +96,26 @@ export function gpa(results: Array<{ credits: number; gradePoint: number; incomp
   const points = counted.reduce((s, r) => s + r.gradePoint * r.credits, 0);
   return { gpa: round2(points / credits), credits };
 }
+
+// ----- Carry-over courses and amendments -----
+
+/**
+ * Courses a student must take again: those whose latest published attempt was a fail. Incomplete (IC)
+ * results are not carry-overs; they are settled by an amendment once the missing mark is in.
+ */
+export function carryOverCourses(attempts: Array<{ courseId: string; isPass: boolean; incomplete: boolean; publishedAt: Date | string }>) {
+  const latest = new Map<string, { isPass: boolean; incomplete: boolean; at: number }>();
+  for (const a of attempts) {
+    const at = new Date(a.publishedAt).getTime();
+    const cur = latest.get(a.courseId);
+    if (!cur || at > cur.at) latest.set(a.courseId, { isPass: a.isPass, incomplete: a.incomplete, at });
+  }
+  return [...latest.entries()].filter(([, v]) => !v.isPass && !v.incomplete).map(([id]) => id);
+}
+
+/** The new result after an amendment: the scores as corrected, graded on the sheet's own scale. */
+export function amendedResult(ca: number, exam: number, bands: Band[]) {
+  const total = Math.round(ca + exam + 1e-9);
+  const band = gradeFor(total, bands);
+  return { caScore: round2(ca), examScore: round2(exam), total, grade: band.letter, gradePoint: band.gradePoint, isPass: band.isPass, incomplete: false };
+}

@@ -102,7 +102,9 @@ export interface MyResults {
     label: string;
     gpa: number | null;
     credits: number;
-    courses: Array<{ code: string; title: string; credits: number; total: number; grade: string; gradePoint: number; isPass: boolean; incomplete: boolean }>;
+    courses: Array<{ code: string; title: string; credits: number; total: number;
+      devotionScore?: number | null;
+      devotionExempt?: boolean; grade: string; gradePoint: number; isPass: boolean; incomplete: boolean }>;
   }>;
 }
 

@@ -65,6 +65,8 @@ model MenuItem {
   name        String
   description String?
   price       Int
+  /// Cloudinary public id of the dish photo.
+  photoId     String?
   isAvailable Boolean       @default(true)
   tags        String[]
   position    Int           @default(0)
@@ -81,7 +83,13 @@ enum FulfilmentType {
 
 enum PaymentOption {
   ONLINE
+  /// Paid to the vendor directly, in cash or by MoMo; the vendor ticks it as paid.
   ON_PICKUP
+}
+
+enum DispatchFeeMode {
+  INCLUDED
+  ON_DELIVERY
 }
 
 enum FoodOrderStatus {
@@ -107,6 +115,12 @@ model FoodOrder {
   fulfilment       FulfilmentType
   /// Fixed when the order is placed, so later changes to the vendor's setting do not affect it.
   viaDispatcher    Boolean         @default(false)
+  /// For campus-dispatcher deliveries: the customer includes the dispatcher's fee in their payment, or pays the dispatcher on delivery.
+  dispatchFeeMode  DispatchFeeMode?
+  /// How a pay-the-vendor order was settled, when the vendor ticked it paid: CASH or MOMO, with the MoMo transaction ID.
+  paidVia          String?
+  paidReference    String?
+  paidMarkedAt     DateTime?
   delivery         Delivery?
   deliveryAddress  String?
   deliveryNote     String?

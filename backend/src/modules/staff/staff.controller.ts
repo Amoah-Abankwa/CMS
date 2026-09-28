@@ -5,7 +5,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { RequireRecentMfa } from '../../common/decorators/require-recent-mfa.decorator';
 import { StaffService } from './staff.service';
 import { StaffRolesService } from './staff-roles.service';
-import { CreateStaffDto, ListStaffDto, RoleSetDto } from './dto/staff.dto';
+import { CreateStaffDto, ListStaffDto, RoleSetDto, AccountStatusDto } from './dto/staff.dto';
 
 @Controller('staff')
 export class StaffController {
@@ -52,5 +52,13 @@ export class StaffController {
   async resendSetup(@Param('id', ParseUUIDPipe) id: string) {
     await this.staff.resendSetup(id);
     return { ok: true };
+  }
+
+  @Post(':id/status')
+  @HttpCode(200)
+  @RequirePermission(PERMISSIONS.USERS_MANAGE)
+  @RequireRecentMfa()
+  setStatus(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AccountStatusDto) {
+    return this.staff.setStatus(actor, id, dto.status, dto.reason);
   }
 }

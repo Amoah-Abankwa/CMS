@@ -14,7 +14,13 @@ const READ_STUDENTS = [P.STUDENTS_READ, P.ACADEMICS_READ];
  * Every role, with the permissions it holds today. Later phases add module permissions
  * (results, attendance, library, hostels and so on) to these same roles.
  */
-export const ROLE_DEFS: Array<{ key: RoleKey; name: string; description: string; permissions: PermissionKey[] }> = [
+export const ROLE_DEFS: Array<{
+  key: RoleKey;
+  name: string;
+  description: string;
+  permissions: PermissionKey[];
+  logGroup: (typeof ROLE_LOG_GROUP)[RoleKey];
+}> = [
   { key: ROLE_KEYS.SUPER_ADMIN, name: 'Super Admin', description: 'Full control of accounts, roles and settings', permissions: ALL },
   { key: ROLE_KEYS.DEVELOPER, name: 'Developer', description: 'System diagnostics; enabled temporarily by a Super Admin', permissions: [P.SYSTEM_DIAGNOSTICS_READ] },
 
@@ -22,28 +28,28 @@ export const ROLE_DEFS: Array<{ key: RoleKey; name: string; description: string;
   { key: ROLE_KEYS.PRO_VICE_CHANCELLOR, name: 'Pro Vice-Chancellor', description: 'Academic oversight and reports', permissions: [...READ_STUDENTS, P.USERS_READ, P.RESULTS_READ_ALL] },
 
   { key: ROLE_KEYS.DEAN, name: 'Dean', description: 'Oversees one school and approves its results', permissions: [...READ_STUDENTS, P.OFFERINGS_MANAGE, P.REGISTRATIONS_REVIEW, P.RESULTS_APPROVE_SCHOOL, P.ATTENDANCE_REPORTS_READ] },
-  { key: ROLE_KEYS.HEAD_OF_DEPARTMENT, name: 'Head of Department', description: 'Leads one department, assigns courses, approves results', permissions: [...READ_STUDENTS, P.OFFERINGS_MANAGE, P.REGISTRATIONS_REVIEW, P.RESULTS_APPROVE_DEPARTMENT, P.ATTENDANCE_REPORTS_READ] },
+  { key: ROLE_KEYS.HEAD_OF_DEPARTMENT, name: 'Head of Department', description: 'Leads one department, assigns courses, approves results', permissions: [...READ_STUDENTS, P.OFFERINGS_MANAGE, P.REGISTRATIONS_REVIEW, P.RESULTS_APPROVE_DEPARTMENT, P.ATTENDANCE_REPORTS_READ, P.ADVISORS_ASSIGN] },
   { key: ROLE_KEYS.PROGRAMME_COORDINATOR, name: 'Programme Coordinator', description: 'Manages programme structure and course registration for a department', permissions: [...READ_STUDENTS, P.OFFERINGS_MANAGE, P.REGISTRATIONS_REVIEW, P.ATTENDANCE_REPORTS_READ] },
   { key: ROLE_KEYS.ACADEMIC_ADVISOR, name: 'Academic Advisor', description: 'Advises students in a department and approves their course registration', permissions: [...READ_STUDENTS, P.REGISTRATIONS_REVIEW] },
   { key: ROLE_KEYS.LECTURER, name: 'Lecturer', description: 'Teaches courses, records attendance and marks', permissions: [P.ACADEMICS_READ, P.TEACHING_READ] },
   { key: ROLE_KEYS.TEACHING_ASSISTANT, name: 'Teaching Assistant', description: 'Helps a lecturer with attendance and continuous assessment', permissions: [P.ACADEMICS_READ, P.TEACHING_READ] },
 
-  { key: ROLE_KEYS.REGISTRAR, name: 'Registrar', description: 'Registers students and manages academic records', permissions: [...READ_STUDENTS, P.STUDENTS_REGISTER, P.ACADEMICS_MANAGE, P.USERS_READ, P.OFFERINGS_MANAGE, P.REGISTRATIONS_REVIEW, P.GRADING_MANAGE, P.RESULTS_PUBLISH, P.RESULTS_READ_ALL, P.EXAMS_MANAGE, P.ATTENDANCE_REPORTS_READ, P.DEVOTION_READ] },
+  { key: ROLE_KEYS.REGISTRAR, name: 'Registrar', description: 'Registers students and manages academic records', permissions: [...READ_STUDENTS, P.STUDENTS_REGISTER, P.ACADEMICS_MANAGE, P.USERS_READ, P.OFFERINGS_MANAGE, P.REGISTRATIONS_REVIEW, P.GRADING_MANAGE, P.RESULTS_PUBLISH, P.RESULTS_READ_ALL, P.EXAMS_MANAGE, P.ATTENDANCE_REPORTS_READ, P.DEVOTION_READ, P.ADVISORS_ASSIGN] },
   { key: ROLE_KEYS.ADMISSIONS_OFFICER, name: 'Admissions Officer', description: 'Processes admissions and registers new students', permissions: [...READ_STUDENTS, P.STUDENTS_REGISTER] },
   { key: ROLE_KEYS.EXAM_COORDINATOR, name: 'Exam Coordinator', description: 'Exam timetables, eligibility and results publishing', permissions: [...READ_STUDENTS, P.NOTIFICATIONS_FAILED_READ, P.RESULTS_PUBLISH, P.RESULTS_READ_ALL, P.EXAMS_MANAGE, P.EXAM_HOLDS_MANAGE] },
   { key: ROLE_KEYS.QA_OFFICER, name: 'QA Officer', description: 'Quality assurance and lecturer evaluations', permissions: [...READ_STUDENTS, P.RESULTS_READ_ALL, P.ATTENDANCE_REPORTS_READ] },
 
-  { key: ROLE_KEYS.DEAN_OF_STUDENTS, name: 'Dean of Students', description: 'Student welfare, conduct and discipline', permissions: [P.STUDENTS_READ, P.EXAM_HOLDS_MANAGE, P.ATTENDANCE_EXCUSES_MANAGE, P.DEVOTION_READ, P.ACCOMMODATION_READ, P.MARKETPLACE_MANAGE] },
+  { key: ROLE_KEYS.DEAN_OF_STUDENTS, name: 'Dean of Students', description: 'Student welfare, conduct and discipline', permissions: [P.STUDENTS_READ, P.EXAM_HOLDS_MANAGE, P.ATTENDANCE_EXCUSES_MANAGE, P.DEVOTION_READ, P.ACCOMMODATION_READ, P.MARKETPLACE_MANAGE, P.EMPLOYMENT_MANAGE, P.ASSOCIATIONS_MANAGE] },
   { key: ROLE_KEYS.COUNSELLOR, name: 'Counsellor', description: 'Confidential student counselling', permissions: [P.STUDENTS_READ] },
   { key: ROLE_KEYS.CHAPLAINCY_OFFICER, name: 'Chaplaincy Officer', description: 'Morning devotion attendance and chapel records', permissions: [P.STUDENTS_READ, P.DEVOTION_MANAGE, P.DEVOTION_READ] },
   { key: ROLE_KEYS.HEALTH_OFFICER, name: 'Health Services Officer', description: 'Clinic visits and medical excuses for absence', permissions: [P.STUDENTS_READ, P.ATTENDANCE_EXCUSES_MANAGE] },
-  { key: ROLE_KEYS.CAREER_SERVICES_OFFICER, name: 'Career Services Officer', description: 'Internships, on-campus jobs and dispatcher approvals', permissions: [P.STUDENTS_READ] },
+  { key: ROLE_KEYS.CAREER_SERVICES_OFFICER, name: 'Career Services Officer', description: 'Internships, on-campus jobs and dispatcher approvals', permissions: [P.STUDENTS_READ, P.EMPLOYMENT_MANAGE] },
   { key: ROLE_KEYS.HOSTEL_MANAGER, name: 'Hostel Manager', description: 'University hostel rooms and allocations', permissions: [P.STUDENTS_READ, P.HOSTELS_MANAGE, P.ACCOMMODATION_READ] },
 
   { key: ROLE_KEYS.LIBRARIAN, name: 'Librarian', description: 'Library catalogue, policies and fines', permissions: [P.STUDENTS_READ, P.LIBRARY_CIRCULATE, P.LIBRARY_MANAGE] },
   { key: ROLE_KEYS.LIBRARY_ASSISTANT, name: 'Library Assistant', description: 'Issues and receives books at the desk', permissions: [P.STUDENTS_READ, P.LIBRARY_CIRCULATE] },
 
-  { key: ROLE_KEYS.FINANCE_OFFICER, name: 'Finance Officer', description: 'Fees, payments and financial clearance', permissions: [P.STUDENTS_READ, P.FINANCE_CLEARANCE_MANAGE, P.MARKETPLACE_MANAGE] },
+  { key: ROLE_KEYS.FINANCE_OFFICER, name: 'Finance Officer', description: 'Fees, payments and financial clearance', permissions: [P.STUDENTS_READ, P.FINANCE_CLEARANCE_MANAGE, P.MARKETPLACE_MANAGE, P.FEES_MANAGE] },
   { key: ROLE_KEYS.HR_OFFICER, name: 'HR Officer', description: 'Staff records and employment details', permissions: [P.USERS_READ] },
   { key: ROLE_KEYS.ICT_SUPPORT, name: 'ICT Support', description: 'Helps users with sign-in problems and failed messages', permissions: [P.USERS_READ, P.STUDENTS_READ, P.NOTIFICATIONS_FAILED_READ] },
   { key: ROLE_KEYS.SECURITY_OFFICER, name: 'Security Officer', description: 'Campus security, visitor and hostel access records', permissions: [P.STUDENTS_READ, P.ACCOMMODATION_READ] },
@@ -54,26 +60,34 @@ export const ROLE_DEFS: Array<{ key: RoleKey; name: string; description: string;
   { key: ROLE_KEYS.VENDOR, name: 'Cafeteria Manager / Vendor', description: 'Food menus and orders', permissions: [P.VENDOR_OWN] },
 
   { key: ROLE_KEYS.STUDENT, name: 'Student', description: 'Enrolled student', permissions: [] },
-  { key: ROLE_KEYS.STUDENT_DISPATCHER, name: 'Student Dispatcher', description: 'Delivers campus orders; needs the minimum GPA', permissions: [] },
+  { key: ROLE_KEYS.ASSOCIATION_OFFICER, name: 'Association Officer', description: 'Elected president or treasurer of a departmental association (EHASSA, BACA...). Added to the Student role for their term', permissions: [P.DUES_COLLECT] },
+  { key: ROLE_KEYS.STUDENT_DISPATCHER, name: 'Student Dispatcher', description: 'Delivers campus orders; needs the minimum GPA. Added to the Student role, not switched into', permissions: [P.DISPATCH_DELIVER] },
 ].map((r) => ({ ...r, logGroup: ROLE_LOG_GROUP[r.key] }));
 
+/** Programme types. The Registrar can change names, semesters and index formats in Registry, Programme types. */
 export const LEVELS = [
-  { code: '4', name: 'Degree', description: 'Undergraduate degree programmes' },
-  { code: '2', name: 'Diploma', description: 'Placeholder code; confirm with the Registry' },
-  { code: '6', name: 'Postgraduate', description: 'Placeholder code; confirm with the Registry' },
+  { code: '4', name: "Bachelor's degree (regular)", description: 'Undergraduate degrees, weekday classes', category: 'BACHELORS' as const, mode: 'REGULAR' as const, semesters: 8, indexFormat: 'ANU{YY}{CODE}{SEQ:5}' },
+  { code: 'W', name: "Bachelor's degree (weekend)", description: 'Undergraduate degrees, weekend classes', category: 'BACHELORS' as const, mode: 'WEEKEND' as const, semesters: 12, indexFormat: 'ANU{YY}{CODE}{SEQ:5}' },
+  // Diploma index numbers start with D and the programme's initials (DCE, DBM, DOE). What follows is to be confirmed by the Registry.
+  { code: '2', name: 'Diploma', description: 'Index numbers start with the programme code, e.g. DCE', category: 'DIPLOMA' as const, mode: 'REGULAR' as const, semesters: 4, indexFormat: '{PROG}{YY}{SEQ:4}' },
+  { code: '6', name: 'Graduate School', description: "Master's programmes. Index format to be confirmed by the Registry", category: 'GRADUATE' as const, mode: 'REGULAR' as const, semesters: 4, indexFormat: 'ANUGS{YY}{SEQ:4}' },
 ];
+
+/** Demo students are spread over these programmes only, so adding programmes never moves them. */
+export const DEMO_STUDENT_PROGRAMMES = ['BA-THE', 'BBA-ACC', 'BBA-MGT', 'BSC-BME', 'BSC-CS', 'BSC-EEE', 'BSC-NUR'];
 
 /** Course codes encode the level: "CSC 203" is a 200-level course. Odd last digit = first semester. */
 export const STRUCTURE = [
   {
     code: 'SET', name: 'School of Engineering and Technology',
     departments: [
-      { code: 'CSC', name: 'Computer Science', programmes: [{ code: 'BSC-CS', name: 'BSc Computer Science' }],
+      { code: 'CSC', name: 'Computer Science', programmes: [{ code: 'BSC-CS', name: 'BSc Computer Science' }, { code: 'BSC-CS-WKD', name: 'BSc Computer Science (Weekend)', level: 'W' }, { code: 'MSC-CS', name: 'MSc Computer Science', level: '6' }],
         courses: [['CSC 101', 'Introduction to Computing', 3], ['CSC 103', 'Programming Fundamentals', 3], ['CSC 102', 'Object-Oriented Programming', 3], ['CSC 201', 'Data Structures', 3], ['CSC 203', 'Computer Organisation', 3], ['CSC 205', 'Discrete Mathematics', 3]] },
-      { code: 'EEE', name: 'Electrical and Electronic Engineering', programmes: [{ code: 'BSC-EEE', name: 'BSc Electronic and Communication Engineering' }],
+      { code: 'EEE', name: 'Electrical and Electronic Engineering', programmes: [{ code: 'BSC-EEE', name: 'BSc Electronic and Communication Engineering' }, { code: 'BSC-CE', name: 'BSc Computer Engineering' }, { code: 'DIP-CE', name: 'Diploma in Computer Engineering', level: '2', indexCode: 'DCE' }],
         courses: [['EEE 101', 'Circuit Theory I', 3], ['EEE 103', 'Engineering Drawing', 2], ['EEE 201', 'Signals and Systems', 3], ['EEE 203', 'Electronics I', 3]] },
-      { code: 'BME', name: 'Biomedical Engineering', programmes: [{ code: 'BSC-BME', name: 'BSc Biomedical Engineering' }],
+      { code: 'BME', name: 'Biomedical Engineering', programmes: [{ code: 'BSC-BME', name: 'BSc Biomedical Engineering' }, { code: 'DIP-BME', name: 'Diploma in Biomedical Engineering', level: '2', indexCode: 'DBM' }],
         courses: [['BME 101', 'Introduction to Biomedical Engineering', 3], ['BME 103', 'Engineering Mathematics I', 3], ['BME 201', 'Human Anatomy for Engineers', 3]] },
+      { code: 'OGE', name: 'Oil and Gas Engineering', programmes: [{ code: 'DIP-OGE', name: 'Diploma in Oil and Gas Engineering', level: '2', indexCode: 'DOE' }], courses: [] },
     ],
   },
   {
@@ -126,6 +140,7 @@ export const DEMO_STAFF: Array<{ email: string; firstName: string; lastName: str
   { email: 'health@demo.anu.edu.gh', firstName: 'Janet', lastName: 'Boakye', title: 'Ms', roles: [ROLE_KEYS.HEALTH_OFFICER] },
   { email: 'chaplaincy@demo.anu.edu.gh', firstName: 'Samuel', lastName: 'Kyei', title: 'Rev', roles: [ROLE_KEYS.CHAPLAINCY_OFFICER] },
   { email: 'hostels.security@demo.anu.edu.gh', firstName: 'Michael', lastName: 'Tetteh', title: 'Mr', roles: [ROLE_KEYS.SECURITY_OFFICER] },
+  { email: 'careers@demo.anu.edu.gh', firstName: 'Gifty', lastName: 'Amoako', title: 'Mrs', roles: [ROLE_KEYS.CAREER_SERVICES_OFFICER] },
   { email: 'libdesk@demo.anu.edu.gh', firstName: 'Priscilla', lastName: 'Asiedu', title: 'Ms', roles: [ROLE_KEYS.LIBRARY_ASSISTANT] },
   { email: 'vc@demo.anu.edu.gh', firstName: 'Emmanuel', lastName: 'Kwarteng', title: 'Prof', roles: [ROLE_KEYS.VICE_CHANCELLOR] },
   { email: 'admissions@demo.anu.edu.gh', firstName: 'Linda', lastName: 'Sarpong', title: 'Mrs', roles: [ROLE_KEYS.ADMISSIONS_OFFICER] },

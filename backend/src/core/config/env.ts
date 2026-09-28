@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { z } from 'zod';
+import { productionProblems, productionWarnings } from './production-checks';
 
 const hex = (len: number) => z.string().regex(new RegExp(`^[0-9a-fA-F]{${len}}$`));
 
@@ -15,6 +16,12 @@ const EnvSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().default(900),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
   MFA_CHALLENGE_TTL_SECONDS: z.coerce.number().default(300),
+  /** smtp (SMTP_* settings) or resend (RESEND_API_KEY). With neither configured, emails are only logged in development. */
+  EMAIL_PROVIDER: z.enum(['smtp', 'resend']).default('smtp'),
+  RESEND_API_KEY: z.string().default(''),
+  CLOUDINARY_CLOUD_NAME: z.string().default(''),
+  CLOUDINARY_API_KEY: z.string().default(''),
+  CLOUDINARY_API_SECRET: z.string().default(''),
   SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().default(''),
@@ -44,6 +51,11 @@ export function loadEnv(): Env {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${issues}`);
   }
+  const problems = productionProblems(parsed.data);
+  if (problems.length) {
+    throw new Error(`Refusing to start in production:\n- ${problems.join('\n- ')}`);
+  }
+  for (const w of productionWarnings(parsed.data)) console.warn(`Warning: ${w}`);
   cached = parsed.data;
   return cached;
 }

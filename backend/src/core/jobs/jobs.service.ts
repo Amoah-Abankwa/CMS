@@ -10,6 +10,10 @@ export const QUEUES = {
   ACCOMMODATION_EXPIRE_OFFERS: 'accommodation-expire-offers',
   LIBRARY_HOURLY: 'library-hourly',
   FOOD_EXPIRE_UNPAID: 'food-expire-unpaid',
+  DISPATCH_MINUTELY: 'dispatch-every-5-minutes',
+  EMPLOYMENT_DAILY: 'employment-daily',
+  HOUSEKEEPING: 'housekeeping',
+  ASSOCIATION_TERMS: 'association-terms',
 } as const;
 
 type Handler<T> = (data: T) => Promise<void>;

@@ -50,3 +50,8 @@ export class ListStaffDto extends PaginationDto {
   @IsOptional() @IsUUID() departmentId?: string;
   @IsOptional() @IsIn(['PENDING_SETUP', 'ACTIVE', 'LOCKED', 'SUSPENDED', 'DEACTIVATED']) status?: string;
 }
+
+export class AccountStatusDto {
+  @IsIn(['ACTIVE', 'SUSPENDED', 'DEACTIVATED']) status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value)) @IsString() @MinLength(5) @MaxLength(300) reason: string;
+}

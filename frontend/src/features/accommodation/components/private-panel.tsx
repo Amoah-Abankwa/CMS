@@ -96,6 +96,11 @@ export function PrivatePanel({ data, onChange }: { data: MyAccommodation; onChan
         <Card key={h.id}>
           <CardHeader title={h.name} description={[h.location, h.distanceNote].filter(Boolean).join('. ')} actions={<Badge>{GENDER_LABEL[h.gender]}</Badge>} />
           <CardBody className="flex flex-col gap-3">
+            {h.photoUrls && h.photoUrls.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {h.photoUrls.map((u, i) => <img key={u} src={u} alt={`${h.name} photo ${i + 1}`} className="h-36 w-52 shrink-0 rounded-md border border-border object-cover" />)}
+              </div>
+            )}
             {h.description && <p className="text-sm">{h.description}</p>}
             {h.facilities.length > 0 && <p className="text-xs text-muted">{h.facilities.join(', ')}</p>}
             <ul className="divide-y divide-border rounded-md border border-border">

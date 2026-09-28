@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
-import { canTransition, commission, formatCedis, isOpenAt, orderTotals, type OpeningHours, type OrderActor, type OrderStatus } from '@anu/shared';
+import { canTransition, commission, deliveryArea, dispatchFeeSettlement, formatCedis, isOpenAt, orderTotals, type OpeningHours, type OrderActor, type OrderStatus } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { JobsService, QUEUES } from '../../core/jobs/jobs.service';
 import { Prisma } from '../../generated/prisma/client';
@@ -10,18 +10,20 @@ import { NotificationsService, type Channel } from '../notifications/notificatio
 import { EVENT_KEYS } from '../notifications/templates';
 import { PaymentsService } from '../payments/payments.service';
 import { MarketplaceSettingsService } from './marketplace-settings.service';
+import { EmploymentRulesService } from '../employment/employment-rules.service';
 import { PlaceOrderDto } from './dto/marketplace.dto';
 
 const MAX_ACTIVE_ORDERS = 3;
 
 export const ORDER_SELECT = {
-  id: true, number: true, status: true, fulfilment: true, deliveryAddress: true, deliveryNote: true, paymentOption: true,
+  id: true, number: true, status: true, fulfilment: true, viaDispatcher: true, dispatchFeeMode: true, paidVia: true, paidReference: true, deliveryAddress: true, deliveryNote: true, paymentOption: true,
   subtotal: true, deliveryFee: true, total: true, pickupCode: true, note: true, paid: true,
   placedAt: true, acceptedAt: true, readyAt: true, completedAt: true, cancelledAt: true, cancelledBy: true, cancelReason: true, estimatedReadyAt: true, createdAt: true,
   vendor: { select: { id: true, name: true, location: true, phone: true } },
   customer: { select: { id: true, firstName: true, lastName: true, indexNumber: true, phone: true } },
   items: { select: { name: true, unitPrice: true, quantity: true, lineTotal: true } },
   payments: { orderBy: { createdAt: 'desc' as const }, take: 1, select: { reference: true, status: true, provider: true, channel: true } },
+  delivery: { select: { id: true, status: true, fee: true, dispatcherId: true, problemNote: true, dispatcher: { select: { transport: true, student: { select: { firstName: true, lastName: true, phone: true } } } } } },
 } satisfies Prisma.FoodOrderSelect;
 
 type OrderRow = Prisma.FoodOrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -41,11 +43,12 @@ export class OrdersService implements OnModuleInit {
     private readonly settings: MarketplaceSettingsService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly employment: EmploymentRulesService,
   ) {}
 
   async onModuleInit() {
     this.payments.onSucceeded('FOOD_ORDER', async (p) => {
-      if (p.orderId) await this.markPaid(p.orderId);
+      if (p.orderId) await this.markOnlinePaid(p.orderId);
     });
     await this.jobs.work(QUEUES.FOOD_EXPIRE_UNPAID, () => this.expireUnpaid());
     await this.jobs.schedule(QUEUES.FOOD_EXPIRE_UNPAID, '*/5 * * * *');
@@ -62,6 +65,9 @@ export class OrdersService implements OnModuleInit {
     if (dto.fulfilment === 'PICKUP' && !vendor.offersPickup) throw new BadRequestException({ code: 'NO_PICKUP', message: `${vendor.name} only delivers.` });
     if (dto.fulfilment === 'DELIVERY' && !dto.deliveryAddress) throw new BadRequestException({ code: 'ADDRESS', message: 'Tell the vendor where to deliver.' });
     if (dto.paymentOption === 'ONLINE' && !vendor.acceptsOnline) throw new BadRequestException({ code: 'NO_ONLINE', message: `${vendor.name} does not take online payment.` });
+    // Campus dispatcher deliveries: the customer pays the dispatcher's fee, in the payment or on delivery.
+    const viaDispatcher = dto.fulfilment === 'DELIVERY' && vendor.useDispatchers;
+    const dispatchFeeMode = viaDispatcher ? dto.dispatchFeeMode ?? 'INCLUDED' : null;
     if (dto.paymentOption === 'ON_PICKUP' && !vendor.acceptsPayOnPickup) throw new BadRequestException({ code: 'PAY_ONLINE', message: `${vendor.name} needs payment online.` });
 
     const active = await this.prisma.foodOrder.count({ where: { customerId: user.id, status: { in: ['PENDING_PAYMENT', 'PLACED', 'ACCEPTED', 'READY', 'OUT_FOR_DELIVERY'] } } });
@@ -75,7 +81,12 @@ export class OrdersService implements OnModuleInit {
     if (soldOut.length) throw new ConflictException({ code: 'SOLD_OUT', message: `Sold out: ${soldOut.join(', ')}.` });
 
     const lines = dto.lines.map((l) => ({ item: byId.get(l.menuItemId)!, quantity: l.quantity }));
-    const totals = orderTotals(lines.map((l) => ({ price: l.item.price, quantity: l.quantity })), dto.fulfilment, vendor);
+    const base = orderTotals(lines.map((l) => ({ price: l.item.price, quantity: l.quantity })), dto.fulfilment, vendor);
+    const dispatchFee = viaDispatcher ? (await this.employment.get()).dispatchFee : 0;
+    // deliveryFee records the dispatcher's fee; the total includes it only when the customer pays it now.
+    const totals = viaDispatcher
+      ? { subtotal: base.subtotal, deliveryFee: dispatchFee, total: base.subtotal + (dispatchFeeMode === 'INCLUDED' ? dispatchFee : 0), belowMinimum: base.belowMinimum }
+      : base;
     if (totals.belowMinimum) throw new BadRequestException({ code: 'MINIMUM', message: `The minimum order is ${formatCedis(vendor.minimumOrder)}.` });
     const settings = await this.settings.get();
     const online = dto.paymentOption === 'ONLINE';
@@ -84,8 +95,8 @@ export class OrdersService implements OnModuleInit {
       data: {
         vendorId: vendor.id, customerId: user.id,
         status: online ? 'PENDING_PAYMENT' : 'PLACED',
-        fulfilment: dto.fulfilment, deliveryAddress: dto.fulfilment === 'DELIVERY' ? dto.deliveryAddress : null, deliveryNote: dto.deliveryNote || null,
-        paymentOption: dto.paymentOption, ...totals, commission: online ? commission(totals.total, settings.commissionPercent) : 0,
+        fulfilment: dto.fulfilment, viaDispatcher, dispatchFeeMode, deliveryAddress: dto.fulfilment === 'DELIVERY' ? dto.deliveryAddress : null, deliveryNote: dto.deliveryNote || null,
+        paymentOption: dto.paymentOption, subtotal: totals.subtotal, deliveryFee: totals.deliveryFee, total: totals.total, commission: online ? commission(viaDispatcher ? totals.subtotal : totals.total, settings.commissionPercent) : 0,
         pickupCode: String(randomInt(1000, 10000)), note: dto.note || null, placedAt: online ? null : new Date(),
         items: { create: lines.map((l) => ({ menuItemId: l.item.id, name: l.item.name, unitPrice: l.item.price, quantity: l.quantity, lineTotal: l.item.price * l.quantity })) },
       },
@@ -110,7 +121,7 @@ export class OrdersService implements OnModuleInit {
   }
 
   /** Called once when an online payment succeeds. */
-  private async markPaid(orderId: string) {
+  private async markOnlinePaid(orderId: string) {
     const moved = await this.prisma.foodOrder.updateMany({ where: { id: orderId, status: 'PENDING_PAYMENT' }, data: { status: 'PLACED', paid: true, placedAt: new Date() } });
     if (moved.count === 1) {
       await this.notifyVendor(orderId);
@@ -134,9 +145,9 @@ export class OrdersService implements OnModuleInit {
    * Moves an order to a new status. Vendors must enter the customer's code to complete, and give a
    * reason to decline or cancel. Paid online orders that end cancelled or declined are refunded.
    */
-  async move(id: string, to: OrderStatus, actor: OrderActor, opts: { reason?: string; code?: string; byUser?: AuthUser } = {}) {
+  async move(id: string, to: OrderStatus, actor: OrderActor, opts: { reason?: string; code?: string; byUser?: AuthUser; dispatcherId?: string } = {}) {
     const order = await this.get(id);
-    if (!canTransition(order.status, to, actor, order.fulfilment)) {
+    if (!canTransition(order.status, to, actor, order.fulfilment, order.viaDispatcher)) {
       throw new ConflictException({ code: 'NOT_ALLOWED', message: `An order that is ${order.status.toLowerCase().replace(/_/g, ' ')} cannot be moved to ${to.toLowerCase().replace(/_/g, ' ')}.` });
     }
     if ((to === 'REJECTED' || (to === 'CANCELLED' && actor === 'VENDOR')) && !opts.reason) {
@@ -145,6 +156,22 @@ export class OrdersService implements OnModuleInit {
     if (to === 'COMPLETED' && opts.code !== order.pickupCode) {
       throw new BadRequestException({ code: 'WRONG_CODE', message: "That is not the customer's code. Ask them to show the code on their order." });
     }
+    const delivery = order.delivery;
+    if (order.viaDispatcher && actor === 'VENDOR' && to === 'COMPLETED' && delivery && delivery.status !== 'CANCELLED') {
+      throw new ConflictException({ code: 'DISPATCHER_COMPLETES', message: "The dispatcher completes this order with the customer's code." });
+    }
+    if (actor === 'DISPATCHER') {
+      const expected = to === 'OUT_FOR_DELIVERY' ? 'ASSIGNED' : 'PICKED_UP';
+      if (!delivery || delivery.dispatcherId !== opts.dispatcherId || delivery.status !== expected) {
+        throw new ForbiddenException({ code: 'NOT_YOURS', message: 'This delivery is not with you.' });
+      }
+    }
+    // The vendor sends out a dispatched order with their own staff: only while no dispatcher has taken it.
+    if (order.viaDispatcher && actor === 'VENDOR' && to === 'OUT_FOR_DELIVERY') {
+      const taken = await this.prisma.delivery.updateMany({ where: { orderId: id, status: 'WAITING' }, data: { status: 'CANCELLED', cancelledAt: new Date(), problemNote: 'Delivered by the vendor' } });
+      if (taken.count !== 1) throw new ConflictException({ code: 'TAKEN', message: 'A dispatcher has just taken this order.' });
+    }
+
     const now = new Date();
     const vendor = await this.prisma.vendor.findUniqueOrThrow({ where: { id: order.vendor.id }, select: { prepMinutes: true } });
     const data: Prisma.FoodOrderUpdateManyMutationInput = { status: to };
@@ -155,6 +182,7 @@ export class OrdersService implements OnModuleInit {
 
     const moved = await this.prisma.foodOrder.updateMany({ where: { id, status: order.status }, data });
     if (moved.count !== 1) throw new ConflictException({ code: 'CHANGED', message: 'This order was just updated. Refresh.' });
+    await this.syncDelivery(order, to, actor, opts.dispatcherId);
     await this.audit.record({
       action: `marketplace.order_${to.toLowerCase()}`,
       module: 'marketplace',
@@ -174,16 +202,67 @@ export class OrdersService implements OnModuleInit {
     }
 
     const minutes = vendor.prepMinutes;
+    const rider = order.delivery?.dispatcher?.student;
     const messages: Partial<Record<OrderStatus, [string, string, string | null]>> = {
+      ...(order.viaDispatcher && to === 'READY' ? { READY: ['ready, a campus dispatcher will bring it', 'We will tell you when it is on the way.', null] as [string, string, null] } : {}),
+      ...(actor === 'DISPATCHER' && to === 'OUT_FOR_DELIVERY' && rider ? { OUT_FOR_DELIVERY: ['on the way', `${rider.firstName} (${rider.phone ?? 'campus dispatcher'}) is bringing it to ${order.deliveryAddress}. Give them your code ${order.pickupCode}.`, `${rider.firstName} is bringing it. Your code is ${order.pickupCode}.`] as [string, string, string] } : {}),
       ACCEPTED: ['accepted', `The vendor is preparing it. About ${minutes} minutes.`, null],
-      READY: ['ready to collect', `Collect it at ${order.vendor.location}. Show your code ${order.pickupCode}.`, `Collect at ${order.vendor.location}. Code ${order.pickupCode}.`],
-      OUT_FOR_DELIVERY: ['on the way', `It is being delivered to ${order.deliveryAddress}. Give your code ${order.pickupCode} to the person delivering.`, `Your code is ${order.pickupCode}.`],
+      ...(order.viaDispatcher ? {} : { READY: ['ready to collect', `Collect it at ${order.vendor.location}. Show your code ${order.pickupCode}.`, `Collect at ${order.vendor.location}. Code ${order.pickupCode}.`] as [string, string, string] }),
+      ...(actor === 'DISPATCHER' ? {} : { OUT_FOR_DELIVERY: ['on the way', `It is being delivered to ${order.deliveryAddress}. Give your code ${order.pickupCode} to the person delivering.`, `Your code is ${order.pickupCode}.`] as [string, string, string] }),
       REJECTED: ['declined', `Reason: ${opts.reason}.${refundNote}`, `Reason: ${opts.reason}.${refundNote ? ' Refund on its way.' : ''}`],
       CANCELLED: actor === 'VENDOR' ? ['cancelled by the vendor', `Reason: ${opts.reason}.${refundNote}`, `Reason: ${opts.reason}.${refundNote ? ' Refund on its way.' : ''}`] : actor === 'SYSTEM' ? ['cancelled', 'It was not paid in time.', null] : undefined,
     };
     const m = messages[to];
     if (m) await this.notifyCustomer(id, m[0], m[1], m[2]);
     return this.get(id);
+  }
+
+  /** Keeps the dispatcher's delivery record in step with the order. */
+  private async syncDelivery(order: OrderRow, to: OrderStatus, actor: OrderActor, dispatcherId?: string) {
+    if (!order.viaDispatcher) return;
+    const now = new Date();
+    if (to === 'READY') {
+      const feeSettlement = dispatchFeeSettlement(order.dispatchFeeMode ?? 'INCLUDED', order.paymentOption);
+      await this.prisma.delivery.upsert({ where: { orderId: order.id }, create: { orderId: order.id, fee: order.deliveryFee, feeSettlement }, update: {} });
+      await this.offerToDispatchers(order.id);
+    }
+    if (actor === 'DISPATCHER' && to === 'OUT_FOR_DELIVERY') {
+      await this.prisma.delivery.updateMany({ where: { orderId: order.id, dispatcherId, status: 'ASSIGNED' }, data: { status: 'PICKED_UP', pickedUpAt: now } });
+    }
+    if (actor === 'DISPATCHER' && to === 'COMPLETED') {
+      await this.prisma.delivery.updateMany({ where: { orderId: order.id, dispatcherId, status: 'PICKED_UP' }, data: { status: 'DELIVERED', deliveredAt: now } });
+    }
+    if (to === 'CANCELLED' || to === 'REJECTED') {
+      const d = order.delivery;
+      await this.prisma.delivery.updateMany({ where: { orderId: order.id, status: { in: ['WAITING', 'ASSIGNED', 'PICKED_UP'] } }, data: { status: 'CANCELLED', cancelledAt: now } });
+      if (d?.dispatcherId && (d.status === 'ASSIGNED' || d.status === 'PICKED_UP')) {
+        const p = await this.prisma.dispatcherProfile.findUnique({ where: { id: d.dispatcherId }, select: { studentId: true } });
+        if (p) {
+          await this.notifications.notify({
+            eventKey: EVENT_KEYS.DELIVERY_UPDATE,
+            recipients: [{ userId: p.studentId }],
+            channels: ['IN_APP', 'SMS'],
+            sharedVars: { number: order.number, headline: 'cancelled by the vendor', detail: d.status === 'PICKED_UP' ? `Take the food back to ${order.vendor.name}.` : 'You do not need to collect it.', link: '/dispatch' },
+            link: '/dispatch',
+          });
+        }
+      }
+    }
+  }
+
+  /** Tells dispatchers who are online that a delivery is waiting. The first to take it gets it. */
+  async offerToDispatchers(orderId: string) {
+    const o = await this.prisma.foodOrder.findUnique({ where: { id: orderId }, select: { customerId: true, deliveryAddress: true, vendor: { select: { name: true } }, delivery: { select: { fee: true, status: true } } } });
+    if (!o?.delivery || o.delivery.status !== 'WAITING') return;
+    const online = await this.prisma.dispatcherProfile.findMany({ where: { status: 'ACTIVE', online: true, studentId: { not: o.customerId } }, select: { studentId: true }, take: 100 });
+    if (!online.length) return;
+    await this.notifications.notify({
+      eventKey: EVENT_KEYS.DELIVERY_AVAILABLE,
+      recipients: online.map((d) => ({ userId: d.studentId })),
+      channels: ['IN_APP'],
+      sharedVars: { vendor: o.vendor.name, area: deliveryArea(o.deliveryAddress), fee: formatCedis(o.delivery.fee) },
+      link: '/dispatch',
+    });
   }
 
   /** Runs every 5 minutes: orders left unpaid too long are cancelled so they do not clutter anyone's list. */
@@ -232,6 +311,19 @@ export class OrdersService implements OnModuleInit {
       sharedVars: { number: o.number, vendor: o.vendor.name, headline, detail, smsDetail: smsDetail ?? '', orderId: o.id },
       link: `/food/orders/${o.id}`,
     });
+  }
+
+  /** A pay-the-vendor order paid by cash or MoMo: the vendor ticks it paid, with the MoMo transaction ID. */
+  async markPaid(orderId: string, vendorId: string, via: 'CASH' | 'MOMO', reference?: string) {
+    const o = await this.get(orderId);
+    if (o.vendor.id !== vendorId) throw new ForbiddenException({ code: 'NOT_YOURS', message: 'This is not one of your orders.' });
+    if (o.paymentOption !== 'ON_PICKUP') throw new ConflictException({ code: 'ONLINE', message: 'Online orders are marked paid by Paystack.' });
+    if (o.paid) throw new ConflictException({ code: 'PAID', message: 'Already marked paid.' });
+    if (o.status === 'CANCELLED' || o.status === 'REJECTED') throw new ConflictException({ code: 'ENDED', message: 'This order was cancelled.' });
+    await this.prisma.foodOrder.update({ where: { id: orderId }, data: { paid: true, paidVia: via, paidReference: reference || null, paidMarkedAt: new Date() } });
+    await this.audit.record({ action: 'marketplace.order_marked_paid', module: 'marketplace', targetType: 'FoodOrder', targetId: orderId, metadata: { number: o.number, via, reference } });
+    await this.notifyCustomer(orderId, 'payment received', `${o.vendor.name} has received your payment${via === 'MOMO' ? ' by MoMo' : ' in cash'}${reference ? ` (transaction ${reference})` : ''}.`, null);
+    return this.get(orderId);
   }
 }
 

@@ -54,7 +54,8 @@ export function VendorMenu({ vendorId }: { vendorId: string }) {
                   const inCart = lines.find((l) => l.id === i.id)?.quantity ?? 0;
                   return (
                     <li key={i.id} className={cn('flex items-center justify-between gap-3 px-4 py-3', !i.isAvailable && 'opacity-60')}>
-                      <span className="min-w-0 text-sm">
+                      {i.photoUrl && <img src={i.photoUrl} alt="" className="size-16 shrink-0 rounded-md object-cover" />}
+                      <span className="min-w-0 flex-1 text-sm">
                         <span className="font-medium">{i.name}</span> <span className="tabular-nums text-muted">{formatCedis(i.price)}</span>
                         {i.description && <span className="block text-xs text-muted">{i.description}</span>}
                         {i.tags.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{i.tags.map((t) => <Badge key={t}>{t}</Badge>)}</span>}
@@ -119,17 +120,18 @@ function CheckoutDialog({ open, menu, onClose }: { open: boolean; menu: Menu; on
     setError(null);
   }, [open, menu]);
 
-  // Campus dispatchers never carry cash, so their deliveries are paid online.
+  // Campus dispatcher deliveries: the customer pays the dispatcher's fee, now or on delivery.
   const dispatched = fulfilment === 'DELIVERY' && menu.useDispatchers;
-  useEffect(() => { if (dispatched) setPayment('ONLINE'); }, [dispatched]);
-  const totals = orderTotals(cart.lines, fulfilment, menu);
+  const [feeMode, setFeeMode] = useState<'INCLUDED' | 'ON_DELIVERY'>('INCLUDED');
+  const base = orderTotals(cart.lines, fulfilment, menu);
+  const totals = dispatched ? { ...base, deliveryFee: feeMode === 'INCLUDED' ? menu.dispatchFee : 0, total: base.subtotal + (feeMode === 'INCLUDED' ? menu.dispatchFee : 0) } : base;
   const place = async () => {
     setBusy(true);
     setError(null);
     try {
       const r = await foodApi.place({
         vendorId: menu.id, lines: cart.lines.map((l) => ({ menuItemId: l.id, quantity: l.quantity })), fulfilment, paymentOption: payment,
-        deliveryAddress: fulfilment === 'DELIVERY' ? address.trim() : undefined, deliveryNote: deliveryNote.trim() || undefined, note: note.trim() || undefined,
+        dispatchFeeMode: dispatched ? feeMode : undefined, deliveryAddress: fulfilment === 'DELIVERY' ? address.trim() : undefined, deliveryNote: deliveryNote.trim() || undefined, note: note.trim() || undefined,
       });
       cart.clear();
       if (r.paymentUrl) window.location.href = r.paymentUrl;
@@ -160,12 +162,18 @@ function CheckoutDialog({ open, menu, onClose }: { open: boolean; menu: Menu; on
             <Field label="Directions (optional)" htmlFor="co-dnote"><Input id="co-dnote" value={deliveryNote} maxLength={200} onChange={(e) => setDeliveryNote(e.target.value)} /></Field>
           </>
         )}
-        {dispatched && <p className="text-sm text-muted">A campus dispatcher brings deliveries from {menu.name}, so you pay online now.</p>}
-        {menu.acceptsOnline && menu.acceptsPayOnPickup && !dispatched && (
+        {dispatched && (
+          <fieldset className="flex gap-2">
+            <legend className="mb-1 text-sm font-medium">A campus dispatcher delivers. Their fee is {formatCedis(menu.dispatchFee)}.</legend>
+            <button type="button" className={choice(feeMode === 'INCLUDED')} aria-pressed={feeMode === 'INCLUDED'} onClick={() => setFeeMode('INCLUDED')}>Include it now<span className="block text-xs font-normal text-muted">Added to what you pay</span></button>
+            <button type="button" className={choice(feeMode === 'ON_DELIVERY')} aria-pressed={feeMode === 'ON_DELIVERY'} onClick={() => setFeeMode('ON_DELIVERY')}>Pay the dispatcher<span className="block text-xs font-normal text-muted">Cash or MoMo on delivery</span></button>
+          </fieldset>
+        )}
+        {menu.acceptsOnline && menu.acceptsPayOnPickup && (
           <fieldset className="flex gap-2">
             <legend className="mb-1 text-sm font-medium">How will you pay?</legend>
             <button type="button" className={choice(payment === 'ONLINE')} aria-pressed={payment === 'ONLINE'} onClick={() => setPayment('ONLINE')}>Pay now<span className="block text-xs font-normal text-muted">Mobile money or card</span></button>
-            <button type="button" className={choice(payment === 'ON_PICKUP')} aria-pressed={payment === 'ON_PICKUP'} onClick={() => setPayment('ON_PICKUP')}>{fulfilment === 'DELIVERY' ? 'Pay on delivery' : 'Pay at the counter'}<span className="block text-xs font-normal text-muted">Cash or mobile money</span></button>
+            <button type="button" className={choice(payment === 'ON_PICKUP')} aria-pressed={payment === 'ON_PICKUP'} onClick={() => setPayment('ON_PICKUP')}>Pay the vendor<span className="block text-xs font-normal text-muted">Cash, or MoMo to {menu.payToNumber}</span></button>
           </fieldset>
         )}
         <Field label="Note for the vendor (optional)" htmlFor="co-note"><Textarea id="co-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="For example: no pepper" /></Field>

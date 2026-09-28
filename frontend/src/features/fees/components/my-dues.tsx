@@ -10,6 +10,7 @@ import { EmptyState, Spinner } from '@/components/ui/states';
 import { errorMessage } from '@/lib/axios';
 import { formatDate } from '@/lib/format';
 import { feesApi, type MyDues as Data } from '../api';
+import { PdfLink } from './pdf-link';
 import { usePaymentReturn } from './use-payment-return';
 
 export function MyDues() {
@@ -52,7 +53,7 @@ export function MyDues() {
                   <span className="block text-xs text-muted">{l.semester}. {l.payment ? `Paid ${formatDate(l.payment.createdAt)} (${l.payment.method === 'CASH' ? 'cash' : 'online'}), receipt ${l.payment.receiptNumber}.` : `Due ${formatDate(l.dueOn)}.`}</span>
                 </span>
                 <span className="shrink-0">
-                  {l.payment ? <Badge tone="success">Paid</Badge> : l.isOpen ? <Button size="sm" loading={busy === l.id} onClick={() => pay(l.id)}>Pay {formatCedis(l.amount)}</Button> : <Badge>Closed</Badge>}
+                  {l.payment ? <span className="flex items-center gap-2"><PdfLink api={`/me/dues/receipts/${l.payment.id}/pdf`} label="Receipt PDF" /><Badge tone="success">Paid</Badge></span> : l.isOpen ? <Button size="sm" loading={busy === l.id} onClick={() => pay(l.id)}>Pay {formatCedis(l.amount)}</Button> : <Badge>Closed</Badge>}
                 </span>
               </li>
             ))}

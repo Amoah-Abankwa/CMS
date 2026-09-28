@@ -17,7 +17,7 @@ const COPY: Record<Target, { verb: string; description: string }> = {
 };
 
 /** Suspend, deactivate or reactivate a staff or partner account. Asks for your authenticator code and is logged. */
-export function AccountAccess({ member, isSelf, onChanged }: { member: { id: string; status: string; firstName: string; lastName: string }; isSelf: boolean; onChanged: (status: string) => void }) {
+export function AccountAccess({ member, isSelf, onChanged, save = (id, status, reason) => staffApi.setStatus(id, status, reason) }: { member: { id: string; status: string; firstName: string; lastName: string }; isSelf: boolean; onChanged: (status: string) => void; save?: (id: string, status: Target, reason: string) => Promise<{ status: string }> }) {
   const [target, setTarget] = useState<Target | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function AccountAccess({ member, isSelf, onChanged }: { member: { id: str
     setBusy(true);
     setError(null);
     try {
-      const r = await staffApi.setStatus(member.id, target, reason.trim());
+      const r = await save(member.id, target, reason.trim());
       onChanged(r.status);
       setTarget(null);
     } catch (err) {

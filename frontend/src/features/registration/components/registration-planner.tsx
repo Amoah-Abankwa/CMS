@@ -127,7 +127,7 @@ export function RegistrationPlanner() {
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <span className="text-sm font-medium">
-                          <span className="font-mono">{o.course.code}</span> {o.course.title}
+                          <span className="font-mono">{o.course.code}</span> {o.course.title}{o.carryOver && <span className="ml-2 rounded-sm bg-warning-soft px-1.5 py-0.5 text-xs font-medium">Carry-over</span>}
                         </span>
                         <span className="text-sm tabular-nums text-muted">{o.course.creditHours} credits</span>
                       </span>

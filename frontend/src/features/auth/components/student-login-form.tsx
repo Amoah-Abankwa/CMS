@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Field } from '@/components/ui/field';
 import { Alert } from '@/components/ui/alert';
@@ -14,6 +13,7 @@ import { errorMessage } from '@/lib/axios';
 import { authApi } from '../api';
 import { studentLoginSchema } from '../schemas';
 import { useCompleteSignIn } from '../use-complete-sign-in';
+import { Input } from '@/components/ui/input';
 
 type Values = z.infer<typeof studentLoginSchema>;
 

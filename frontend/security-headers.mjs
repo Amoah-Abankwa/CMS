@@ -11,9 +11,10 @@ export function securityHeaders(isProduction) {
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${isProduction ? '' : " 'unsafe-eval'"}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    // Photos are served by Cloudinary; uploads go from the browser straight to Cloudinary with a signature.
+    "img-src 'self' data: blob: https://res.cloudinary.com",
     "font-src 'self'",
-    `connect-src 'self'${isProduction ? '' : ' ws: wss:'}`,
+    `connect-src 'self' https://api.cloudinary.com${isProduction ? '' : ' ws: wss:'}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

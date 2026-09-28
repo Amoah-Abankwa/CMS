@@ -1,3 +1,5 @@
+import { UploadsService } from '../uploads/uploads.service';
+import { HostelFeesService } from './hostel-fees.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -16,6 +18,8 @@ export class StudentAccommodationService {
     private readonly allocation: AllocationService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly hostelFees: HostelFeesService,
+    private readonly uploads: UploadsService,
   ) {}
 
   /** Everything the student's accommodation page needs. */
@@ -132,6 +136,8 @@ export class StudentAccommodationService {
       if (privateBed) throw new ConflictException({ code: 'HAS_PRIVATE', message: 'You have a confirmed private hostel booking. Cancel it before accepting a university room.' });
     }
     await this.prisma.roomAllocation.update({ where: { id: offer.id }, data: { status: accept ? 'ACCEPTED' : 'DECLINED', respondedAt: new Date() } });
+    // The room's price goes into the student's hostel fees account.
+    if (accept) await this.hostelFees.syncAllocation(offer.id, user.id);
     if (!accept) await this.prisma.hostelApplication.updateMany({ where: { semesterId: semester.id, studentId: user.id }, data: { status: 'WITHDRAWN' } });
     await this.audit.record({ action: accept ? 'accommodation.offer_accepted' : 'accommodation.offer_declined', module: 'accommodation', targetType: 'RoomAllocation', targetId: offer.id });
     return this.overview(user);
@@ -144,13 +150,13 @@ export class StudentAccommodationService {
       where: { kind: 'PRIVATE', isActive: true, verification: 'APPROVED' },
       orderBy: { name: 'asc' },
       select: {
-        id: true, name: true, gender: true, location: true, digitalAddress: true, distanceNote: true, description: true, facilities: true, contactPhone: true,
+        id: true, name: true, gender: true, location: true, digitalAddress: true, distanceNote: true, description: true, facilities: true, contactPhone: true, photoIds: true,
         roomTypes: { where: { isActive: true }, orderBy: { pricePerSemester: 'asc' }, select: { id: true, name: true, bedsPerRoom: true, pricePerSemester: true, availableBeds: true, description: true } },
       },
     });
     const profile = await this.prisma.studentProfile.findUnique({ where: { userId: user.id }, select: { gender: true } });
     const gender = toGender(profile?.gender);
-    return hostels.filter((h) => h.gender === 'MIXED' || !gender || h.gender === gender);
+    return hostels.filter((h) => h.gender === 'MIXED' || !gender || h.gender === gender).map(({ photoIds, ...h }) => ({ ...h, photoUrls: photoIds.map((p) => this.uploads.url(p, 900)).filter(Boolean) }));
   }
 
   async requestBooking(user: AuthUser, dto: BookingRequestDto) {
@@ -206,6 +212,7 @@ export class StudentAccommodationService {
         link: '/my-hostel',
       });
     }
+    await this.hostelFees.syncBooking(id);
     return { ok: true };
   }
 

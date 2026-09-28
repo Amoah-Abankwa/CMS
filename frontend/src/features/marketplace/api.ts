@@ -28,6 +28,7 @@ export interface MenuItem {
   description: string | null;
   price: number;
   isAvailable: boolean;
+  photoUrl?: string | null;
   tags: string[];
   categoryId: string | null;
   position?: number;
@@ -37,6 +38,9 @@ export interface VendorMenu extends VendorPublic {
   categories: Array<{ id: string; name: string }>;
   items: MenuItem[];
   defaultAddress: string | null;
+  /** The campus dispatcher's fee, paid by the customer (0 if the vendor delivers itself). */
+  dispatchFee: number;
+  payToNumber: string;
 }
 
 export interface Order {
@@ -45,6 +49,9 @@ export interface Order {
   status: OrderStatus;
   fulfilment: 'PICKUP' | 'DELIVERY';
   viaDispatcher: boolean;
+  dispatchFeeMode: 'INCLUDED' | 'ON_DELIVERY' | null;
+  paidVia: string | null;
+  paidReference: string | null;
   deliveryAddress: string | null;
   deliveryNote: string | null;
   paymentOption: 'ONLINE' | 'ON_PICKUP';
@@ -148,7 +155,7 @@ export interface DispatcherSettlement {
 export const foodApi = {
   vendors: () => api.get<Array<VendorPublic & { itemsAvailable: number }>>('/food/vendors').then((r) => r.data),
   menu: (id: string) => api.get<VendorMenu>(`/food/vendors/${id}`).then((r) => r.data),
-  place: (dto: { vendorId: string; lines: Array<{ menuItemId: string; quantity: number }>; fulfilment: 'PICKUP' | 'DELIVERY'; paymentOption: 'ONLINE' | 'ON_PICKUP'; deliveryAddress?: string; deliveryNote?: string; note?: string }) =>
+  place: (dto: { vendorId: string; lines: Array<{ menuItemId: string; quantity: number }>; fulfilment: 'PICKUP' | 'DELIVERY'; paymentOption: 'ONLINE' | 'ON_PICKUP'; dispatchFeeMode?: 'INCLUDED' | 'ON_DELIVERY'; deliveryAddress?: string; deliveryNote?: string; note?: string }) =>
     api.post<{ orderId: string; number: number; paymentUrl?: string; provider?: string }>('/food/orders', dto).then((r) => r.data),
   orders: (page: number) => api.get<{ items: Order[]; total: number; page: number; pageSize: number }>('/food/orders', { params: { page, pageSize: 20 } }).then((r) => r.data),
   order: (id: string) => api.get<Order>(`/food/orders/${id}`).then((r) => r.data),
@@ -168,6 +175,7 @@ export const foodApi = {
   setAvailable: (id: string, isAvailable: boolean) => api.post(`/vendor/items/${id}/availability`, { isAvailable }),
   deleteItem: (id: string) => api.delete(`/vendor/items/${id}`),
   board: () => api.get<Board>('/vendor/orders').then((r) => r.data),
+  markPaid: (id: string, via: 'CASH' | 'MOMO', reference?: string) => api.post(`/vendor/orders/${id}/paid`, { via, reference }),
   act: (id: string, to: string, extra: { reason?: string; code?: string } = {}) => api.post<Order>(`/vendor/orders/${id}/action`, { to, ...extra }).then((r) => r.data),
 
   adminVendors: () => api.get<AdminVendor[]>('/marketplace/vendors').then((r) => r.data),

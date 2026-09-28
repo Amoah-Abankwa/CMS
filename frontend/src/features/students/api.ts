@@ -46,6 +46,7 @@ export interface RegisteredStudent {
 }
 
 export const studentsApi = {
+  setStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED', reason: string) => api.post<{ status: string }>(`/students/${id}/status`, { status, reason }).then((r) => r.data),
   resendSetup: (id: string) => api.post(`/students/${id}/resend-setup`),
   programmes: () => api.get<ProgrammeOption[]>('/academics/programmes').then((r) => r.data),
   list: (params: { page: number; pageSize?: number; search?: string; programmeId?: string; admissionYear?: number }) =>

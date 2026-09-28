@@ -61,7 +61,7 @@
 - Expected students are those with an approved course registration that semester. Services close themselves after 8:00; anyone not recorded becomes absent or excused.
 - Service times are copied from the rules when scheduled, so changing the rules does not alter past services.
 - The Chaplaincy finalises scores at the end of the semester; students are told their score. Finalising again after corrections only tells students whose score changed.
-- Not yet: exemptions for specific students, and passing the 5.00 into a course result. Tell us how ANU uses the score and it can be added.
+- Done since: individual exemptions and the 5.00 in course totals (see later sections).
 
 ## Phase 5 notes (accommodation)
 
@@ -70,7 +70,7 @@
 - Private hostels are created by owners with partner accounts (same setup link and authenticator sign-in as staff) and are hidden from students until the Hostel Office verifies them. Accepting a booking takes a bed off the free count in a way two acceptances cannot both take the last bed.
 - A student can hold one place a semester: accepting a university room is blocked while they have a confirmed private booking, and the other way round.
 - Owners see a student's name, index number, phone and email, nothing academic.
-- Not yet: payment of hostel fees (planned with payments), photos of private hostels (needs file storage), roommate requests, hall check-in and check-out, and complaints about private hostels.
+- Not yet: roommate requests and complaints about private hostels (hostel fees, photos, check-in and check-out are done; see later sections).
 
 ## Phase 6 notes (library)
 
@@ -80,7 +80,7 @@
 - Returned copies go to the next person in the reservation queue and are kept for a set number of days; uncollected copies pass along the queue automatically.
 - Reminders: before the due date, the day after, then weekly (at most three), only between 07:00 and 20:00.
 - Two desks cannot issue the same copy at once.
-- Not yet: paying fines online, library clearance for graduation, e-books and journals, inter-library loans, and linking reading lists to courses.
+- Not yet: library clearance for graduation, e-books and journals, inter-library loans, and linking reading lists to courses (fines can be paid online).
 
 ## Phase 7 notes (food marketplace)
 
@@ -93,7 +93,7 @@
 - Refunds happen automatically when a paid order is declined or cancelled, or when a payment arrives after its order expired. Paystack refunds complete later and are marked refunded by webhook. A refund that fails is logged for Finance to resolve.
 - Online payments are collected into the university's account. **Vendor settlements** shows, per vendor and period, online sales, commission (0% by default), payouts recorded and what is owed. Recording a payout does not send money; Finance pays by mobile money and records the transaction ID. Pay-at-counter money goes straight to the vendor.
 - Vendors deliver with their own staff for now. Student dispatchers come with Phase 8.
-- Not yet: automatic payouts through Paystack transfers, ratings and reviews, meal plans or student wallet, scheduled orders, photos of dishes, and receipts as PDFs.
+- Not yet: automatic payouts through Paystack transfers, ratings and reviews, meal plans or student wallet, and scheduled orders (dish photos are done).
 
 ## Phase 8 notes (student employment and dispatchers)
 
@@ -118,12 +118,61 @@
 - `pnpm db:deploy` now applies migrations and then re-applies the database hardening (append-only activity log, row-level security), which new tables from Phases 4 to 8 needed.
 - New: administrators can suspend, deactivate and reactivate staff and partner accounts (signs them out everywhere at once). Reset codes are limited to three per account per hour. Old sessions and codes are cleaned up nightly.
 - `.github/workflows/ci.yml` installs everything, type-checks, tests, builds, and runs the smoke test against a real database. Pushing the project to GitHub gives the first real run that Phase 9 is waiting for.
-- Not yet: independent penetration test, nonce-based content security policy, suspending student accounts from the Registry screens, records-retention periods (an ANU decision; see `docs/SECURITY.md`).
+- Not yet: independent penetration test, nonce-based content security policy, records-retention periods (an ANU decision; see `docs/SECURITY.md`). Suspending student accounts is done.
 
 ## Fees and departmental dues (added after Phase 10)
 
 - **Fees.** Finance sets fee schedules per semester, for everyone or for a programme and/or level (the most specific applies), and issues bills. Students pay online (mobile money or card) or at the bank, where Finance records the slip; the same slip cannot be recorded twice. Scholarships, waivers and extra charges are adjustments with a reason. Payments recorded in error are reversed, not deleted.
 - **Automatic fee clearance.** Once a student has paid the set percentage (70% by default, set by Finance) they are cleared for exams; if a reversal or charge takes them below it, that automatic clearance is withdrawn. Clearances Finance sets by hand are never changed by the rule.
 - **Departmental dues.** Associations (EHASSA, BACA and others) are linked to departments by the Dean of Students office, which records each elected president and treasurer for a term. Officers get an **Association dues** screen for their term only (an add-on to their student account, like dispatchers), set dues, see who has paid, and record cash. Every payment, cash or online, has a numbered receipt sent to the student by SMS; only the Dean of Students office can cancel one. Online dues are held by the university and paid out to the association's account by Finance.
-- To confirm with ANU: the real clearance percentage; whether international students pay in US dollars (the platform currently bills in cedis only); what EHASSA and BACA stand for and which departments each covers; whether dues are compulsory.
-- Not yet: fee instalment plans with deadlines, late-payment penalties, bank statement import, and printed PDF receipts.
+- Confirmed by ANU: the Registrar's office sets the clearance percentage; international students are billed in US dollars; EHASSA is the Engineering and Health and Allied Science Students Association and BACA the Business and Accounting Students Association; dues are compulsory.
+- Not yet: fee instalment plans with deadlines, late-payment penalties and bank statement import (PDF receipts are done).
+
+## Registry and fee updates
+
+- **Registry.** The Registrar creates, edits and removes schools, departments and programmes, and links programmes to departments. Each programme has a type: Bachelor's regular (8 semesters), Bachelor's weekend (12), Diploma, Graduate School, or any the Registrar adds; a programme can override its type's number of semesters. Programmes with students are marked "not admitting" rather than removed.
+- **Index numbers.** The Registrar sets the index number format for each programme type, from tokens: {YY}/{YYYY} admission year, {CODE} the type's code, {SEQ:n} the running number (e.g. ANU{YY}{CODE}{SEQ:5} gives ANU25400001; ANUGS{YY}{SEQ:4} gives ANUGS250001). Formats that could repeat or clash are refused. Changing a format affects new students only. Sign-in accepts any configured format.
+- **Fees.** The Accounts office keeps the list of fee items, and every schedule, bill, statement and receipt uses those labels. Schedules are for Ghanaian, international or all students, in cedis or US dollars; international students are billed in dollars. Online dollar payments need USD enabled on the university's Paystack account; otherwise they pay at the bank. Students see a statement (debits, credits, running balance) and a receipt for every payment, both printable or saved as PDF from the browser. The clearance percentage is set by the Registrar.
+- **Student dashboard** shows CGPA, fees balance and clearance, and compulsory dues outstanding.
+- Diploma index numbers start with D and the programme's initials, set per programme by the Registrar as its index code: DCE (Diploma in Computer Engineering), DBM (Diploma in Biomedical Engineering), DOE (Diploma in Oil and Gas Engineering). The format part {PROG} puts it in the number; each programme has its own sequence, and a code cannot change once students hold numbers with it.
+- To confirm: what follows the diploma initials (currently the 2-digit year and a 4-digit running number, DCE260001), the Graduate School format, and whether any dues should affect clearance or registration (they are compulsory but do not block anything yet).
+- Done since: server-generated PDFs and exchange rates.
+
+## After the first real run
+
+- **Email through Resend.** `EMAIL_PROVIDER=resend` with `RESEND_API_KEY`; verify the sending domain in Resend so mail does not land in spam. SMTP still works. A failed send is marked failed and appears on **Failed messages** for resending.
+- **Student accounts can be suspended**, deactivated and reactivated by the Registry (with a reason and an authenticator check); suspending signs the student out everywhere.
+- **Library fines can be paid online** from the student's Library page; the payment settles the fine, and a payment for an already-settled fine is refunded.
+- **Hall fees are charged on the fee bill** when a student accepts a university hall place (the room's price), adjusted by the price difference on a move, and credited back on cancellation. Students pay them like other fees, and they count towards the exam clearance percentage. Bills in US dollars are skipped (logged) because room prices are in cedis; charge those at the hostel office.
+- **Academic advisors.** Heads of Department (and the Registry) assign students to their own advisor. An advisor with advisees reviews only those students' registrations; one without advisees still reviews the whole department.
+- **Photos through Cloudinary (signed uploads).** Vendors add a photo to each dish; private hostel owners add up to 8 photos (first is the cover), shown to students. The browser uploads straight to Cloudinary with a signature the API creates for a fixed folder and image formats; the API only accepts photos from that folder.
+- Not yet: deleting replaced photos from Cloudinary (they stay in the account), a size limit enforced by Cloudinary (the browser checks 5 MB; set an upload preset limit in Cloudinary for full enforcement), profile photos.
+
+## Results and exams (second round after the first run)
+
+- **Result amendments.** A published result is corrected by request from the course's lead lecturer or the Exams Office, with the corrected scores and a reason. It is approved by the Head of Department, then the Dean, then applied by the Exams Office or Registrar, regraded on the scale the results were published with. The original stays on record; the student is told the before and after by email, SMS and in-app, and their GPA follows.
+- **Carry-over courses.** A course whose latest published attempt was a fail is offered to the student again when it runs, whatever its level, marked "Carry-over" on the registration page. Incomplete (IC) results are not carry-overs; they are settled by an amendment. All attempts count towards the CGPA, as before; say if ANU uses best or latest attempt instead.
+- **Exams.** The Exams Office numbers seats (papers sharing a hall at the same time get separate ranges; halls over capacity are listed) and sends each invigilator their duty list. Students see their seat on their exam timetable. Invigilators open the **Exam register** for their papers, mark present, late or absent (or type or scan index numbers), note incidents, and close it (anyone unmarked is recorded absent). Each candidate shows eligibility, fee clearance and any unpaid compulsory departmental dues; these are flags, not blocks.
+- QA: `check-wiring.py` now also catches duplicate names in one import (a TypeScript error the syntax check missed); one was found and fixed in the sidebar.
+
+## Money (third round after the first run)
+
+- **Campus dispatcher fee paid by the customer.** At checkout the customer includes the dispatcher's fee in their payment or pays the dispatcher on delivery. Customers can pay online (Paystack, marked paid automatically) or pay the vendor directly in cash or by MoMo; the vendor ticks the order as paid with the MoMo transaction ID and the customer is told. Finance pays dispatchers only for fees paid through Paystack; vendors hand over fees included in a direct payment; customers pay on delivery otherwise. Vendors' settlements no longer lose the dispatch fee, and the commission is taken on the food only.
+- **Exchange rates.** The Accounts office adds dated rates (cedis per US dollar). Dollar bills show the cedi equivalent, and a payment made in the other currency is converted at the rate in force on its date, keeping the original amount and rate on the receipt.
+- **PDFs generated by the server** for fee receipts, fee statements and dues receipts (the browser print view remains). The PDFs use standard fonts, so money reads GHS and USD rather than the cedi sign; embedding a font can change that.
+- **Unpaid dues on exam registers** is off by default; each Head of Department can switch it on for their department. Nothing is ever blocked.
+
+## Hostels and devotion (fourth round after the first run)
+
+- **Morning devotion in course totals** (the Registrar's setting, on by default): assessments add up to 95% and each student's devotion score (out of 5.00) is added to every course. Weekend students are exempt from devotion (no longer expected at services) and their 95 is scaled to 100. Results cannot be submitted until the Chaplaincy has finalised devotion scores. Students see "incl. devotion 4.25" or "scaled from 95" beside each total; amendments keep the devotion part. Results published before this change are untouched.
+- **Hostel fees** for university halls and private hostels are now their own account per placement, not a line on the tuition bill (anything charged there before is credited back automatically). The fee is the room's price once a hall place is accepted, or the room type's price once an owner accepts a booking; a move changes it and giving up the place sets it to zero. Students pay online (part or all); the Hostel Manager (halls) or the owner (private hostels) records cash, MoMo or bank payments. Every payment has a receipt and a PDF, sent to the student and to the Hostel Manager or owner. Online private hostel fees are paid out to owners by Finance (**Hostel owner payouts**).
+
+## Documents and small rules (fifth round after the first run)
+
+- **Private documents in Cloudinary.** Hostel forms, signed forms and excuse evidence are uploaded straight from the browser as "authenticated" files (no public address), with a signature that fixes the folder, the formats (PDF, JPG, PNG) and the private type; up to 10 MB. The API only gives a five-minute download link to people allowed to see a document, and records who opened private ones.
+- **Hostel forms.** The Hostel Manager (for all halls or one hall) and owners (their hostels) upload blank forms such as the tenancy agreement and registration form. Students placed there download, sign and upload them back; the hostel accepts or returns them with a note.
+- **Check-in and check-out.** The Hostel Manager (halls) and owners (private hostels) check residents in and out with a note (keys, room condition). **Residents** shows everyone placed this semester, who is in, and their forms.
+- **Excuse requests.** Students ask to be excused for a date range with a reason and a document (required for illness). The Health Centre or Dean of Students office excuses or declines; excusing records the excuse, which corrects class attendance and morning devotion.
+- **Individual devotion exemptions** by the Chaplaincy for the semester: exempt students are not expected at services and their course marks out of 95 are scaled to 100, like weekend students.
+- **Reopening an approved registration** by the advisor, Head of Department or Registry, with a reason, until results for any of its courses are submitted. The student changes it and submits again.
+- Next: the library (graduation clearance, e-books, inter-library loans, course reading lists).

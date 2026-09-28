@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { formatCedis, type FeeRules } from '@anu/shared';
+import Link from 'next/link';
+import { formatMoney, STUDENT_GROUP_LABEL, type Currency, type FeeRules, type FeeStudentGroup } from '@anu/shared';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
 import { errorMessage } from '@/lib/axios';
-import { feesApi, type FeeOptions, type Schedule } from '../api';
+import { feesApi, type FeeItem, type FeeOptions, type Schedule } from '../api';
 
 /** Fee schedules for a semester, issuing bills, and the clearance rule. */
 export function FeeSetup() {
@@ -46,8 +47,8 @@ export function FeeSetup() {
           <ul className="divide-y divide-border">
             {schedules.map((s) => (
               <li key={s.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <span className="text-sm"><span className="font-medium">{s.name}</span> <span className="tabular-nums">{formatCedis(s.lines.reduce((t, l) => t + l.amount, 0))}</span>
-                  <span className="block text-xs text-muted">For {s.programme?.name ?? 'every programme'}, {s.level ? `level ${s.level}` : 'every level'}. {s.lines.map((l) => l.name).join(', ')}. {s._count.bills} bills issued.</span></span>
+                <span className="text-sm"><span className="font-medium">{s.name}</span> <span className="tabular-nums">{formatMoney(s.lines.reduce((t, l) => t + l.amount, 0), s.currency)}</span>
+                  <span className="block text-xs text-muted">For {STUDENT_GROUP_LABEL[s.studentGroup].toLowerCase()}, {s.programme?.name ?? 'every programme'}, {s.level ? `level ${s.level}` : 'every level'}. {s.lines.map((l) => l.name).join(', ')}. {s._count.bills} bills issued.</span></span>
                 <span className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setEditing(s)}>Edit</Button>
                   {s._count.bills === 0 && <Button variant="ghost" size="sm" onClick={() => run('del' + s.id, async () => { await feesApi.deleteSchedule(s.id); return 'Schedule removed.'; })}>Remove</Button>}
@@ -69,41 +70,43 @@ export function FeeSetup() {
 }
 
 function RulesCard() {
-  const [r, setR] = useState<{ clearancePercent: string; minOnlinePayment: string } | null>(null);
+  const [r, setR] = useState<{ clearancePercent: number; minOnlinePayment: string; minOnlinePaymentUsd: string } | null>(null);
   const [msg, setMsg] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
-  useEffect(() => { feesApi.rules().then((x: FeeRules) => setR({ clearancePercent: String(x.clearancePercent), minOnlinePayment: String(x.minOnlinePayment / 100) })).catch(() => undefined); }, []);
+  useEffect(() => { feesApi.rules().then((x: FeeRules) => setR({ clearancePercent: x.clearancePercent, minOnlinePayment: String(x.minOnlinePayment / 100), minOnlinePaymentUsd: String(x.minOnlinePaymentUsd / 100) })).catch(() => undefined); }, []);
   if (!r) return null;
   const save = async () => {
     try {
-      const x = await feesApi.saveRules({ clearancePercent: Number(r.clearancePercent), minOnlinePayment: Math.round(Number(r.minOnlinePayment) * 100) });
-      setMsg({ tone: 'success', text: x.rechecked ? `Saved. Clearance was rechecked for ${x.rechecked} bills this semester.` : 'Saved.' });
+      await feesApi.saveRules({ minOnlinePayment: Math.round(Number(r.minOnlinePayment) * 100), minOnlinePaymentUsd: Math.round(Number(r.minOnlinePaymentUsd) * 100) });
+      setMsg({ tone: 'success', text: 'Saved.' });
     } catch (err) { setMsg({ tone: 'danger', text: errorMessage(err) }); }
   };
   return (
     <Card>
-      <CardHeader title="Clearance rule" description="Students are cleared for exams automatically once they have paid this share of the semester's bill. A clearance you set by hand on the Fee clearance screen is never changed by this rule." />
+      <CardHeader title="Online payments" description={`Students are cleared for exams automatically once they have paid ${r.clearancePercent}% of the semester's bill. The Registrar's office sets that percentage.`} />
       <CardBody className="flex flex-col gap-4">
         {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Paid to be cleared (%)" htmlFor="fr-pct"><Input id="fr-pct" type="number" min={1} max={100} value={r.clearancePercent} onChange={(e) => setR({ ...r, clearancePercent: e.target.value })} /></Field>
           <Field label="Smallest online payment (GH₵)" htmlFor="fr-min"><Input id="fr-min" type="number" value={r.minOnlinePayment} onChange={(e) => setR({ ...r, minOnlinePayment: e.target.value })} /></Field>
+          <Field label="Smallest online payment (US$)" htmlFor="fr-usd"><Input id="fr-usd" type="number" value={r.minOnlinePaymentUsd} onChange={(e) => setR({ ...r, minOnlinePaymentUsd: e.target.value })} /></Field>
         </div>
-        <div><Button variant="secondary" onClick={save}>Save rule</Button></div>
+        <div><Button variant="secondary" onClick={save}>Save</Button></div>
       </CardBody>
     </Card>
   );
 }
 
 function ScheduleDialog({ target, semesterId, programmes, onClose, onDone }: { target: Schedule | 'new' | null; semesterId: string; programmes: FeeOptions['programmes']; onClose: () => void; onDone: () => void }) {
-  const [f, setF] = useState({ name: '', programmeId: '', level: '' });
-  const [lines, setLines] = useState<Array<{ name: string; amount: string }>>([]);
+  const [f, setF] = useState({ name: '', programmeId: '', level: '', studentGroup: 'ALL' as FeeStudentGroup, currency: 'GHS' as Currency });
+  const [lines, setLines] = useState<Array<{ feeItemId: string; amount: string }>>([]);
+  const [items, setItems] = useState<FeeItem[]>([]);
+  useEffect(() => { feesApi.items().then((x) => setItems(x.filter((i) => i.isActive))).catch(() => undefined); }, []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!target) return;
     const s = target === 'new' ? null : target;
-    setF({ name: s?.name ?? '', programmeId: s?.programmeId ?? '', level: s?.level ? String(s.level) : '' });
-    setLines(s ? s.lines.map((l) => ({ name: l.name, amount: String(l.amount / 100) })) : [{ name: 'Tuition', amount: '' }, { name: 'SRC dues', amount: '' }]);
+    setF({ name: s?.name ?? '', programmeId: s?.programmeId ?? '', level: s?.level ? String(s.level) : '', studentGroup: s?.studentGroup ?? 'ALL', currency: s?.currency ?? 'GHS' });
+    setLines(s ? s.lines.map((l) => ({ feeItemId: l.feeItemId ?? '', amount: String(l.amount / 100) })) : [{ feeItemId: '', amount: '' }]);
     setError(null);
   }, [target]);
   if (!target) return null;
@@ -113,7 +116,7 @@ function ScheduleDialog({ target, semesterId, programmes, onClose, onDone }: { t
     setBusy(true);
     setError(null);
     try {
-      await feesApi.saveSchedule({ semesterId, name: f.name.trim(), programmeId: f.programmeId || null, level: f.level ? Number(f.level) : null, lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), amount: Math.round(Number(l.amount || 0) * 100) })) }, existing?.id);
+      await feesApi.saveSchedule({ semesterId, name: f.name.trim(), programmeId: f.programmeId || null, level: f.level ? Number(f.level) : null, studentGroup: f.studentGroup, currency: f.currency, lines: lines.filter((l) => l.feeItemId).map((l) => ({ feeItemId: l.feeItemId, amount: Math.round(Number(l.amount || 0) * 100) })) }, existing?.id);
       onDone();
     } catch (err) { setError(errorMessage(err)); } finally { setBusy(false); }
   };
@@ -124,22 +127,27 @@ function ScheduleDialog({ target, semesterId, programmes, onClose, onDone }: { t
         <Field label="Name" htmlFor="sc-name"><Input id="sc-name" value={f.name} maxLength={80} placeholder="Undergraduate, Ghanaian students" onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Programme" htmlFor="sc-prog"><Select id="sc-prog" value={f.programmeId} onChange={(e) => setF({ ...f, programmeId: e.target.value })}><option value="">Every programme</option>{programmes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+          <Field label="Students" htmlFor="sc-group"><Select id="sc-group" value={f.studentGroup} onChange={(e) => setF({ ...f, studentGroup: e.target.value as FeeStudentGroup, currency: e.target.value === 'INTERNATIONAL' ? 'USD' : f.currency })}>{(Object.keys(STUDENT_GROUP_LABEL) as FeeStudentGroup[]).map((g) => <option key={g} value={g}>{STUDENT_GROUP_LABEL[g]}</option>)}</Select></Field>
+          <Field label="Currency" htmlFor="sc-cur"><Select id="sc-cur" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value as Currency })}><option value="GHS">Ghana cedis (GH₵)</option><option value="USD">US dollars (US$)</option></Select></Field>
           <Field label="Level" htmlFor="sc-level"><Select id="sc-level" value={f.level} onChange={(e) => setF({ ...f, level: e.target.value })}><option value="">Every level</option>{[100, 200, 300, 400, 500, 600].map((l) => <option key={l} value={l}>{l}</option>)}</Select></Field>
         </div>
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 text-sm font-medium">Items</legend>
           {lines.map((l, i) => (
             <div key={i} className="flex gap-2">
-              <Input aria-label={`Item ${i + 1}`} value={l.name} maxLength={60} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-              <Input aria-label={`Amount for item ${i + 1} (GH₵)`} className="w-36" type="number" inputMode="decimal" value={l.amount} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+              <Select aria-label={`Item ${i + 1}`} value={l.feeItemId} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, feeItemId: e.target.value } : x)))}>
+                <option value="">Choose a fee item</option>
+                {items.map((it) => <option key={it.id} value={it.id} disabled={lines.some((x, j) => j !== i && x.feeItemId === it.id)}>{it.name}</option>)}
+              </Select>
+              <Input aria-label={`Amount for item ${i + 1}`} className="w-36" type="number" inputMode="decimal" value={l.amount} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
               <Button variant="ghost" size="sm" onClick={() => setLines(lines.filter((_, j) => j !== i))}>Remove</Button>
             </div>
           ))}
-          <div className="flex items-center justify-between"><Button variant="ghost" size="sm" onClick={() => setLines([...lines, { name: '', amount: '' }])}>Add item</Button><span className="text-sm font-medium tabular-nums">Total {formatCedis(total)}</span></div>
+          <div className="flex items-center justify-between"><span className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setLines([...lines, { feeItemId: '', amount: '' }])}>Add item</Button><Link href="/finance/fees/items" className="self-center text-xs text-primary hover:underline">Edit the fee items list</Link></span><span className="text-sm font-medium tabular-nums">Total {formatMoney(total, f.currency)}</span></div>
         </fieldset>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button loading={busy} disabled={f.name.trim().length < 3 || !lines.some((l) => l.name.trim()) || total <= 0} onClick={save}>Save schedule</Button>
+          <Button loading={busy} disabled={f.name.trim().length < 3 || !lines.some((l) => l.feeItemId) || lines.some((l) => !l.feeItemId && l.amount) || total <= 0} onClick={save}>Save schedule</Button>
         </div>
       </div>
     </Dialog>

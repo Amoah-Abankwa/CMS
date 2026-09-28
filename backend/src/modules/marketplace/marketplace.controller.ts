@@ -7,8 +7,9 @@ import { VendorsAdminService } from './vendors-admin.service';
 import { VendorService } from './vendor.service';
 import { CustomerService } from './customer.service';
 import { OrdersService } from './orders.service';
+import { DispatchService } from './dispatch.service';
 import {
-  AvailabilityDto, CategoryDto, CreateVendorDto, MarketplaceSettingsDto, MenuItemDto, OrdersQuery, PauseDto, PayoutDto, PlaceOrderDto, ReviewVendorDto, SettlementQuery, VendorActionDto, VendorProfileDto,
+  AvailabilityDto, MarkPaidDto, CategoryDto, CreateVendorDto, DeliveredDto, DispatcherPayoutDto, OnlineDto, ProblemDto, MarketplaceSettingsDto, MenuItemDto, OrdersQuery, PauseDto, PayoutDto, PlaceOrderDto, ReviewVendorDto, SettlementQuery, VendorActionDto, VendorProfileDto,
 } from './dto/marketplace.dto';
 
 @Controller('marketplace')
@@ -17,7 +18,18 @@ export class MarketplaceAdminController {
   constructor(
     private readonly admin: VendorsAdminService,
     private readonly settings: MarketplaceSettingsService,
+    private readonly dispatch: DispatchService,
   ) {}
+
+  @Get('dispatcher-settlements')
+  dispatcherSettlements(@Query() q: SettlementQuery) {
+    return this.dispatch.settlements(q.from, q.to);
+  }
+
+  @Post('dispatcher-payouts')
+  dispatcherPayout(@CurrentUser() u: AuthUser, @Body() dto: DispatcherPayoutDto) {
+    return this.dispatch.recordPayout(u, dto);
+  }
 
   @Get('vendors')
   vendors() {
@@ -115,6 +127,11 @@ export class VendorController {
     return this.vendor.board(u);
   }
 
+  @Post('orders/:id/paid') @HttpCode(200)
+  markPaid(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: MarkPaidDto) {
+    return this.vendor.markPaid(u, id, dto.via, dto.reference);
+  }
+
   @Post('orders/:id/action') @HttpCode(200)
   act(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VendorActionDto) {
     return this.vendor.act(u, id, dto);
@@ -161,5 +178,52 @@ export class FoodController {
   @Post('orders/:id/pay') @HttpCode(200)
   pay(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.orders.retryPayment(u, id);
+  }
+}
+
+/** An approved student dispatcher's deliveries. */
+@Controller('dispatch')
+@RequirePermission(PERMISSIONS.DISPATCH_DELIVER)
+export class DispatchController {
+  constructor(private readonly dispatch: DispatchService) {}
+
+  @Get()
+  state(@CurrentUser() u: AuthUser) {
+    return this.dispatch.state(u);
+  }
+
+  @Post('online') @HttpCode(200)
+  online(@CurrentUser() u: AuthUser, @Body() dto: OnlineDto) {
+    return this.dispatch.setOnline(u, dto.online);
+  }
+
+  @Post('deliveries/:id/take') @HttpCode(200)
+  take(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.dispatch.take(u, id);
+  }
+
+  @Post('deliveries/:id/release') @HttpCode(200)
+  release(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.dispatch.release(u, id);
+  }
+
+  @Post('deliveries/:id/picked-up') @HttpCode(200)
+  pickedUp(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.dispatch.pickedUp(u, id);
+  }
+
+  @Post('deliveries/:id/delivered') @HttpCode(200)
+  delivered(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DeliveredDto) {
+    return this.dispatch.delivered(u, id, dto.code);
+  }
+
+  @Post('deliveries/:id/problem') @HttpCode(200)
+  problem(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ProblemDto) {
+    return this.dispatch.problem(u, id, dto.note);
+  }
+
+  @Get('earnings')
+  earnings(@CurrentUser() u: AuthUser, @Query() q: SettlementQuery) {
+    return this.dispatch.earnings(u, q.from, q.to);
   }
 }

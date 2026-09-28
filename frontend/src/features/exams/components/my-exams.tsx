@@ -65,7 +65,7 @@ export function MyExams() {
               </p>
               {p.exam ? (
                 <p className="text-sm">
-                  {examDay(p.exam.startsAt)}, {examTime(p.exam.startsAt, p.exam.durationMinutes)}. {p.exam.venue ?? 'Venue to be announced'}.
+                  {examDay(p.exam.startsAt)}, {examTime(p.exam.startsAt, p.exam.durationMinutes)}. {p.exam.venue ?? 'Venue to be announced'}.{p.seatNumber ? ` Seat ${p.seatNumber}.` : ''}
                 </p>
               ) : (
                 <p className="text-sm text-muted">Not on the timetable yet.</p>

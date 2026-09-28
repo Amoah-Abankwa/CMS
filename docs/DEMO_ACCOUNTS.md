@@ -197,7 +197,7 @@ Vendors only take orders in their opening hours (Ghana time). If you are running
 
 **Fees and departmental dues**
 
-This semester's fees are issued: GH₵ 3,800.00 for most students and GH₵ 4,050.00 for first years. The clearance rule is 70% paid. EHASSA and BACA are set up with demo departments (EHASSA: Computer Science and Electrical Engineering; BACA: Accounting and Management); the Dean of Students office sets the real ones.
+This semester's fees are issued from the Accounts office's fee items: GH₵ 3,800.00 for most Ghanaian students, GH₵ 4,050.00 for Ghanaian first years, and US$ 1,842.00 for international students (`ANU25400008` is the demo international student). The clearance rule is 70% paid, set by the Registrar. EHASSA (Engineering and Health and Allied Science Students Association) covers Computer Science, Electrical Engineering, Biomedical Engineering, Oil and Gas Engineering and Nursing; BACA (Business and Accounting Students Association) covers Accounting and Management. Dues are compulsory.
 
 73. Sign in as `ANU26400013` and open **Fees**: 40% paid, not yet cleared, with the bill's items, a bank payment and its receipt. Choose **Pay online**, pay part of the balance on the test checkout, and see the payment and receipt appear.
 74. Sign in as **finance** and open **Student fees**: totals for the semester, and every student's balance. Open `ANU26400013` and **Record a payment**: bank deposit, GH₵ 1,300.00 (taking them from 40% to over 72%), any slip number. The student passes 70% and is **cleared for exams automatically**, and told by SMS. Try recording the same slip number again: it is refused.
@@ -208,7 +208,57 @@ This semester's fees are issued: GH₵ 3,800.00 for most students and GH₵ 4,05
 79. Sign in as **deanofstudents** and open **Departmental associations**. Open EHASSA's **Receipts** and cancel one with a reason: the student and the president are told. Record an elected president for BACA (for example `ANU25400002` if they are in a BACA department, or change BACA's departments first). When a term ends, the officer loses the dues screen automatically.
 80. As **finance**, **Dues payouts** shows the online dues held for EHASSA. Record a payout to the association's mobile money number.
 
+**Registry: programmes, departments and index numbers**
+
+83. Sign in as **registrar** and open **Academic structure**. Add a department to a school, then a programme in it (for example BSc Computer Engineering already sits under Electrical and Electronic Engineering). Programmes with students cannot be removed, only marked as not admitting.
+84. Open **Programme types**: Bachelor's regular (8 semesters), Bachelor's weekend (12), Diploma and Graduate School, each with its index number format. Edit Graduate School's format and watch the example number change as you type; formats that could repeat or clash are refused. New students get numbers in the new format; existing numbers never change.
+85. On the same page, **Exam fee clearance** sets the percentage of fees paid for automatic clearance.
+86. Register a student on **MSc Computer Science** (Students, Register): their index number follows the Graduate School format, for example ANUGS260001, and they can sign in with it. Register one on **Diploma in Computer Engineering**: diploma numbers start with D and the programme's initials, so theirs is DCE260001 (Diploma in Biomedical Engineering gives DBM…, Oil and Gas DOE…). Each diploma programme has its own index code, set by the Registrar, and its own sequence. Adding a diploma programme asks for its code, suggested from the name.
+
+**Student dashboard, statements and receipts**
+
+87. Sign in as `ANU25400005`: the dashboard shows CGPA, fees balance and clearance, and compulsory dues outstanding.
+88. Open **Fees**, then **Statement**: each fee item as a debit, payments and the scholarship or waivers as credits, and the running balance. Print it, or choose "Save as PDF". Each payment has a **Receipt** that prints the same way. Finance can reprint any receipt from the student's bill.
+89. Sign in as `ANU25400008` (international): the bill is in US dollars.
+
+**After the first run: advisors, hall fees, fines, photos, suspending students**
+
+92. As **lecturer.cs** (Head of Department for Computer Science; switch to that role), open **Academic advisors**, choose **advisor.cs** and paste some Computer Science index numbers. Signed in as **advisor.cs**, **Registration approvals** now shows only those students.
+93. As a student who accepts a university hall place (step 40), open **Fees**: the hall fee is on the bill and the statement. If the Hostel Manager moves or cancels the place, the bill is adjusted.
+94. As `ANU25400006` (owes a GH₵ 12.00 fine), open **Library**, then **Fines**, and **Pay online**.
+95. As **vendor**, open **Menu**, edit a dish and add a photo; customers see it. As **owner**, open **Hostel photos**. (Needs the Cloudinary settings.)
+96. As **registrar**, open **Students**, choose **Account** on a student and suspend them with a reason: they are signed out at once and cannot sign in until reactivated.
+
+**Result amendments, carry-overs and the exam register**
+
+97. As **exams**, open the published **Exam timetable** and choose **Number seats**, then **Send invigilator duties**. Students see their seat on **Exams**.
+98. As an invigilator of a paper (or **exams**, who sees every paper), open **Exam register**: seat, student, flags (not eligible, fees not cleared, unpaid EHASSA or BACA dues), and Present, Late or Absent. Type an index number to mark present quickly. **Close register** records everyone unmarked as absent.
+99. As **lecturer.cs** (lead lecturer), open **Result amendments**, find a student's published CSC result, and request an amendment with corrected scores and a reason. Switch to Head of Department and approve; then the Dean approves and **exams** applies. The student is told the old and new grade.
+100. As a 2025 Computer Science student who failed a first-semester course last year, open **Course registration**: that course is offered again, marked **Carry-over**.
+
+**Money: dispatcher fees, paying the vendor, exchange rates, PDFs**
+
+101. As `ANU25400002`, order a delivery from **ANU Main Cafeteria** (campus dispatchers): choose to **include the dispatcher's fee** or **pay the dispatcher on delivery**, and **Pay the vendor** (cash or MoMo). As **vendor**, **Mark paid** with a MoMo transaction ID; the customer is told. The dispatcher sees who pays their fee.
+102. As **finance**, open **Exchange rates** and add a rate. Open `ANU25400008`'s bill (dollars) and record a bank payment **in cedis**: it is converted at the rate, and the receipt shows both.
+103. As any student with a payment, open **Fees**: **Statement as PDF** and each receipt's **PDF** download files generated by the server. Dues receipts download the same way.
+104. As **lecturer.cs** (Head of Department), open **Dues on exam registers** and switch it on for Computer Science: invigilators now see unpaid-dues markers for those students.
+
+**Devotion in results, and hostel fees**
+
+105. As **registrar**, open **Programme types**: **Morning devotion in course totals** is on. As **lecturer.cs**, the suggested assessments now add up to 95%. Submitting results before the Chaplaincy finalises devotion scores is refused with an explanation.
+106. As a student who accepts a hall place (step 40), open **Accommodation**: **Hostel fees** shows the room's price. Pay part online; the receipt (PDF) arrives, and the Hostel Manager is sent a copy.
+107. As **hostels**, open **Hall fees**: record a cash payment for that student. As **owner**, **Hostel fees** does the same for Koforidua Heights bookings.
+108. As **finance**, **Hostel owner payouts** shows online fees held for each private hostel.
+
+**Documents, residents, excuses and small rules**
+
+109. As **hostels**, open **Hall residents**: upload a blank **Tenancy agreement** for every university hall. Check in a resident with a note. (Documents need the Cloudinary settings.)
+110. As that resident, open **Accommodation**: download the form, then upload a signed copy. As **hostels**, open it from **Hall residents** and accept or return it.
+111. As `ANU25400002`, open **Excuse requests**: ask to be excused for illness with a medical note attached. As **health**, open **Excuse requests**, open the note and **Excuse**: attendance and devotion are corrected for those days.
+112. As **chaplaincy**, open **Devotion exemptions** and exempt a student with a reason; their results are scaled from 95 like weekend students.
+113. As **advisor.cs**, open **Registration approvals**, the **Approved** tab, and **Reopen** a registration with a reason; the student can change it and submit again.
+
 **Oversight**
 
-81. As **superadmin** or **auditor**, open **All activity** to see every step above, grouped by user type.
-82. As superadmin, enable **Developer access** for Kofi Amponsah; as dev.candidate switch to Developer to see **System diagnostics**.
+114. As **superadmin** or **auditor**, open **All activity** to see every step above, grouped by user type.
+115. As superadmin, enable **Developer access** for Kofi Amponsah; as dev.candidate switch to Developer to see **System diagnostics**.

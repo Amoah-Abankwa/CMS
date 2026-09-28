@@ -178,4 +178,27 @@ export class StaffService {
     }
     return err;
   }
+
+  /**
+   * Suspend (temporary), deactivate (left the university) or reactivate a staff or partner account.
+   * Suspending or deactivating ends every session at once; the sign-in check refuses the account
+   * from its next request. Nobody can lock themselves out, and the last Super Admin cannot be locked out.
+   */
+  async setStatus(actor: AuthUser, id: string, status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED', reason: string) {
+    if (actor.id === id) throw new ForbiddenException({ code: 'SELF', message: 'Another administrator must change your own account.' });
+    const user = await this.prisma.user.findFirst({ where: { id, type: { in: ['STAFF', 'PARTNER'] } }, select: { id: true, status: true, firstName: true, lastName: true, roles: { select: { role: { select: { key: true } } } } } });
+    if (!user) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Account not found.' });
+    if (user.status === 'PENDING_SETUP' && status === 'ACTIVE') throw new BadRequestException({ code: 'PENDING', message: 'This person has not set up their account yet. Resend the setup link instead.' });
+    if (user.status === status) return { status };
+    if (status !== 'ACTIVE' && user.roles.some((r) => r.role.key === ROLE_KEYS.SUPER_ADMIN)) {
+      const others = await this.prisma.user.count({ where: { id: { not: id }, status: 'ACTIVE', roles: { some: { role: { key: ROLE_KEYS.SUPER_ADMIN } } } } });
+      if (others === 0) throw new ConflictException({ code: 'LAST_ADMIN', message: 'This is the only active Super Admin. Add another before locking this account.' });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id }, data: { status, ...(status === 'ACTIVE' ? { failedLoginCount: 0, lockedUntil: null } : {}) } });
+      if (status !== 'ACTIVE') await tx.session.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+    });
+    await this.audit.record({ action: 'staff.status_changed', module: 'staff', targetType: 'User', targetId: id, before: { status: user.status }, after: { status, reason } });
+    return { status };
+  }
 }

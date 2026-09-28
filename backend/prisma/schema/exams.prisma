@@ -42,6 +42,12 @@ model ExamSession {
   notes           String?
   updatedAt       DateTime          @updatedAt
   invigilators    ExamInvigilator[]
+  seats           ExamSeat[]
+  attendance      ExamAttendance[]
+  /// Incidents or remarks the invigilator writes on the register.
+  registerNote    String?
+  registerClosedAt DateTime?
+  registerClosedById String?        @db.Uuid
 
   @@index([timetableId, startsAt])
 }
@@ -142,4 +148,36 @@ model ExamEligibility {
 
   @@unique([semesterId, studentId, offeringId])
   @@index([semesterId, status])
+}
+
+/// A student's seat for a paper. Numbers are unique within a hall at a sitting, even when several papers share it.
+model ExamSeat {
+  sessionId  String      @db.Uuid
+  session    ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId  String      @db.Uuid
+  student    User        @relation("ExamSeatStudent", fields: [studentId], references: [id])
+  seatNumber Int
+
+  @@id([sessionId, studentId])
+  @@index([studentId])
+}
+
+enum ExamAttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+/// The exam attendance register, marked by the invigilators.
+model ExamAttendance {
+  sessionId  String               @db.Uuid
+  session    ExamSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId  String               @db.Uuid
+  student    User                 @relation("ExamAttendanceStudent", fields: [studentId], references: [id])
+  status     ExamAttendanceStatus
+  markedById String               @db.Uuid
+  markedAt   DateTime             @default(now())
+  note       String?
+
+  @@id([sessionId, studentId])
 }

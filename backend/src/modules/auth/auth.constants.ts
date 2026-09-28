@@ -6,3 +6,5 @@ export const LOCK_MINUTES = 15;
 export const RESET_CODE_MINUTES = 10;
 export const RESET_CODE_MAX_ATTEMPTS = 5;
 export const RECOVERY_CODE_COUNT = 10;
+/** Reset codes sent to one account per hour; more requests are ignored (without telling the requester). */
+export const RESET_CODES_PER_HOUR = 3;

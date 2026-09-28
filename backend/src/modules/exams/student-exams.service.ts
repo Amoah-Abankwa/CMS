@@ -25,8 +25,13 @@ export class StudentExamsService {
       this.prisma.examEligibility.findMany({ where: { semesterId: semester.id, studentId: user.id, publishedAt: { not: null } }, select: { offeringId: true, publishedStatus: true, publishedReasons: true } }),
       this.prisma.examEligibilityList.findUnique({ where: { semesterId: semester.id }, select: { publishedAt: true } }),
     ]);
-    const snapshot = (timetable?.publishedSnapshot ?? {}) as Record<string, PublishedPaper>;
-    const decisions = new Map(eligibility.map((e) => [e.offeringId, e]));
+    const seats = await this.prisma.examSeat.findMany({ where: { studentId: user.id, session: { offeringId: { in: offerings.map((o) => o.id) } } }, select: { seatNumber: true, session: { select: { offeringId: true } } } });
+    const seatOf = new Map(seats.map((s) => [s.session.offeringId, s.seatNumber]));
+const snapshot =
+  (timetable?.publishedSnapshot ?? {}) as unknown as Record<
+    string,
+    PublishedPaper
+  >;    const decisions = new Map(eligibility.map((e) => [e.offeringId, e]));
 
     const papers = offerings
       .map((o) => {
@@ -36,6 +41,7 @@ export class StudentExamsService {
           offeringId: o.id,
           course: o.course,
           exam,
+          seatNumber: seatOf.get(o.id) ?? null,
           eligibility: d?.publishedStatus
             ? { status: d.publishedStatus, reasons: ((d.publishedReasons as EligibilityReason[]) ?? []).map((c) => ELIGIBILITY_REASON_TEXT[c] ?? c) }
             : null,

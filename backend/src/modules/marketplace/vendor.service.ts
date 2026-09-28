@@ -1,3 +1,4 @@
+import { UploadsService } from '../uploads/uploads.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { isOpenAt, validateHours, type OpeningHours } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -15,6 +16,7 @@ export class VendorService {
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
     private readonly audit: AuditService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async mine(user: AuthUser) {
@@ -26,7 +28,7 @@ export class VendorService {
       },
     });
     if (!vendor) throw new NotFoundException({ code: 'NO_VENDOR', message: 'No vendor is linked to your account. Contact the Dean of Students office.' });
-    return { ...vendor, openNow: isOpenAt(vendor.openingHours as OpeningHours, new Date(), vendor.paused) };
+    return { ...vendor, items: vendor.items.map((i) => ({ ...i, photoUrl: this.uploads.url(i.photoId, 400) })), openNow: isOpenAt(vendor.openingHours as OpeningHours, new Date(), vendor.paused) };
   }
 
   async updateProfile(user: AuthUser, dto: VendorProfileDto) {
@@ -35,6 +37,9 @@ export class VendorService {
     if (problems.length) throw new BadRequestException({ code: 'HOURS', message: problems[0] });
     if (!dto.offersPickup && !dto.offersDelivery) throw new BadRequestException({ code: 'FULFILMENT', message: 'Offer pickup, delivery, or both.' });
     if (!dto.acceptsOnline && !dto.acceptsPayOnPickup) throw new BadRequestException({ code: 'PAYMENT', message: 'Accept online payment, payment at the counter, or both.' });
+    if (dto.useDispatchers && (!dto.offersDelivery || !dto.acceptsOnline)) {
+      throw new BadRequestException({ code: 'DISPATCH', message: 'Campus dispatchers need delivery switched on and online payment accepted, because they never handle cash.' });
+    }
     if (dto.acceptsOnline && !dto.payoutNumber) throw new BadRequestException({ code: 'PAYOUT', message: 'Add a mobile money number so Finance can pay you for online orders.' });
     const updated = await this.prisma.vendor.update({
       where: { id: v.id },
@@ -105,6 +110,12 @@ export class VendorService {
     const hide = <T extends { pickupCode: string }>(o: T) => ({ ...o, pickupCode: undefined });
     const sales = done.filter((o) => o.status === 'COMPLETED').reduce((s, o) => s + o.total, 0);
     return { vendor: { id: v.id, name: v.name, paused: v.paused, openNow: v.openNow, status: v.status }, active: active.map(hide), done: done.map(hide), salesToday: sales };
+  }
+
+  async markPaid(user: AuthUser, orderId: string, via: 'CASH' | 'MOMO', reference?: string) {
+    const v = await this.mine(user);
+    const o = await this.orders.markPaid(orderId, v.id, via, reference);
+    return { ...o, pickupCode: undefined };
   }
 
   async act(user: AuthUser, orderId: string, dto: VendorActionDto) {

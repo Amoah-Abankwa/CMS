@@ -96,8 +96,11 @@ export class TimetableService {
     const needing = offerings.filter((o) => (enrolled.get(o.id)?.size ?? 0) > 0).map((o) => ({ offeringId: o.id, label: o.course.code }));
     const issues = findTimetableIssues(papers, enrolled, needing);
 
-    const snapshot = (timetable.publishedSnapshot ?? {}) as Record<string, PublishedPaper>;
-    const current = Object.fromEntries(sessions.map((s) => [s.offeringId, toPublished(s)]));
+const snapshot =
+  (timetable.publishedSnapshot ?? {}) as unknown as Record<
+    string,
+    PublishedPaper
+  >;    const current = Object.fromEntries(sessions.map((s) => [s.offeringId, toPublished(s)]));
     const changedOfferingIds = [...new Set([...Object.keys(snapshot), ...Object.keys(current)])].filter((id) => !samePaper(snapshot[id], current[id]));
 
     const scheduled = new Set(sessions.map((s) => s.offeringId));
@@ -169,8 +172,11 @@ export class TimetableService {
     if (view.timetable.publishedVersion > 0 && view.pendingChanges === 0) throw new ConflictException({ code: 'NOTHING_CHANGED', message: 'Nothing has changed since the timetable was last published.' });
 
     const timetable = await this.prisma.examTimetable.findUniqueOrThrow({ where: { id: view.timetable.id } });
-    const previous = (timetable.publishedSnapshot ?? {}) as Record<string, PublishedPaper>;
-    const sessions = await this.prisma.examSession.findMany({ where: { timetableId: timetable.id }, select: SESSION_SELECT });
+const previous =
+  (timetable.publishedSnapshot ?? {}) as unknown as Record<
+    string,
+    PublishedPaper
+  >;    const sessions = await this.prisma.examSession.findMany({ where: { timetableId: timetable.id }, select: SESSION_SELECT });
     const snapshot: Record<string, PublishedPaper> = Object.fromEntries(sessions.map((s) => [s.offeringId, toPublished(s)]));
     const firstTime = timetable.publishedVersion === 0;
     const changed = [...new Set([...Object.keys(previous), ...Object.keys(snapshot)])].filter((id) => !samePaper(previous[id], snapshot[id]));

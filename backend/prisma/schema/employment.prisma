@@ -109,6 +109,12 @@ model DispatcherProfile {
   @@index([status, online])
 }
 
+enum DispatchFeeSettlement {
+  UNIVERSITY
+  VENDOR
+  CUSTOMER
+}
+
 enum DispatchDeliveryStatus {
   WAITING
   ASSIGNED
@@ -127,6 +133,8 @@ model Delivery {
   status       DispatchDeliveryStatus @default(WAITING)
   /// What the dispatcher earns, fixed when the delivery is offered.
   fee          Int
+  /// Who hands the fee to the dispatcher: the university (Paystack), the vendor (paid them directly) or the customer (on delivery).
+  feeSettlement DispatchFeeSettlement @default(UNIVERSITY)
   offeredAt    DateTime           @default(now())
   assignedAt   DateTime?
   pickedUpAt   DateTime?

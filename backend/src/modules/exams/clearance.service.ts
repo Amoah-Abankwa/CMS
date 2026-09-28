@@ -63,8 +63,9 @@ export class ClearanceService {
       students.map((s) =>
         this.prisma.financialClearance.upsert({
           where: { studentId_semesterId: { studentId: s.id, semesterId: semester.id } },
-          create: { studentId: s.id, semesterId: semester.id, cleared: dto.cleared, note: dto.note, updatedById: user.id },
-          update: { cleared: dto.cleared, note: dto.note, updatedById: user.id },
+          // A decision made here by hand is never changed by the fee rule.
+          create: { studentId: s.id, semesterId: semester.id, cleared: dto.cleared, source: 'MANUAL', note: dto.note, updatedById: user.id },
+          update: { cleared: dto.cleared, source: 'MANUAL', note: dto.note, updatedById: user.id },
         }),
       ),
     );

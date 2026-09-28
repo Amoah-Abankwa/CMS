@@ -9,7 +9,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
+import { api, errorMessage } from '@/lib/axios';
+import { uploadImage } from '@/components/ui/image-upload';
 import { cn } from '@/lib/cn';
 import { foodApi, type MenuItem, type MyVendor } from '../api';
 
@@ -120,6 +121,7 @@ function ItemDialog({ target, categories, onClose, onDone }: { target: MenuItem 
           </Field>
         </div>
         <Field label="Description (optional)" htmlFor="it-desc"><Textarea id="it-desc" value={f.description} maxLength={300} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+        {existing ? <DishPhoto item={existing} onChanged={onDone} /> : <p className="text-xs text-muted">Save the dish first, then add a photo.</p>}
         <Field label="Labels (optional)" htmlFor="it-tags" hint="Separate with commas, for example: Spicy, Vegetarian."><Input id="it-tags" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} /></Field>
         <div className="flex flex-wrap justify-between gap-2">
           {existing ? <Button variant="ghost" onClick={remove} disabled={busy}>Remove dish</Button> : <span />}
@@ -130,5 +132,37 @@ function ItemDialog({ target, categories, onClose, onDone }: { target: MenuItem 
         </div>
       </div>
     </Dialog>
+  );
+}
+
+function DishPhoto({ item, onChanged }: { item: MenuItem; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = async (file: File | null) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const publicId = file ? await uploadImage('menu', item.id, file) : null;
+      await api.put(`/uploads/menu-items/${item.id}/photo`, { publicId });
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error && !('response' in err) ? err.message : errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-sm font-medium">Photo</span>
+      {item.photoUrl && <img src={item.photoUrl} alt={item.name} className="h-32 w-48 rounded-md border border-border object-cover" />}
+      {error && <Alert tone="danger">{error}</Alert>}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border px-3 text-sm hover:bg-surface-muted">
+          {busy ? 'Uploading…' : item.photoUrl ? 'Change photo' : 'Add a photo'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void set(f); e.target.value = ''; }} />
+        </label>
+        {item.photoUrl && <Button variant="ghost" size="sm" disabled={busy} onClick={() => set(null)}>Remove photo</Button>}
+      </div>
+    </div>
   );
 }

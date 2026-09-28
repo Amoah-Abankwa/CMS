@@ -6,6 +6,8 @@ export type RegistrationStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
 
 export interface AvailableOffering extends Offering {
   seatsTaken: number;
+  /** Failed at the latest attempt; must be taken again. */
+  carryOver?: boolean;
 }
 
 export interface MyRegistration {
@@ -60,5 +62,6 @@ export const registrationApi = {
   review: (params: { semesterId?: string; status?: RegistrationStatus; search?: string; page: number; pageSize?: number }) =>
     api.get<ReviewPage>('/registrations', { params }).then((r) => r.data),
   approve: (id: string, note?: string) => api.post<ReviewItem>(`/registrations/${id}/approve`, { note: note || undefined }).then((r) => r.data),
+  reopen: (id: string, reason: string) => api.post(`/registrations/${id}/reopen`, { reason }),
   reject: (id: string, note: string) => api.post<ReviewItem>(`/registrations/${id}/reject`, { note }).then((r) => r.data),
 };

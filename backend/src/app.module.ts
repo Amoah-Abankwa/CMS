@@ -22,6 +22,11 @@ import { AccommodationModule } from './modules/accommodation/accommodation.modul
 import { LibraryModule } from './modules/library/library.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { EmploymentModule } from './modules/employment/employment.module';
+import { SecurityModule } from './modules/security/security.module';
+import { FeesModule } from './modules/fees/fees.module';
+import { RegistryModule } from './modules/registry/registry.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { AccountSetupModule } from './modules/account-setup/account-setup.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { AcademicsModule } from './modules/academics/academics.module';
@@ -49,6 +54,11 @@ import { HealthModule } from './modules/health/health.module';
     LibraryModule,
     PaymentsModule,
     MarketplaceModule,
+    EmploymentModule,
+    SecurityModule,
+    FeesModule,
+    RegistryModule,
+    UploadsModule,
     AcademicsModule,
     PreferencesModule,
     HealthModule,

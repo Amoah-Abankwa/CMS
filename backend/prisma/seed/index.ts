@@ -2,12 +2,12 @@ import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { computeTotal, DEFAULT_DEVOTION_POLICY, devotionTimes, gradeFor, INCOMPLETE_GRADE, serviceDates, PERMISSIONS, ROLE_KEYS, ROLE_SCOPE, scopeValue, type Mark } from '@anu/shared';
+import { pickSchedule, receiptNumber, studentGroupOf, computeTotal, DEFAULT_DEVOTION_POLICY, devotionTimes, gradeFor, INCOMPLETE_GRADE, serviceDates, PERMISSIONS, ROLE_KEYS, ROLE_SCOPE, scopeValue, type Mark } from '@anu/shared';
 import { PrismaClient } from '../../src/generated/prisma/client';
 import { encrypt } from '../../src/core/crypto/crypto.util';
 import { formatIndexNumber } from '../../src/modules/students/index-number';
 import { DEFAULT_TEMPLATES } from '../../src/modules/notifications/templates';
-import { courseLevel, courseSemester, DEFAULT_GRADING_SCALE, DEMO_BOOKS, DEMO_VENDORS, DEMO_HOSTELS, DEMO_PASSWORD, DEMO_VENUES, demoGender, DEMO_STAFF, DEMO_TOTP_SECRET, demoStudentName, GENERAL_STUDIES_DEPT, LEVELS, ROLE_DEFS, STRUCTURE } from './data';
+import { DEMO_STUDENT_PROGRAMMES, courseLevel, courseSemester, DEFAULT_GRADING_SCALE, DEMO_BOOKS, DEMO_VENDORS, DEMO_HOSTELS, DEMO_PASSWORD, DEMO_VENUES, demoGender, DEMO_STAFF, DEMO_TOTP_SECRET, demoStudentName, GENERAL_STUDIES_DEPT, LEVELS, ROLE_DEFS, STRUCTURE } from './data';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DIRECT_URL! }) });
 
@@ -27,10 +27,16 @@ async function seedAccess() {
   }
 }
 
-async function seedAcademics() {
+/** Programme types are reference data: production needs them before the Registrar can add programmes. */
+async function seedProgrammeTypes() {
   for (const level of LEVELS) {
     await prisma.programmeLevel.upsert({ where: { code: level.code }, create: level, update: { name: level.name } });
   }
+}
+
+async function seedAcademics() {
+  await seedProgrammeTypes();
+
   for (const s of STRUCTURE) {
     const school = await prisma.school.upsert({ where: { code: s.code }, create: { code: s.code, name: s.name, isDemo: true }, update: { name: s.name } });
     for (const d of s.departments) {
@@ -42,7 +48,7 @@ async function seedAcademics() {
       for (const p of d.programmes) {
         await prisma.programme.upsert({
           where: { code: p.code },
-          create: { code: p.code, name: p.name, departmentId: dept.id, levelCode: '4', durationYears: 4, isDemo: true },
+          create: { code: p.code, name: p.name, departmentId: dept.id, indexCode: (p as { indexCode?: string }).indexCode ?? null, levelCode: (p as { level?: string }).level ?? '4', durationYears: Math.ceil((LEVELS.find((l) => l.code === ((p as { level?: string }).level ?? '4'))?.semesters ?? 8) / 2), isDemo: true },
           update: { name: p.name },
         });
       }
@@ -594,6 +600,152 @@ async function seedMarketplace(passwordHash: string) {
   await order(4, '2026-09-26T08:30:00Z', 'PLACED', false, [[5, 1], [7, 1]]);
 }
 
+/**
+ * Employment demo: jobs with applicants, one hire, an active and a pending dispatcher, and past
+ * deliveries so earnings and settlements have figures. The 2025 Computer Science students are
+ * registered this semester so their CGPA from last year's results decides their eligibility.
+ */
+async function seedEmployment() {
+  if (await prisma.job.count()) return;
+  const current = await prisma.semester.findFirstOrThrow({ where: { isCurrent: true } });
+  const advisor = await prisma.user.findUniqueOrThrow({ where: { email: 'advisor.cs@demo.anu.edu.gh' } });
+  const byIndex = async (indexNumber: string) => prisma.user.findUniqueOrThrow({ where: { indexNumber } });
+  for (const idx of ['ANU25400005', 'ANU25400012', 'ANU25400019']) {
+    const st = await byIndex(idx);
+    await prisma.courseRegistration.upsert({
+      where: { studentId_semesterId: { studentId: st.id, semesterId: current.id } },
+      create: { studentId: st.id, semesterId: current.id, status: 'APPROVED', submittedAt: new Date('2026-08-25T09:00:00Z'), reviewedAt: new Date('2026-08-26T09:00:00Z'), reviewedById: advisor.id },
+      update: {},
+    });
+  }
+
+  const careers = await prisma.user.findUniqueOrThrow({ where: { email: 'careers@demo.anu.edu.gh' } });
+  const staff = async (email: string) => (await prisma.user.findUniqueOrThrow({ where: { email } })).id;
+  const closes = new Date('2026-10-16T23:59:00Z');
+  const library = await prisma.job.create({ data: {
+    title: 'Library shelving assistant', unit: 'University Library', hoursPerWeek: 8, payRate: 1000, payUnit: 'HOUR', positions: 2, closesAt: closes, status: 'OPEN',
+    description: 'Return books to the shelves, keep the reading room tidy and help students find books. Evening and Saturday shifts are available around your lectures.',
+    supervisorId: await staff('librarian@demo.anu.edu.gh'), createdById: careers.id,
+  } });
+  const ict = await prisma.job.create({ data: {
+    title: 'ICT help desk assistant', unit: 'ICT Directorate', hoursPerWeek: 10, payRate: 1200, payUnit: 'HOUR', positions: 1, minCgpa: 3.0, closesAt: closes, status: 'OPEN',
+    description: 'Help students and staff sign in, reset passwords, connect to campus Wi-Fi and use the platform. Good for Computer Science and IT students; you must be patient and explain things clearly.',
+    supervisorId: await staff('ict@demo.anu.edu.gh'), createdById: careers.id,
+  } });
+  const chapel = await prisma.job.create({ data: {
+    title: 'Chapel media assistant', unit: 'Chaplaincy', hoursPerWeek: 6, payRate: 30000, payUnit: 'MONTH', positions: 1, closesAt: new Date('2026-09-10T23:59:00Z'), status: 'CLOSED',
+    description: 'Run the projector and sound for morning devotion and Sunday service, and put up slides for hymns and readings.',
+    supervisorId: await staff('chaplaincy@demo.anu.edu.gh'), createdById: careers.id,
+  } });
+  await prisma.job.create({ data: {
+    title: 'Admissions open day guide', unit: 'Admissions Office', hoursPerWeek: 5, payRate: 5000, payUnit: 'TASK', positions: 6, closesAt: new Date('2026-11-20T23:59:00Z'), status: 'DRAFT',
+    description: 'Show visiting applicants and parents around campus on open days and answer their questions about student life.',
+    supervisorId: await staff('admissions@demo.anu.edu.gh'), createdById: careers.id,
+  } });
+
+  const s5 = await byIndex('ANU25400005');
+  const s19 = await byIndex('ANU25400019');
+  const s20 = await byIndex('ANU26400020');
+  await prisma.jobApplication.createMany({ data: [
+    { jobId: library.id, studentId: s5.id, statement: 'I spend most evenings in the library already and know the catalogue well. I am careful and can work Saturdays.', availability: 'Weekday evenings after 16:00, Saturdays', createdAt: new Date('2026-09-18T10:00:00Z') },
+    { jobId: ict.id, studentId: s5.id, statement: 'I am a level 200 Computer Science student and I help my classmates with their laptops and Wi-Fi all the time.', availability: 'Tuesday and Thursday afternoons', createdAt: new Date('2026-09-19T11:00:00Z') },
+    { jobId: ict.id, studentId: s19.id, statement: 'I set up the computers for my church and like solving problems for people. I would like experience on a real help desk.', availability: 'Monday, Wednesday and Friday afternoons', createdAt: new Date('2026-09-20T09:30:00Z') },
+    { jobId: chapel.id, studentId: s20.id, status: 'HIRED', statement: 'I run the projector for my fellowship and I am on campus early every day for devotion.', decidedById: careers.id, decidedAt: new Date('2026-09-12T10:00:00Z'), startedAt: new Date('2026-09-14T07:00:00Z'), createdAt: new Date('2026-09-05T10:00:00Z') },
+  ] });
+
+  // Dispatchers: one active (with the add-on role), one waiting for approval.
+  const role = await prisma.role.findUniqueOrThrow({ where: { key: ROLE_KEYS.STUDENT_DISPATCHER } });
+  const rider = await byIndex('ANU26400006');
+  const riderProfile = await prisma.dispatcherProfile.create({ data: {
+    studentId: rider.id, status: 'ACTIVE', transport: 'BICYCLE', statement: 'I have a bicycle and my lectures finish early on most days. I know every hall on campus.',
+    payoutNetwork: 'MTN', payoutNumber: '233244000606', payoutName: `${rider.firstName} ${rider.lastName}`, reviewedById: careers.id, reviewedAt: new Date('2026-09-15T10:00:00Z'),
+  } });
+  await prisma.userRole.create({ data: { userId: rider.id, roleId: role.id } });
+  const pending = await byIndex('ANU25400012');
+  await prisma.dispatcherProfile.create({ data: {
+    studentId: pending.id, transport: 'WALKING', statement: 'I would like to earn some money between lectures. I live in Faith Hall and know the campus well.',
+    payoutNetwork: 'Telecel', payoutNumber: '233204000512', payoutName: `${pending.firstName} ${pending.lastName}`, createdAt: new Date('2026-09-24T15:00:00Z'),
+  } });
+
+  // The cafeteria sends deliveries to campus dispatchers; two past deliveries give the rider earnings.
+  const cafeteria = await prisma.vendor.findFirstOrThrow({ where: { name: 'ANU Main Cafeteria' } });
+  await prisma.vendor.update({ where: { id: cafeteria.id }, data: { useDispatchers: true } });
+  const dish = await prisma.menuItem.findFirstOrThrow({ where: { vendorId: cafeteria.id }, orderBy: { position: 'asc' } });
+  const customers = [await byIndex('ANU25400002'), await byIndex('ANU25400004')];
+  const when = ['2026-09-23T19:05:00Z', '2026-09-24T19:40:00Z'];
+  for (let i = 0; i < 2; i++) {
+    const at = new Date(when[i]);
+    const total = dish.price + cafeteria.deliveryFee;
+    const order = await prisma.foodOrder.create({ data: {
+      vendorId: cafeteria.id, customerId: customers[i].id, status: 'COMPLETED', fulfilment: 'DELIVERY', viaDispatcher: true, deliveryAddress: i ? 'Mercy Hall, room M07' : 'Grace Hall, room G14',
+      paymentOption: 'ONLINE', subtotal: dish.price, deliveryFee: cafeteria.deliveryFee, total, pickupCode: String(4100 + i * 77), paid: true,
+      placedAt: at, acceptedAt: at, readyAt: new Date(at.getTime() + 15 * 60_000), completedAt: new Date(at.getTime() + 30 * 60_000), createdAt: at,
+      items: { create: [{ menuItemId: dish.id, name: dish.name, unitPrice: dish.price, quantity: 1, lineTotal: dish.price }] },
+    } });
+    await prisma.payment.create({ data: { reference: `ANU-DEMO-D${order.number}`, provider: 'demo', purpose: 'FOOD_ORDER', userId: customers[i].id, orderId: order.id, amount: total, status: 'SUCCEEDED', channel: 'mobile_money', paidAt: at, createdAt: at } });
+    await prisma.delivery.create({ data: {
+      orderId: order.id, dispatcherId: riderProfile.id, status: 'DELIVERED', fee: 400, offeredAt: new Date(at.getTime() + 15 * 60_000),
+      assignedAt: new Date(at.getTime() + 17 * 60_000), pickedUpAt: new Date(at.getTime() + 20 * 60_000), deliveredAt: new Date(at.getTime() + 30 * 60_000),
+    } });
+  }
+}
+
+/**
+ * Fees and dues demo: this semester's schedules (one for everyone, a dearer one for level 100),
+ * bills for every student, some bank and online payments, a scholarship, and two associations.
+ * EHASSA's and BACA's departments here are only for the demo; the Dean of Students office sets the real ones.
+ */
+async function seedFees() {
+  if (await prisma.feeSchedule.count()) return;
+  const semester = await prisma.semester.findFirstOrThrow({ where: { isCurrent: true } });
+  const finance = await prisma.user.findUniqueOrThrow({ where: { email: 'finance@demo.anu.edu.gh' } });
+  // The Accounts office's labels; every schedule line uses one of these.
+  const itemNames = ['Tuition', 'SRC dues', 'Library', 'ICT and internet', 'Medical', 'Matriculation and ID card', 'Examination fee', 'Hall affiliation'];
+  const items = new Map<string, string>();
+  for (const [position, name] of itemNames.entries()) items.set(name, (await prisma.feeItem.create({ data: { name, position } })).id);
+  const line = ([name, amount]: readonly [string, number], position: number) => ({ feeItemId: items.get(name)!, name, amount, position });
+  const common = [['Tuition', 320000], ['SRC dues', 15000], ['Library', 10000], ['ICT and internet', 20000], ['Medical', 15000]] as const;
+  const everyone = await prisma.feeSchedule.create({ data: { semesterId: semester.id, name: 'Undergraduate fees (Ghanaian students)', studentGroup: 'GHANAIAN', createdById: finance.id, lines: { create: common.map(line) } }, include: { lines: true } });
+  const freshers = await prisma.feeSchedule.create({ data: { semesterId: semester.id, name: 'Undergraduate fees, first year (Ghanaian students)', studentGroup: 'GHANAIAN', level: 100, createdById: finance.id, lines: { create: [...common, ['Matriculation and ID card', 25000] as const].map(line) } }, include: { lines: true } });
+  const international = await prisma.feeSchedule.create({ data: { semesterId: semester.id, name: 'Undergraduate fees (international students)', studentGroup: 'INTERNATIONAL', currency: 'USD', createdById: finance.id, lines: { create: ([['Tuition', 180000], ['SRC dues', 1000], ['Library', 700], ['ICT and internet', 1500], ['Medical', 1000]] as const).map(line) } }, include: { lines: true } });
+  // One demo student is international and is billed in dollars.
+  const intlStudent = await prisma.user.findUniqueOrThrow({ where: { indexNumber: 'ANU25400008' } });
+  await prisma.studentProfile.update({ where: { userId: intlStudent.id }, data: { nationality: 'Nigerian' } });
+  const students = await prisma.user.findMany({ where: { type: 'STUDENT', isDemo: true }, select: { id: true, indexNumber: true, studentProfile: { select: { programmeId: true, currentLevel: true, nationality: true } } } });
+  const bills = new Map<string, string>();
+  for (const st of students) {
+    if (!st.studentProfile) continue;
+    const s = pickSchedule([everyone, freshers, international], { programmeId: st.studentProfile.programmeId, level: st.studentProfile.currentLevel, group: studentGroupOf(st.studentProfile.nationality) })!;
+    const bill = await prisma.studentBill.create({ data: { studentId: st.id, semesterId: semester.id, scheduleId: s.id, currency: s.currency, lines: s.lines.map((l) => ({ name: l.name, amount: l.amount })), charged: s.lines.reduce((t, l) => t + l.amount, 0), issuedById: finance.id, issuedAt: new Date('2026-08-20T09:00:00Z') } });
+    bills.set(st.indexNumber!, bill.id);
+  }
+  let n = 0;
+  const bank = (index: string, amount: number, paidOn: string) => prisma.feePayment.create({ data: { billId: bills.get(index)!, amount, method: 'BANK', reference: `GCB-DEMO-${1000 + ++n}`, receiptNumber: `ANU-F-DEMO-${String(n).padStart(4, '0')}`, paidOn: new Date(paidOn), recordedById: finance.id } });
+  await bank('ANU26400006', 405000, '2026-08-25');
+  await bank('ANU26400013', 162000, '2026-09-02');
+  await bank('ANU26400020', 200000, '2026-09-05');
+  await bank('ANU25400012', 380000, '2026-08-28');
+  await prisma.feeAdjustment.create({ data: { billId: bills.get('ANU25400019')!, amount: -95000, reason: 'Vice-Chancellor scholarship (25% of tuition)', createdById: finance.id } });
+  const s5 = students.find((s) => s.indexNumber === 'ANU25400005')!;
+  await prisma.payment.create({ data: { reference: 'ANU-DEMO-FEES-1', provider: 'demo', purpose: 'FEES', userId: s5.id, subjectId: bills.get('ANU25400005'), amount: 100000, status: 'SUCCEEDED', channel: 'mobile_money', paidAt: new Date('2026-09-10T10:00:00Z') } });
+  await prisma.feePayment.create({ data: { billId: bills.get('ANU25400005')!, amount: 100000, method: 'ONLINE', reference: 'ANU-DEMO-FEES-1', receiptNumber: 'ANU-F-DEMO-ONLINE-1', paidOn: new Date('2026-09-10'), recordedById: s5.id } });
+
+  // Associations and dues.
+  const dept = async (code: string) => (await prisma.department.findUniqueOrThrow({ where: { code } })).id;
+  const ehassa = await prisma.association.create({ data: { code: 'EHASSA', name: 'Engineering and Health and Allied Science Students Association', description: 'Engineering (including Oil and Gas), computing and health departments.', payoutNetwork: 'MTN', payoutNumber: '233244000901', payoutName: 'EHASSA Executive Account', receiptSeq: 2, departments: { create: [{ departmentId: await dept('CSC') }, { departmentId: await dept('EEE') }, { departmentId: await dept('BME') }, { departmentId: await dept('OGE') }, { departmentId: await dept('NUR') }] } } });
+  await prisma.association.create({ data: { code: 'BACA', name: 'Business and Accounting Students Association', description: 'Business and accounting departments.', departments: { create: [{ departmentId: await dept('ACC') }, { departmentId: await dept('MGT') }] } } });
+  const dean = await prisma.user.findUniqueOrThrow({ where: { email: 'deanofstudents@demo.anu.edu.gh' } });
+  const role = await prisma.role.findUniqueOrThrow({ where: { key: ROLE_KEYS.ASSOCIATION_OFFICER } });
+  await prisma.associationOfficer.create({ data: { associationId: ehassa.id, studentId: s5.id, office: 'PRESIDENT', startsOn: new Date('2026-09-01'), endsOn: new Date('2027-08-31'), appointedById: dean.id } });
+  await prisma.userRole.create({ data: { userId: s5.id, roleId: role.id } });
+  const levy = await prisma.duesLevy.create({ data: { associationId: ehassa.id, semesterId: semester.id, title: 'EHASSA dues 2026/2027', amount: 5000, dueOn: new Date('2026-10-31'), createdById: s5.id } });
+  const s12 = students.find((s) => s.indexNumber === 'ANU25400012')!;
+  const s6 = students.find((s) => s.indexNumber === 'ANU26400006')!;
+  await prisma.duesPayment.create({ data: { levyId: levy.id, studentId: s12.id, amount: 5000, method: 'CASH', receiptNumber: receiptNumber('EHASSA', 1), recordedById: s5.id, createdAt: new Date('2026-09-15T12:00:00Z') } });
+  await prisma.payment.create({ data: { reference: 'ANU-DEMO-DUES-1', provider: 'demo', purpose: 'DUES', userId: s6.id, subjectId: levy.id, amount: 5000, status: 'SUCCEEDED', channel: 'mobile_money', paidAt: new Date('2026-09-16T09:00:00Z') } });
+  await prisma.duesPayment.create({ data: { levyId: levy.id, studentId: s6.id, amount: 5000, method: 'ONLINE', receiptNumber: receiptNumber('EHASSA', 2), reference: 'ANU-DEMO-DUES-1', recordedById: s6.id, createdAt: new Date('2026-09-16T09:00:00Z') } });
+}
+
 async function seedTemplates() {
   for (const t of DEFAULT_TEMPLATES) {
     await prisma.notificationTemplate.upsert({ where: { eventKey: t.eventKey }, create: t, update: {} });
@@ -627,7 +779,7 @@ async function seedStaff(passwordHash: string) {
 }
 
 async function seedStudents(passwordHash: string) {
-  const programmes = await prisma.programme.findMany({ orderBy: { code: 'asc' } });
+  const programmes = await prisma.programme.findMany({ where: { code: { in: DEMO_STUDENT_PROGRAMMES } }, orderBy: { code: 'asc' } });
   const studentRoleId = (await prisma.role.findUniqueOrThrow({ where: { key: ROLE_KEYS.STUDENT } })).id;
   const existing = await prisma.user.count({ where: { type: 'STUDENT', isDemo: true } });
   if (existing > 0) return;
@@ -657,7 +809,28 @@ async function seedStudents(passwordHash: string) {
   }
 }
 
+/**
+ * Production: only the reference data the platform needs to work (roles and permissions, message
+ * templates, the default grading scale). No people, no demo programmes. Create the first Super
+ * Admin afterwards with: pnpm admin:create --email ... (see docs/DEPLOYMENT.md).
+ */
+async function seedProduction() {
+  await seedAccess();
+  await seedProgrammeTypes();
+  await seedTemplates();
+  await seedGradingScale();
+  console.log('Production seed complete: roles, permissions, programme types, message templates and the default grading scale.');
+  console.log('Next: create the first Super Admin with  pnpm admin:create --email <address> --first <name> --last <name>');
+}
+
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    if (process.env.SEED_DEMO === 'true') {
+      throw new Error('Demo data cannot be loaded into a production database: the demo accounts share a published password and authenticator secret.');
+    }
+    await seedProduction();
+    return;
+  }
   const passwordHash = await argon2.hash(DEMO_PASSWORD, { type: argon2.argon2id });
   await seedAccess();
   await seedAcademics();
@@ -673,6 +846,8 @@ async function main() {
   await seedAccommodation(passwordHash);
   await seedLibrary();
   await seedMarketplace(passwordHash);
+  await seedEmployment();
+  await seedFees();
   await prisma.systemSetting.upsert({ where: { key: 'demo_mode' }, create: { key: 'demo_mode', value: true }, update: {} });
   console.log('Seed complete. Demo accounts are listed in docs/DEMO_ACCOUNTS.md');
 }

@@ -116,6 +116,7 @@ export interface MyExams {
     offeringId: string;
     course: { code: string; title: string; creditHours: number };
     exam: { startsAt: string; durationMinutes: number; venue: string | null; notes: string | null } | null;
+    seatNumber?: number | null;
     eligibility: { status: EligibilityStatus; reasons: string[] } | null;
   }>;
 }

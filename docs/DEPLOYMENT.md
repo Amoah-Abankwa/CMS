@@ -23,7 +23,8 @@ Start from `backend/.env.example`. In production the API **refuses to start** if
 - `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`: two different values from `openssl rand -base64 48`
 - `MFA_ENCRYPTION_KEY`: `openssl rand -hex 32`. **Keep a copy in a safe place**: without it, every staff authenticator must be set up again.
 - `DATABASE_URL` (pooled, port 6543) and `DIRECT_URL` (direct, port 5432) from Supabase
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`
+- `EMAIL_PROVIDER=resend`, `RESEND_API_KEY=re_...`, `MAIL_FROM` (an address on the domain verified in Resend). SMTP (`EMAIL_PROVIDER=smtp` with `SMTP_*`) also works.
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` from the Cloudinary console, for dish and hostel photos. Without them, photo uploads say they are not set up; everything else works.
 - `SMS_PROVIDER=arkesel`, `SMS_API_KEY`, `SMS_SENDER_ID=ANU`
 - `PAYMENTS_PROVIDER=paystack`, `PAYSTACK_SECRET_KEY=sk_live_...` (a `sk_test_` key is allowed for a staging site, with a warning)
 
@@ -37,7 +38,7 @@ The website needs `API_URL` (where it can reach the API, for example `http://127
 4. **Start the API** and check `https://<api-or-portal>/api/v1/health` returns `{"status":"ok"}`.
 5. **First administrator.** `pnpm admin:create --email <address> --first <name> --last <name> --staff-number <number>`. They receive a setup link by email, choose a password and set up an authenticator. Further staff are added from the Staff screens by a signed-in person, so every change is logged against someone.
 6. **Website.** Deploy the frontend with `API_URL` set. Point the domain at it and make sure HTTPS works.
-7. **Email.** Add SPF, DKIM and DMARC records for the sending domain, or setup links and reset codes will land in spam. Send yourself a password reset to check.
+7. **Email.** In Resend, add and verify the sending domain (it gives the SPF and DKIM records to add to DNS), and add a DMARC record, or setup links and reset codes will land in spam. Send yourself a password reset to check.
 8. **SMS.** Register the sender ID "ANU" with Arkesel (sender IDs in Ghana need approval, which can take a few days) and fund the account. Send a test.
 9. **Paystack.** Complete business verification, then in the dashboard set the webhook URL to `https://portal.anu.edu.gh/api/v1/payments/paystack/webhook` and switch to live keys. Make one small real payment and refund it.
 10. **University set-up** (Registrar, Career Services and others, in the platform): schools, departments and programmes; semesters; grading scale check; staff accounts and roles; student accounts; library, devotion, attendance, hostel, marketplace and employment rules.

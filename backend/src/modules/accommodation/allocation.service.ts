@@ -1,3 +1,4 @@
+import { HostelFeesService } from './hostel-fees.service';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { allocateBeds, formatCedis, priorityGroup, type Applicant, type Gender } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -33,6 +34,7 @@ export class AllocationService implements OnModuleInit {
     private readonly semesters: SemestersService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly hostelFees: HostelFeesService,
   ) {}
 
   async onModuleInit() {
@@ -250,6 +252,7 @@ export class AllocationService implements OnModuleInit {
     if (a.room.id === roomId) throw new BadRequestException({ code: 'SAME_ROOM', message: 'The student is already in that room.' });
     const room = await this.freeRoom(roomId, a.semesterId, toGender(a.student.studentProfile?.gender));
     await this.prisma.roomAllocation.update({ where: { id }, data: { roomId } });
+    await this.hostelFees.syncAllocation(id, user.id);
     await this.audit.record({ action: 'hostels.allocation_moved', module: 'accommodation', targetType: 'RoomAllocation', targetId: id, before: { room: `${a.room.hostel.name} ${a.room.number}` }, after: { room: `${room.hostel.name} ${room.number}` } });
     if (a.status !== 'PROVISIONAL') {
       await this.notifications.notify({
@@ -267,6 +270,7 @@ export class AllocationService implements OnModuleInit {
     const a = await this.prisma.roomAllocation.findUnique({ where: { id }, select: { ...ALLOCATION_SELECT, semesterId: true } });
     if (!a || !HOLDING.includes(a.status as (typeof HOLDING)[number])) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Active allocation not found.' });
     await this.prisma.roomAllocation.update({ where: { id }, data: { status: 'CANCELLED', cancelReason: reason.trim(), respondedAt: new Date() } });
+    await this.hostelFees.syncAllocation(id, user.id);
     await this.prisma.hostelApplication.updateMany({ where: { semesterId: a.semesterId, studentId: a.student.id, status: 'ALLOCATED' }, data: { status: 'UNPLACED' } });
     await this.audit.record({ action: 'hostels.allocation_cancelled', module: 'accommodation', targetType: 'RoomAllocation', targetId: id, metadata: { reason, room: `${a.room.hostel.name} ${a.room.number}` } });
     if (a.status !== 'PROVISIONAL') {

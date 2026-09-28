@@ -10,3 +10,4 @@ export * from './library';
 export * from './marketplace';
 export * from './employment';
 export * from './fees';
+export * from './index-format';

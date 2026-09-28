@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatCedis } from '@anu/shared';
+import { formatMoney } from '@anu/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -27,8 +27,8 @@ export function FeeBills() {
     const all = await feesApi.bills({ semesterId: q.semesterId || undefined, status: q.status || undefined, search: q.search || undefined, page: 1 });
     const rows = [...all.items];
     for (let page = 2; (page - 1) * all.pageSize < all.total; page++) rows.push(...(await feesApi.bills({ semesterId: q.semesterId || undefined, status: q.status || undefined, search: q.search || undefined, page })).items);
-    downloadCsv('student-fees.csv', [['Index number', 'Name', 'Programme', 'Level', 'Due (GHS)', 'Paid (GHS)', 'Balance (GHS)', 'Paid %', 'Cleared'],
-      ...rows.map((b) => [b.student.indexNumber, `${b.student.firstName} ${b.student.lastName}`, b.student.studentProfile?.programme.name, b.student.studentProfile?.currentLevel, b.due / 100, (b.due - Math.max(0, b.balance)) / 100, Math.max(0, b.balance) / 100, b.percentPaid, b.clearance?.cleared ? 'Yes' : 'No'])]);
+    downloadCsv('student-fees.csv', [['Index number', 'Name', 'Programme', 'Level', 'Currency', 'Due', 'Paid', 'Balance', 'Paid %', 'Cleared'],
+      ...rows.map((b) => [b.student.indexNumber, `${b.student.firstName} ${b.student.lastName}`, b.student.studentProfile?.programme.name, b.student.studentProfile?.currentLevel, b.currency, b.due / 100, (b.due - Math.max(0, b.balance)) / 100, Math.max(0, b.balance) / 100, b.percentPaid, b.clearance?.cleared ? 'Yes' : 'No'])]);
   };
 
   if (!opts) return error ? <Alert tone="danger">{error}</Alert> : <Spinner />;
@@ -36,8 +36,8 @@ export function FeeBills() {
     <div className="flex flex-col gap-4">
       {error && <Alert tone="danger">{error}</Alert>}
       {data?.summary && (
-        <div className="grid gap-3 sm:grid-cols-4">
-          {[['Bills', String(data.summary.bills)], ['Due', formatCedis(data.summary.due)], ['Collected', formatCedis(data.summary.collected)], [`Cleared (${data.clearancePercent}% rule)`, String(data.summary.cleared)]].map(([l, v]) => (
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {[['Bills', String(data.summary.bills)], ...data.summary.byCurrency.flatMap((c) => [[`Due (${c.currency})`, formatMoney(c.due, c.currency)], [`Collected (${c.currency})`, formatMoney(c.collected, c.currency)]]), [`Cleared (${data.clearancePercent}% rule)`, String(data.summary.cleared)]].map(([l, v]) => (
             <div key={l} className="rounded-lg border border-border bg-surface px-4 py-3"><p className="text-xs text-muted">{l}</p><p className="text-lg font-semibold tabular-nums">{v}</p></div>
           ))}
         </div>
@@ -59,7 +59,7 @@ export function FeeBills() {
                   <Link href={`/finance/fees/${b.id}`} className="flex flex-col gap-1 px-4 py-2.5 hover:bg-surface-muted sm:flex-row sm:items-center sm:justify-between sm:px-5">
                     <span className="text-sm"><span className="font-medium">{b.student.firstName} {b.student.lastName}</span> <span className="text-muted">{b.student.indexNumber}</span></span>
                     <span className="flex items-center gap-3 text-sm">
-                      <span className="tabular-nums">{formatCedis(Math.max(0, b.balance))} owed</span>
+                      <span className="tabular-nums">{formatMoney(Math.max(0, b.balance), b.currency)} owed</span>
                       <Badge tone={b.clearance?.cleared ? 'success' : b.percentPaid > 0 ? 'warning' : 'neutral'}>{b.clearance?.cleared ? 'Cleared' : `${b.percentPaid}%`}</Badge>
                     </span>
                   </Link>

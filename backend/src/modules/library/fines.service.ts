@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PaymentsService } from '../payments/payments.service';
+import { OnModuleInit, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { formatCedis } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
@@ -8,11 +9,41 @@ import { outstanding } from './circulation.service';
 import { FinesQuery, PayFineDto } from './dto/library.dto';
 
 @Injectable()
-export class FinesService {
+export class FinesService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly payments: PaymentsService,
   ) {}
+
+  onModuleInit() {
+    // Fines paid online: applied once (the reference is unique), and never more than is owed.
+    this.payments.onSucceeded('LIBRARY_FINE', async (p) => {
+      if (!p.subjectId || (await this.prisma.finePayment.findUnique({ where: { reference: p.reference } }))) return;
+      const fine = await this.load(p.subjectId);
+      const owed = outstanding(fine);
+      if (owed <= 0) {
+        await this.payments.refund(p.id, 'Fine already settled');
+        return;
+      }
+      const amount = Math.min(owed, p.amount);
+      await this.prisma.$transaction([
+        this.prisma.finePayment.create({ data: { fineId: fine.id, amount, method: 'ONLINE', reference: p.reference, receiptNumber: p.reference, recordedById: p.userId } }),
+        this.prisma.libraryFine.update({ where: { id: fine.id }, data: { paid: { increment: amount }, ...(amount === owed ? { settledAt: new Date() } : {}) } }),
+      ]);
+      await this.audit.record({ action: 'library.fine_paid_online', module: 'library', targetType: 'LibraryFine', targetId: fine.id, actor: { id: p.userId, label: 'Online payment', roleKey: null }, metadata: { amount, reference: p.reference } });
+    });
+  }
+
+  /** A borrower pays their own fine online; the whole amount still owed. */
+  async payOnline(user: AuthUser, id: string) {
+    const fine = await this.load(id);
+    if (fine.borrowerId !== user.id) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Fine not found.' });
+    const owed = outstanding(fine);
+    if (owed <= 0) throw new BadRequestException({ code: 'SETTLED', message: 'This fine is already settled.' });
+    const started = await this.payments.start({ purpose: 'LIBRARY_FINE', userId: user.id, subjectId: id, amount: owed, returnPath: '/library', description: 'Library fine' });
+    return { paymentUrl: started.authorizationUrl };
+  }
 
   async list(q: FinesQuery) {
     const where: Prisma.LibraryFineWhereInput = {

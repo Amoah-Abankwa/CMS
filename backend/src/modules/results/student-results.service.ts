@@ -17,7 +17,7 @@ export class StudentResultsService {
     const rows = await this.prisma.courseResult.findMany({
       where: { studentId: user.id, sheet: { status: 'PUBLISHED' } },
       select: {
-        credits: true, total: true, grade: true, gradePoint: true, isPass: true, incomplete: true,
+        credits: true, total: true, grade: true, gradePoint: true, isPass: true, incomplete: true, devotionScore: true, devotionExempt: true,
         sheet: {
           select: {
             publishedAt: true,

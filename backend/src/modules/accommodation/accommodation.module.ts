@@ -1,3 +1,8 @@
+import { HostelFormsController } from './hostel-forms.controller';
+import { HostelFormsService } from './hostel-forms.service';
+import { HostelFeesController, HostelOwnerPayoutsController } from './hostel-fees.controller';
+import { HostelFeesService } from './hostel-fees.service';
+import { FeesModule } from '../fees/fees.module';
 import { Module } from '@nestjs/common';
 import { HostelsController, MyAccommodationController, OwnerController, ResidenceController } from './accommodation.controller';
 import { HostelsService } from './hostels.service';
@@ -7,7 +12,8 @@ import { OwnerService } from './owner.service';
 import { ResidenceService } from './residence.service';
 
 @Module({
-  controllers: [HostelsController, MyAccommodationController, OwnerController, ResidenceController],
-  providers: [HostelsService, AllocationService, StudentAccommodationService, OwnerService, ResidenceService],
+  imports: [FeesModule],
+  controllers: [HostelFormsController, HostelFeesController, HostelOwnerPayoutsController, HostelsController, MyAccommodationController, OwnerController, ResidenceController],
+  providers: [HostelFormsService, HostelFeesService, HostelsService, AllocationService, StudentAccommodationService, OwnerService, ResidenceService],
 })
 export class AccommodationModule {}

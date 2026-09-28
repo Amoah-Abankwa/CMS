@@ -1,9 +1,10 @@
+import { INDEX_NUMBER_INPUT } from '@anu/shared';
 import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class StudentLoginDto {
   @Transform(({ value }) => String(value ?? '').trim().toUpperCase())
-  @Matches(/^ANU\d{2}[0-9A-Z]{1,3}\d{5}$/, { message: 'Enter your index number, for example ANU25400001.' })
+  @Matches(INDEX_NUMBER_INPUT, { message: 'Enter your index number as it appears on your ID card.' })
   indexNumber: string;
 
   @IsString() @MinLength(1) @MaxLength(200) password: string;

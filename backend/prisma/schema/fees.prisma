@@ -1,5 +1,27 @@
 // School fees and departmental dues.
 
+enum Currency {
+  GHS
+  USD
+}
+
+enum FeeStudentGroup {
+  ALL
+  GHANAIAN
+  INTERNATIONAL
+}
+
+/// The Accounts office's list of fee names, so every bill, statement and receipt uses the same labels.
+model FeeItem {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String            @unique
+  description String?
+  isActive    Boolean           @default(true)
+  position    Int               @default(0)
+  createdAt   DateTime          @default(now())
+  lines       FeeScheduleLine[]
+}
+
 /// What students in a semester are charged. programmeId and level narrow who it is for; the most
 /// specific schedule that fits a student is used.
 model FeeSchedule {
@@ -10,6 +32,8 @@ model FeeSchedule {
   programmeId String?           @db.Uuid
   programme   Programme?        @relation(fields: [programmeId], references: [id])
   level       Int?
+  studentGroup FeeStudentGroup  @default(ALL)
+  currency    Currency          @default(GHS)
   createdById String            @db.Uuid
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
@@ -23,6 +47,9 @@ model FeeScheduleLine {
   id         String      @id @default(uuid()) @db.Uuid
   scheduleId String      @db.Uuid
   schedule   FeeSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  feeItemId  String?     @db.Uuid
+  feeItem    FeeItem?    @relation(fields: [feeItemId], references: [id])
+  /// The item's name when the schedule was saved.
   name       String
   amount     Int
   position   Int         @default(0)
@@ -40,6 +67,7 @@ model StudentBill {
   schedule    FeeSchedule?    @relation(fields: [scheduleId], references: [id])
   /// [{ name, amount }]
   lines       Json
+  currency    Currency        @default(GHS)
   charged     Int
   issuedById  String          @db.Uuid
   issuedAt    DateTime        @default(now())
@@ -57,8 +85,12 @@ model FeeAdjustment {
   bill        StudentBill @relation(fields: [billId], references: [id], onDelete: Cascade)
   amount      Int
   reason      String
+  /// Set for hall fees, so the charge follows the room: added on acceptance, adjusted on a move, credited on cancellation.
+  allocationId String?    @db.Uuid
   createdById String      @db.Uuid
   createdAt   DateTime    @default(now())
+
+  @@index([allocationId])
 }
 
 enum FeePaymentMethod {
@@ -77,6 +109,10 @@ model FeePayment {
   /// Bank teller or slip number, mobile money transaction ID, or the Paystack reference. Unique per method so a slip cannot be recorded twice.
   reference      String
   receiptNumber  String           @unique
+  /// When paid in the other currency (e.g. cedis towards a dollar bill): what was paid and the rate used.
+  originalAmount   Int?
+  originalCurrency Currency?
+  exchangeRate     Float?
   paidOn         DateTime         @db.Date
   recordedById   String           @db.Uuid
   createdAt      DateTime         @default(now())
@@ -193,4 +229,16 @@ model DuesPayout {
   note          String?
   recordedById  String      @db.Uuid
   createdAt     DateTime    @default(now())
+}
+
+/// Cedis per US dollar, set by the Accounts office. The latest rate that has taken effect is used.
+model ExchangeRate {
+  id             String   @id @default(uuid()) @db.Uuid
+  cedisPerDollar Float
+  effectiveFrom  DateTime
+  note           String?
+  createdById    String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  @@index([effectiveFrom])
 }

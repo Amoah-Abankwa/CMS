@@ -90,6 +90,7 @@ export interface RoomType {
 }
 
 export interface PrivateHostel {
+  photoUrls?: string[];
   id: string;
   name: string;
   gender: HostelGender;

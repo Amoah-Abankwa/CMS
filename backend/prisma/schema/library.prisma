@@ -133,6 +133,7 @@ enum FinePaymentMethod {
   CASH
   MOBILE_MONEY
   WAIVER
+  ONLINE
 }
 
 model FinePayment {
@@ -142,6 +143,8 @@ model FinePayment {
   amount        Int
   method        FinePaymentMethod
   receiptNumber String?
+  /// Paystack reference for online payments; unique so a payment is applied once.
+  reference     String?           @unique
   note          String?
   recordedById  String            @db.Uuid
   createdAt     DateTime          @default(now())

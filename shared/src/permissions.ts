@@ -74,6 +74,8 @@ export const PERMISSIONS = {
   ASSOCIATIONS_MANAGE: 'associations.manage',
   /** An elected association officer: set dues, see who has paid, record cash with a receipt. */
   DUES_COLLECT: 'dues.collect',
+  /** Assign students to their own academic advisor (Heads of Department within their department, and the Registry). */
+  ADVISORS_ASSIGN: 'advisors.assign',
   // Audit
   AUDIT_READ_ALL: 'audit.read_all',
   AUDIT_EXPORT: 'audit.export',
@@ -110,6 +112,7 @@ export const ACADEMIC_DECISION_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.FEES_MANAGE,
   PERMISSIONS.ASSOCIATIONS_MANAGE,
   PERMISSIONS.DUES_COLLECT,
+  PERMISSIONS.ADVISORS_ASSIGN,
 ];
 
 /** Permissions that are only granted while a DeveloperAccessGrant is active. */

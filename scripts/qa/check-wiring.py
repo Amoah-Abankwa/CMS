@@ -48,6 +48,13 @@ for path in files('frontend/src/**/*.ts') + files('frontend/src/**/*.tsx'):
         calls += 1
         if not match(method, url):
             problems.append(f'API: {method} /{url} called in {os.path.relpath(path, ROOT)} has no backend route')
+# PDF downloads are plain links to API routes: <PdfLink api="/me/fees/receipts/${id}/pdf" /> and pdf={`...`}
+for path in files('frontend/src/**/*.tsx'):
+    for m in re.finditer(r"(?:<PdfLink api=|\bpdf=)\{?\s*([`'])(/[^`']*)\1", read(path)):
+        url = re.sub(r'\$\{[^}]*\}', '*', m.group(2)).strip('/')
+        calls += 1
+        if not match('GET', url):
+            problems.append(f'PDF link: GET /{url} in {os.path.relpath(path, ROOT)} has no backend route')
 notes.append(f'{len(routes)} backend routes, {calls} frontend API calls checked')
 
 # ---------- 2. Pages and links ----------
@@ -127,6 +134,23 @@ modules = set(re.findall(r"module:\s*'(\w+)'", ' '.join(read(p) for p in files('
 module_opts = set(re.findall(r"value:\s*'(\w+)'", labels[labels.index('MODULE_OPTIONS'):]))
 for m in sorted(modules - module_opts): problems.append(f'Activity filter: module "{m}" is missing from MODULE_OPTIONS')
 notes.append(f'{actions} activity records checked')
+
+# ---------- 6. Duplicate imports (a TypeScript error the syntax check misses) ----------
+dups = 0
+for path in files('frontend/src/**/*.ts') + files('frontend/src/**/*.tsx') + files('backend/src/**/*.ts') + files('shared/src/**/*.ts'):
+    text = read(path)
+    imported = []
+    for m in re.finditer(r"import\s+(?:type\s+)?\{([^}]*)\}\s+from", text):
+        for n in m.group(1).split(','):
+            n = n.strip()
+            if not n: continue
+            local = n.split(' as ')[-1].replace('type ', '').strip()
+            imported.append(local)
+    for n in set(imported):
+        if imported.count(n) > 1:
+            dups += 1
+            problems.append(f'Duplicate import: {n} in {os.path.relpath(path, ROOT)}')
+notes.append('duplicate imports checked')
 
 for n in notes: print('note', n)
 for p in problems: print('PROBLEM', p)

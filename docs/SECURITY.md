@@ -25,7 +25,10 @@ What protects the platform, what is still open, and what ANU needs to decide. Fo
 
 **Money**
 - Payments count only after the server verifies them with Paystack; amount and currency must match. Paystack webhooks are checked by signature. A payment is applied exactly once. Refunds are automatic when a paid order is cancelled, and failed refunds are logged for Finance.
-- Campus dispatchers never handle cash.
+- Campus dispatchers are paid their fee by whoever holds it: Finance for fees paid through Paystack, the vendor for fees included in a cash or MoMo payment to the vendor, or the customer on delivery. Each delivery records which, so Finance only pays out what the university collected.
+- Vendors tick cash and MoMo orders as paid themselves (with the MoMo transaction ID); the customer is told at once, and each tick is in the activity log.
+- Payments in the other currency (cedis towards a dollar bill) are converted at the Accounts office's rate in force on the payment date; the original amount and rate are kept on the payment and its receipt.
+- Receipts and statements are also generated as PDFs by the server, only for the student they belong to (or Finance, or for dues the association's officers and the Dean of Students office).
 - Fee payments recorded from bank slips cannot be recorded twice (the slip number is unique per method), and are reversed with a reason rather than deleted.
 - Every departmental dues payment gets a numbered receipt that is sent to the student by SMS, including cash recorded by an officer, so a student would notice a payment that was not recorded or one they never made. Only the Dean of Students office can cancel a receipt.
 
@@ -33,6 +36,8 @@ What protects the platform, what is still open, and what ANU needs to decide. Fo
 - Every significant action is in the activity log with who, what, when and the result. The log is append-only in the database itself (a trigger refuses changes and deletions).
 - Row-level security is on for every table, so Supabase's public API cannot read data; `pnpm db:deploy` re-applies it after every migration.
 - CSV downloads neutralise spreadsheet formulas typed into names or notes.
+- Private documents (hostel forms, signed forms, excuse evidence such as medical notes) are stored in Cloudinary as "authenticated" files with no public address. The API gives a five-minute signed download link only to people allowed to see a document (the student, and the staff who handle it), and records every opening of a private document in the activity log.
+- Photos are uploaded by the browser straight to Cloudinary with a short-lived signature the API creates only after checking the person owns the dish or hostel. The signature fixes the folder and allowed formats; the API refuses any photo from outside that folder. The Cloudinary API secret never reaches the browser. The content security policy allows images only from Cloudinary's delivery address and uploads only to its API.
 
 **Production safety**
 - The API refuses to start in production with demo mode, simulated payments or SMS, missing email, an address that is not https, placeholder or shared secrets, or any demo account in the database.

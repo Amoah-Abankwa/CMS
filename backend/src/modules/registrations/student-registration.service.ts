@@ -1,3 +1,4 @@
+import { carryOverCourses } from '@anu/shared';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -113,7 +114,7 @@ export class StudentRegistrationService {
     if (user.type !== 'STUDENT') throw new ForbiddenException({ code: 'STUDENTS_ONLY', message: 'Course registration is for students.' });
     const profile = await this.prisma.studentProfile.findUnique({
       where: { userId: user.id },
-      select: { programmeId: true, currentLevel: true, programme: { select: { code: true, name: true } } },
+      select: { userId: true, programmeId: true, currentLevel: true, programme: { select: { code: true, name: true } } },
     });
     if (!profile) throw new ForbiddenException({ code: 'NO_PROFILE', message: 'Your student record is incomplete. Contact the Registry.' });
     return { profile, semester: await this.semesters.resolve(semesterId) };
@@ -126,20 +127,29 @@ export class StudentRegistrationService {
   }
 
   /** Offered courses in the student's curriculum for their level and this semester. */
-  private async available(profile: { programmeId: string; currentLevel: number }, semester: Semester) {
+  private async available(profile: { programmeId: string; currentLevel: number; userId?: string }, semester: Semester) {
+    // Carry-overs: courses the student failed at their latest attempt, offered this semester at any level.
+    const attempts = profile.userId
+      ? await this.prisma.courseResult.findMany({ where: { studentId: profile.userId, sheet: { status: 'PUBLISHED' } }, select: { isPass: true, incomplete: true, sheet: { select: { publishedAt: true, offering: { select: { courseId: true } } } } } })
+      : [];
+    const carry = carryOverCourses(attempts.map((a) => ({ courseId: a.sheet.offering.courseId, isPass: a.isPass, incomplete: a.incomplete, publishedAt: a.sheet.publishedAt ?? new Date(0) })));
     const rows = await this.prisma.courseOffering.findMany({
       where: {
         semesterId: semester.id,
-        course: { isActive: true, curriculum: { some: { programmeId: profile.programmeId, level: profile.currentLevel, semesterNo: semester.number } } },
+        OR: [
+          { course: { isActive: true, curriculum: { some: { programmeId: profile.programmeId, level: profile.currentLevel, semesterNo: semester.number } } } },
+          ...(carry.length ? [{ courseId: { in: carry } }] : []),
+        ],
       },
       orderBy: { course: { code: 'asc' } },
       select: {
         ...OFFERING_SELECT,
+        courseId: true,
       },
     });
     // Seats count submitted and approved registrations. Drafts do not hold a seat.
     const held = await this.seatsHeld(rows.map((r) => r.id));
-    return rows.map((o) => ({ ...presentOffering(o), seatsTaken: held.get(o.id) ?? 0 }));
+    return rows.map((o) => ({ ...presentOffering(o), seatsTaken: held.get(o.id) ?? 0, carryOver: carry.includes(o.courseId) }));
   }
 
   async seatsHeld(offeringIds: string[], excludeStudentId?: string) {

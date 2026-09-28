@@ -77,16 +77,18 @@ export class VendorsAdminService {
   }
 
   /**
-   * What each vendor is owed for completed online orders in a period, less commission and payouts
+   * What each vendor is owed for completed online orders in a period, less commission, campus dispatcher fees and payouts
    * already recorded for that period. Pay-at-counter sales go straight to the vendor and are shown for reference.
    */
   async settlements(from: string, to: string) {
     const start = new Date(from);
     const end = new Date(to);
-    const [vendors, orders, payouts] = await Promise.all([
+    const [vendors, orders, payouts, deliveries] = await Promise.all([
       this.prisma.vendor.findMany({ where: { status: { not: 'REJECTED' } }, orderBy: { name: 'asc' }, select: { id: true, name: true, payoutNetwork: true, payoutNumber: true, payoutName: true } }),
       this.prisma.foodOrder.findMany({ where: { status: 'COMPLETED', completedAt: { gte: start, lte: end } }, select: { vendorId: true, paymentOption: true, total: true, commission: true } }),
       this.prisma.vendorPayout.findMany({ where: { periodFrom: { gte: start }, periodTo: { lte: end } }, orderBy: { createdAt: 'desc' } }),
+      // Campus dispatchers are paid per delivery by Finance, and that cost comes out of the vendor's share.
+      this.prisma.delivery.findMany({ where: { status: 'DELIVERED', feeSettlement: 'UNIVERSITY', order: { completedAt: { gte: start, lte: end } } }, select: { fee: true, order: { select: { vendorId: true } } } }),
     ]);
     return vendors.map((v) => {
       const mine = orders.filter((o) => o.vendorId === v.id);
@@ -94,14 +96,16 @@ export class VendorsAdminService {
       const gross = online.reduce((s, o) => s + o.total, 0);
       const commissionTotal = online.reduce((s, o) => s + o.commission, 0);
       const paidOut = payouts.filter((p) => p.vendorId === v.id).reduce((s, p) => s + p.amount, 0);
+      const dispatchFees = deliveries.filter((d) => d.order.vendorId === v.id).reduce((s, d) => s + d.fee, 0);
       return {
         vendor: v,
         onlineOrders: online.length,
         onlineGross: gross,
         commission: commissionTotal,
-        net: gross - commissionTotal,
+        dispatchFees,
+        net: gross - commissionTotal - dispatchFees,
         paidOut,
-        owed: gross - commissionTotal - paidOut,
+        owed: gross - commissionTotal - dispatchFees - paidOut,
         counterOrders: mine.length - online.length,
         counterGross: mine.filter((o) => o.paymentOption === 'ON_PICKUP').reduce((s, o) => s + o.total, 0),
         payouts: payouts.filter((p) => p.vendorId === v.id),

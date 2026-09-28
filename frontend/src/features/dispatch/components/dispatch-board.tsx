@@ -86,7 +86,7 @@ export function DispatchBoard() {
                 {d.order.customer.phone && <a className="text-primary hover:underline" href={`tel:${d.order.customer.phone}`}>{d.order.customer.phone}</a>}
               </div>
             </div>
-            <p className="text-muted">{d.order.items.map((i) => `${i.quantity} x ${i.name}`).join(', ')}. Already paid online; do not collect money.</p>
+            <p className="text-muted">{d.order.items.map((i) => `${i.quantity} x ${i.name}`).join(', ')}. {d.feeSettlement === 'CUSTOMER' ? `Collect your fee of ${formatCedis(d.fee)} from the customer on delivery.` : d.feeSettlement === 'VENDOR' ? `The vendor hands you your fee of ${formatCedis(d.fee)} when you collect.` : 'Your fee is paid to you by Finance.'}</p>
             {d.problemNote && <Alert tone="warning">You reported: {d.problemNote}. The vendor has been told.</Alert>}
             <div className="flex flex-wrap gap-2">
               {d.status === 'ASSIGNED' ? (
@@ -114,7 +114,7 @@ export function DispatchBoard() {
                   <span className="block text-xs text-muted">Collect at {a.vendor.location}. {a.items} {a.items === 1 ? 'item' : 'items'}. Ready since {clockTime(a.offeredAt)}.</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
-                  <span className="text-sm font-medium tabular-nums">{formatCedis(a.fee)}</span>
+                  <span className="text-sm font-medium tabular-nums">{formatCedis(a.fee)}<span className="block text-xs font-normal text-muted">{a.feeSettlement === 'CUSTOMER' ? 'from the customer' : a.feeSettlement === 'VENDOR' ? 'from the vendor' : 'paid by Finance'}</span></span>
                   <Button size="sm" disabled={full} loading={busy === a.id} onClick={() => run(a.id, () => dispatchApi.take(a.id), `Order #${a.number} is yours. Go to ${a.vendor.name}.`)}>Take it</Button>
                 </span>
               </li>

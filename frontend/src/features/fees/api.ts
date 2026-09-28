@@ -1,13 +1,15 @@
-import type { AssociationOffice, FeePaymentMethod, FeeRules } from '@anu/shared';
+import type { AssociationOffice, Currency, FeePaymentMethod, FeeRules, FeeStudentGroup, StatementEntry } from '@anu/shared';
 import { api } from '@/lib/axios';
 
 export interface BillLine { name: string; amount: number }
-export interface FeePaymentRow { id: string; amount: number; method: FeePaymentMethod; reference: string; receiptNumber: string; paidOn: string; createdAt: string; reversedAt: string | null; reversalReason: string | null }
+export interface FeePaymentRow { id: string; amount: number; method: FeePaymentMethod; reference: string; receiptNumber: string; paidOn: string; createdAt: string; reversedAt: string | null; reversalReason: string | null; originalAmount?: number | null; originalCurrency?: Currency | null; exchangeRate?: number | null }
+export interface ExchangeRate { id: string; cedisPerDollar: number; effectiveFrom: string; note: string | null; createdAt: string }
 export interface BillFigures { due: number; balance: number; percentPaid: number; overpaid: number }
 export interface Bill extends BillFigures {
   id: string;
   semesterId: string;
   lines: BillLine[];
+  currency: Currency;
   charged: number;
   issuedAt: string;
   semester: { id: string; number: number; academicYear: { label: string } };
@@ -16,9 +18,12 @@ export interface Bill extends BillFigures {
   payments: FeePaymentRow[];
   clearance: { cleared: boolean; source: 'MANUAL' | 'FEES'; note?: string | null } | null;
   clearancePercent?: number;
+  cedisPerDollar?: number | null;
 }
-export interface MyBill extends Omit<Bill, 'student' | 'clearance'> { semesterLabel: string; cleared: boolean }
-export interface Schedule { id: string; name: string; programmeId: string | null; level: number | null; programme: { name: string } | null; lines: Array<{ id: string; name: string; amount: number }>; _count: { bills: number } }
+export interface MyBill extends Omit<Bill, 'student' | 'clearance'> { semesterLabel: string; cleared: boolean; statement: StatementEntry[] }
+export interface Schedule { id: string; name: string; programmeId: string | null; level: number | null; studentGroup: FeeStudentGroup; currency: Currency; programme: { name: string } | null; lines: Array<{ id: string; feeItemId: string | null; name: string; amount: number }>; _count: { bills: number } }
+export interface FeeItem { id: string; name: string; description: string | null; isActive: boolean; _count: { lines: number } }
+export interface FeeReceipt { originalAmount?: number | null; originalCurrency?: Currency | null; exchangeRate?: number | null; id: string; amount: number; method: FeePaymentMethod; reference: string; receiptNumber: string; paidOn: string; createdAt: string; reversedAt: string | null; reversalReason: string | null; currency: Currency; semester: string; student: { name: string; indexNumber: string | null; programme: string | null; level: number | null }; balanceAfter: number; balanceNow: number }
 export interface FeeOptions { semesters: Array<{ id: string; label: string; isCurrent: boolean }>; programmes: Array<{ id: string; name: string }> }
 
 export interface AdminAssociation {
@@ -50,21 +55,30 @@ export interface MyDues {
 export interface DuesSettlement { id: string; code: string; name: string; payoutNetwork: string | null; payoutNumber: string | null; payoutName: string | null; online: number; cash: number; paidOut: number; owed: number }
 
 export const feesApi = {
-  mine: () => api.get<{ rules: FeeRules; provider: string; bills: MyBill[] }>('/me/fees').then((r) => r.data),
+  mine: () => api.get<{ rules: FeeRules; provider: string; cedisPerDollar: number | null; bills: MyBill[] }>('/me/fees').then((r) => r.data),
+  rates: () => api.get<ExchangeRate[]>('/fees/rates').then((r) => r.data),
+  addRate: (dto: { cedisPerDollar: number; effectiveFrom: string; note?: string }) => api.post('/fees/rates', dto),
+  deleteRate: (id: string) => api.delete(`/fees/rates/${id}`),
   pay: (billId: string, amount: number) => api.post<{ paymentUrl: string }>('/me/fees/pay', { billId, amount }).then((r) => r.data),
 
   options: () => api.get<FeeOptions>('/fees/options').then((r) => r.data),
   rules: () => api.get<FeeRules>('/fees/rules').then((r) => r.data),
-  saveRules: (dto: FeeRules) => api.put<FeeRules & { rechecked: number }>('/fees/rules', dto).then((r) => r.data),
+  saveRules: (dto: Pick<FeeRules, 'minOnlinePayment' | 'minOnlinePaymentUsd'>) => api.put<FeeRules>('/fees/rules', dto).then((r) => r.data),
+  items: () => api.get<FeeItem[]>('/fees/items').then((r) => r.data),
+  saveItem: (dto: { name: string; description?: string; isActive?: boolean }, id?: string) => (id ? api.put(`/fees/items/${id}`, dto) : api.post('/fees/items', dto)),
+  clearanceRule: () => api.get<{ clearancePercent: number }>('/fees/clearance-rule').then((r) => r.data),
+  saveClearanceRule: (clearancePercent: number) => api.put<{ clearancePercent: number; rechecked: number }>('/fees/clearance-rule', { clearancePercent }).then((r) => r.data),
+  myReceipt: (id: string) => api.get<FeeReceipt>(`/me/fees/receipts/${id}`).then((r) => r.data),
+  adminReceipt: (id: string) => api.get<FeeReceipt>(`/fees/payments/${id}/receipt`).then((r) => r.data),
   schedules: (semesterId: string) => api.get<Schedule[]>('/fees/schedules', { params: { semesterId } }).then((r) => r.data),
-  saveSchedule: (dto: { semesterId: string; name: string; programmeId: string | null; level: number | null; lines: BillLine[] }, id?: string) => (id ? api.put(`/fees/schedules/${id}`, dto) : api.post('/fees/schedules', dto)),
+  saveSchedule: (dto: { semesterId: string; name: string; programmeId: string | null; level: number | null; studentGroup: FeeStudentGroup; currency: Currency; lines: Array<{ feeItemId: string; amount: number }> }, id?: string) => (id ? api.put(`/fees/schedules/${id}`, dto) : api.post('/fees/schedules', dto)),
   deleteSchedule: (id: string) => api.delete(`/fees/schedules/${id}`),
   copySchedules: (fromSemesterId: string, toSemesterId: string) => api.post<{ copied: number; skipped: number }>('/fees/schedules/copy', { fromSemesterId, toSemesterId }).then((r) => r.data),
   issue: (semesterId: string) => api.post<{ issued: number; alreadyBilled: number; noSchedule: number }>('/fees/bills/issue', { semesterId }).then((r) => r.data),
   bills: (p: { semesterId?: string; search?: string; status?: string; page: number }) =>
-    api.get<{ items: Bill[]; total: number; page: number; pageSize: number; summary: { bills: number; due: number; collected: number; cleared: number } | null; clearancePercent: number; semesterId?: string }>('/fees/bills', { params: { ...p, pageSize: 25 } }).then((r) => r.data),
+    api.get<{ items: Bill[]; total: number; page: number; pageSize: number; summary: { bills: number; cleared: number; byCurrency: Array<{ currency: Currency; bills: number; due: number; collected: number }> } | null; clearancePercent: number; semesterId?: string }>('/fees/bills', { params: { ...p, pageSize: 25 } }).then((r) => r.data),
   bill: (id: string) => api.get<Bill>(`/fees/bills/${id}`).then((r) => r.data),
-  recordPayment: (id: string, dto: { amount: number; method: 'BANK' | 'MOBILE_MONEY' | 'CHEQUE'; reference: string; paidOn: string }) => api.post<Bill>(`/fees/bills/${id}/payments`, dto).then((r) => r.data),
+  recordPayment: (id: string, dto: { amount: number; method: 'BANK' | 'MOBILE_MONEY' | 'CHEQUE'; reference: string; paidOn: string; paidCurrency?: Currency }) => api.post<Bill>(`/fees/bills/${id}/payments`, dto).then((r) => r.data),
   adjust: (id: string, dto: { amount: number; reason: string }) => api.post<Bill>(`/fees/bills/${id}/adjustments`, dto).then((r) => r.data),
   reverse: (paymentId: string, reason: string) => api.post<Bill>(`/fees/payments/${paymentId}/reverse`, { reason }).then((r) => r.data),
   duesSettlements: () => api.get<DuesSettlement[]>('/fees/dues-settlements').then((r) => r.data),

@@ -77,3 +77,59 @@ describe('grading', () => {
     expect(gpa([])).toEqual({ gpa: null, credits: 0 });
   });
 });
+
+import { amendedResult, carryOverCourses } from '@anu/shared';
+
+describe('carry-over courses', () => {
+  it('lists courses whose latest attempt was a fail', () => {
+    const r = carryOverCourses([
+      { courseId: 'CSC101', isPass: false, incomplete: false, publishedAt: '2025-12-20' },
+      { courseId: 'CSC101', isPass: true, incomplete: false, publishedAt: '2026-05-20' },
+      { courseId: 'CSC103', isPass: false, incomplete: false, publishedAt: '2026-05-20' },
+      { courseId: 'CSC105', isPass: false, incomplete: true, publishedAt: '2026-05-20' },
+      { courseId: 'MTH101', isPass: true, incomplete: false, publishedAt: '2025-12-20' },
+      { courseId: 'MTH101', isPass: false, incomplete: false, publishedAt: '2026-05-20' },
+    ]);
+    expect(r.sort()).toEqual(['CSC103', 'MTH101']);
+  });
+});
+
+describe('amended results', () => {
+  const bands = [
+    { letter: 'A', minScore: 80, gradePoint: 4, isPass: true },
+    { letter: 'B', minScore: 70, gradePoint: 3, isPass: true },
+    { letter: 'D', minScore: 50, gradePoint: 1, isPass: true },
+    { letter: 'F', minScore: 0, gradePoint: 0, isPass: false },
+  ];
+  it('regrades the corrected scores on the sheet scale', () => {
+    expect(amendedResult(28.5, 41, bands)).toMatchObject({ total: 70, grade: 'B', gradePoint: 3, isPass: true, incomplete: false });
+    expect(amendedResult(20, 25, bands)).toMatchObject({ total: 45, grade: 'F', isPass: false });
+  });
+});
+
+import { courseTotalWithDevotion } from '@anu/shared';
+
+describe('morning devotion in course totals', () => {
+  it('adds the devotion score to course marks out of 95', () => {
+    expect(courseTotalWithDevotion(76, { score: 4.25 })).toBe(80);
+    expect(courseTotalWithDevotion(95, { score: 5 })).toBe(100);
+    expect(courseTotalWithDevotion(44.5, { score: 0.5 })).toBe(45);
+  });
+  it('scales weekend students from 95 to 100', () => {
+    expect(courseTotalWithDevotion(76, { exempt: true })).toBe(80);
+    expect(courseTotalWithDevotion(95, { exempt: true })).toBe(100);
+    expect(courseTotalWithDevotion(47.5, { exempt: true })).toBe(50);
+  });
+  it('needs assessments to add up to 95 when devotion counts', () => {
+    const c = (w: number) => ({ id: String(w), kind: 'CONTINUOUS' as const, weight: w, maxScore: 100 });
+    expect(weightsProblem([c(35), c(60)], 95)).toBeNull();
+    expect(weightsProblem([c(40), c(60)], 95)).toMatch('exactly 95%');
+    expect(weightsProblem([c(40), c(60)])).toBeNull();
+  });
+  it('keeps the devotion part when an amendment regrades', () => {
+    const bands = [{ letter: 'A', minScore: 80, gradePoint: 4, isPass: true }, { letter: 'B', minScore: 70, gradePoint: 3, isPass: true }, { letter: 'F', minScore: 0, gradePoint: 0, isPass: false }];
+    expect(amendedResult(30, 46, bands, { score: 4 })).toMatchObject({ total: 80, grade: 'A' });
+    expect(amendedResult(30, 46, bands, { exempt: true })).toMatchObject({ total: 80, grade: 'A' });
+    expect(amendedResult(30, 46, bands)).toMatchObject({ total: 76, grade: 'B' });
+  });
+});

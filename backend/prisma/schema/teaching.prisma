@@ -69,6 +69,10 @@ model CourseRegistration {
   reviewedById String?                  @db.Uuid
   reviewedBy   User?                    @relation("RegistrationReviewer", fields: [reviewedById], references: [id])
   reviewNote   String?
+  /// An approved registration reopened for changes: by whom, when and why.
+  reopenedAt   DateTime?
+  reopenedById String?  @db.Uuid
+  reopenReason String?
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
   items        CourseRegistrationItem[]
@@ -85,4 +89,17 @@ model CourseRegistrationItem {
 
   @@id([registrationId, offeringId])
   @@index([offeringId])
+}
+
+/// A student's own academic advisor, assigned by the Head of Department or the Registry. Advisors with
+/// advisees review only them; students without one are reviewed by any advisor in the department.
+model AdvisorAssignment {
+  studentId    String   @id @db.Uuid
+  student      User     @relation("Advisee", fields: [studentId], references: [id])
+  advisorId    String   @db.Uuid
+  advisor      User     @relation("Advisor", fields: [advisorId], references: [id])
+  assignedById String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  @@index([advisorId])
 }

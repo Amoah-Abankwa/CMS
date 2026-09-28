@@ -50,6 +50,7 @@ function makeExpect(actual: unknown, negate = false) {
     toEqual: (e: unknown) => check(equal(actual, e), `to equal ${show(e)}`),
     toBeNull: () => check(actual === null, 'to be null'),
     toContain: (e: unknown) => check((actual as { includes(x: unknown): boolean }).includes(e), `to contain ${show(e)}`),
+    toBeGreaterThan: (n: number) => check((actual as number) > n, `to be greater than ${n}`),
     toHaveLength: (n: number) => check((actual as { length: number }).length === n, `to have length ${n}`),
     toMatch: (r: RegExp | string) => check(typeof r === 'string' ? String(actual).includes(r) : r.test(String(actual)), `to match ${r}`),
     toMatchObject: (e: unknown) => check(subset(actual, e), `to match object ${show(e)}`),

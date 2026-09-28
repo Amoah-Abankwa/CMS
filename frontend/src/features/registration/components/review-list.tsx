@@ -31,6 +31,7 @@ export function ReviewList() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [open, setOpen] = useState<ReviewItem | null>(null);
+  const [reload, setReload] = useState(0);
 
   const load = useCallback(() => {
     setError(null);
@@ -38,7 +39,7 @@ export function ReviewList() {
       .review({ semesterId: semesterId || undefined, status, search: search.trim() || undefined, page, pageSize: PAGE_SIZE })
       .then(setData)
       .catch((err) => setError(errorMessage(err)));
-  }, [semesterId, status, search, page]);
+  }, [semesterId, status, search, page, reload]);
 
   useEffect(() => {
     const id = window.setTimeout(() => void load(), 250);
@@ -92,9 +93,12 @@ export function ReviewList() {
                     {r.submittedAt ? ` Submitted ${formatDateTime(r.submittedAt)}.` : ''}
                   </p>
                 </div>
-                <Button variant={status === 'SUBMITTED' ? 'primary' : 'secondary'} size="sm" onClick={() => setOpen(r)}>
-                  {status === 'SUBMITTED' ? 'Review' : 'View'}
-                </Button>
+                <span className="flex gap-2">
+                  {status === 'APPROVED' && <Button variant="ghost" size="sm" onClick={() => { const reason = window.prompt(`Reopen ${fullName(r.student)}'s registration so they can change it and submit again. Reason:`); if (reason && reason.trim().length >= 5) registrationApi.reopen(r.id, reason.trim()).then(() => { window.alert(`Reopened. ${fullName(r.student)} can change the registration and submit it again.`); setReload((n) => n + 1); }).catch((err) => window.alert(errorMessage(err))); }}>Reopen</Button>}
+                  <Button variant={status === 'SUBMITTED' ? 'primary' : 'secondary'} size="sm" onClick={() => setOpen(r)}>
+                    {status === 'SUBMITTED' ? 'Review' : 'View'}
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>

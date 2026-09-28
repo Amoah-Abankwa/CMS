@@ -1,5 +1,7 @@
 'use client';
 
+import { MyHostelFees } from './hostel-fees';
+import { MyHostelForms } from './hostel-paperwork';
 import { useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/states';
@@ -31,6 +33,9 @@ export function MyAccommodation() {
 
   return (
     <div className="flex flex-col gap-4">
+
+    <MyHostelFees />
+      <MyHostelForms />
       <div role="tablist" aria-label="Accommodation" className="flex flex-wrap gap-1 border-b border-border">
         {TABS.map((t) => (
           <button key={t.value} role="tab" type="button" aria-selected={tab === t.value} onClick={() => setTab(t.value)}

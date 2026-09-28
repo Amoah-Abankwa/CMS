@@ -93,3 +93,33 @@ model AttendanceWarning {
 
   @@id([studentId, offeringId])
 }
+
+enum ExcuseRequestStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+  WITHDRAWN
+}
+
+/// A student asking to be excused, with a supporting document. Approving it records an excuse, which
+/// corrects class attendance and morning devotion for those dates.
+model ExcuseRequest {
+  id           String              @id @default(uuid()) @db.Uuid
+  studentId    String              @db.Uuid
+  student      User                @relation("ExcuseRequestStudent", fields: [studentId], references: [id])
+  fromDate     DateTime            @db.Date
+  toDate       DateTime            @db.Date
+  category     ExcuseCategory
+  statement    String
+  documentId   String?             @db.Uuid
+  document     StoredDocument?     @relation(fields: [documentId], references: [id])
+  status       ExcuseRequestStatus @default(REQUESTED)
+  decisionNote String?
+  decidedById  String?             @db.Uuid
+  decidedAt    DateTime?
+  excuseId     String?             @db.Uuid
+  createdAt    DateTime            @default(now())
+
+  @@index([status, createdAt])
+  @@index([studentId])
+}

@@ -49,6 +49,7 @@ export class VendorProfileDto {
   @IsBoolean() acceptsPayOnPickup: boolean;
   @IsBoolean() offersPickup: boolean;
   @IsBoolean() offersDelivery: boolean;
+  @IsOptional() @IsBoolean() useDispatchers?: boolean;
   @Type(() => Number) @IsInt() @Min(0) @Max(100_000) deliveryFee: number;
   @Transform(trim) @IsOptional() @IsString() @MaxLength(200) deliveryNote?: string;
   @Type(() => Number) @IsInt() @Min(0) @Max(1_000_000) minimumOrder: number;
@@ -97,9 +98,37 @@ export class PlaceOrderDto {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => OrderLineDto) lines: OrderLineDto[];
   @IsIn(['PICKUP', 'DELIVERY']) fulfilment: 'PICKUP' | 'DELIVERY';
   @IsIn(['ONLINE', 'ON_PICKUP']) paymentOption: 'ONLINE' | 'ON_PICKUP';
+  /** Campus-dispatcher deliveries: include the dispatcher's fee in the payment, or pay the dispatcher on delivery. */
+  @IsOptional() @IsIn(['INCLUDED', 'ON_DELIVERY']) dispatchFeeMode?: 'INCLUDED' | 'ON_DELIVERY';
   @Transform(trim) @IsOptional() @IsString() @MaxLength(200) deliveryAddress?: string;
   @Transform(trim) @IsOptional() @IsString() @MaxLength(200) deliveryNote?: string;
   @Transform(trim) @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 
 export class OrdersQuery extends PaginationDto {}
+
+export class OnlineDto {
+  @IsBoolean() online: boolean;
+}
+
+export class DeliveredDto {
+  @Transform(trim) @Matches(/^\d{4}$/, { message: "Enter the customer's 4-digit code." }) code: string;
+}
+
+export class ProblemDto {
+  @Transform(trim) @IsString() @MinLength(5) @MaxLength(300) note: string;
+}
+
+export class DispatcherPayoutDto {
+  @IsUUID() dispatcherId: string;
+  @IsDateString() periodFrom: string;
+  @IsDateString() periodTo: string;
+  @Type(() => Number) @IsInt() @Min(1) @Max(10_000_000) amount: number;
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(60) reference?: string;
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(300) note?: string;
+}
+
+export class MarkPaidDto {
+  @IsIn(['CASH', 'MOMO']) via: 'CASH' | 'MOMO';
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(60) reference?: string;
+}

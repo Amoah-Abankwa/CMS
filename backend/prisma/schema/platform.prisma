@@ -93,3 +93,25 @@ model SystemSetting {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+enum DocumentPurpose {
+  HOSTEL_FORM
+  HOSTEL_FORM_SUBMISSION
+  EXCUSE
+}
+
+/// A private document stored in Cloudinary (type "authenticated"). Nobody can open it without a
+/// short-lived download link, which the API only gives to people allowed to see it.
+model StoredDocument {
+  id           String          @id @default(uuid()) @db.Uuid
+  publicId     String          @unique
+  format       String
+  bytes        Int?
+  originalName String
+  purpose      DocumentPurpose
+  uploadedById String          @db.Uuid
+  createdAt    DateTime        @default(now())
+  formTemplates     HostelFormTemplate[]
+  formSubmissions   HostelFormSubmission[]
+  excuseRequests    ExcuseRequest[]
+}

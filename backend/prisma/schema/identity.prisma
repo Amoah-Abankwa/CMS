@@ -84,6 +84,14 @@ model User {
   bills               StudentBill[]        @relation("BillStudent")
   associationOffices  AssociationOfficer[] @relation("AssociationOfficer")
   duesPayments        DuesPayment[]        @relation("DuesPayer")
+  advisor             AdvisorAssignment?   @relation("Advisee")
+  advisees            AdvisorAssignment[]  @relation("Advisor")
+  examSeats           ExamSeat[]           @relation("ExamSeatStudent")
+  examAttendance      ExamAttendance[]     @relation("ExamAttendanceStudent")
+  hostelFees          HostelFee[]          @relation("HostelFeeStudent")
+  hostelForms         HostelFormSubmission[] @relation("HostelFormStudent")
+  excuseRequests      ExcuseRequest[]      @relation("ExcuseRequestStudent")
+  devotionExemptions  DevotionExemption[]  @relation("DevotionExemptionStudent")
 
   @@index([type, status])
 }
@@ -182,11 +190,32 @@ model UserPreference {
   updatedAt        DateTime        @updatedAt
 }
 
+enum ProgrammeCategory {
+  DIPLOMA
+  BACHELORS
+  GRADUATE
+  OTHER
+}
+
+enum StudyMode {
+  REGULAR
+  WEEKEND
+  SANDWICH
+  DISTANCE
+}
+
+/// A programme type (for example Bachelor's regular, Bachelor's weekend, Diploma, Graduate School),
+/// set by the Registrar with its length in semesters and the format of its index numbers.
 model ProgrammeLevel {
-  code        String   @id
+  code        String            @id
   name        String
   description String?
-  isActive    Boolean  @default(true)
+  category    ProgrammeCategory @default(BACHELORS)
+  mode        StudyMode         @default(REGULAR)
+  semesters   Int               @default(8)
+  /// See shared/src/index-format.ts, e.g. ANU{YY}{CODE}{SEQ:5}.
+  indexFormat String            @default("ANU{YY}{CODE}{SEQ:5}")
+  isActive    Boolean           @default(true)
   programmes  Programme[]
 }
 

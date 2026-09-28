@@ -73,3 +73,16 @@ model DevotionResult {
 
   @@id([studentId, semesterId])
 }
+
+/// A student excused from morning devotion for a semester (beyond weekend students), granted by the
+/// Chaplaincy. Like weekend students, their course marks out of 95 are scaled to 100.
+model DevotionExemption {
+  studentId   String   @db.Uuid
+  student     User     @relation("DevotionExemptionStudent", fields: [studentId], references: [id])
+  semesterId  String   @db.Uuid
+  reason      String
+  grantedById String   @db.Uuid
+  createdAt   DateTime @default(now())
+
+  @@id([studentId, semesterId])
+}

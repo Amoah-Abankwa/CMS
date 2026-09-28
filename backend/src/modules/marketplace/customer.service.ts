@@ -1,3 +1,5 @@
+import { EmploymentRulesService } from '../employment/employment-rules.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { isOpenAt, type OpeningHours } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -7,7 +9,7 @@ import { OrdersQuery } from './dto/marketplace.dto';
 
 const VENDOR_PUBLIC = {
   id: true, name: true, description: true, location: true, phone: true, openingHours: true, paused: true,
-  acceptsOnline: true, acceptsPayOnPickup: true, offersPickup: true, offersDelivery: true, deliveryFee: true, deliveryNote: true, minimumOrder: true, prepMinutes: true,
+  acceptsOnline: true, acceptsPayOnPickup: true, offersPickup: true, offersDelivery: true, useDispatchers: true, deliveryFee: true, deliveryNote: true, minimumOrder: true, prepMinutes: true,
 } as const;
 
 @Injectable()
@@ -15,6 +17,8 @@ export class CustomerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
+    private readonly uploads: UploadsService,
+    private readonly employment: EmploymentRulesService,
   ) {}
 
   private assertCustomer(user: AuthUser) {
@@ -37,11 +41,11 @@ export class CustomerService {
       select: {
         ...VENDOR_PUBLIC,
         categories: { orderBy: { position: 'asc' }, select: { id: true, name: true } },
-        items: { orderBy: [{ position: 'asc' }, { name: 'asc' }], select: { id: true, name: true, description: true, price: true, isAvailable: true, tags: true, categoryId: true } },
+        items: { orderBy: [{ position: 'asc' }, { name: 'asc' }], select: { id: true, name: true, description: true, price: true, isAvailable: true, tags: true, categoryId: true, photoId: true } },
       },
     });
     if (!vendor) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Vendor not found.' });
-    return { ...vendor, openNow: isOpenAt(vendor.openingHours as OpeningHours, new Date(), vendor.paused), defaultAddress: await this.defaultAddress(user) };
+    return { ...vendor, items: vendor.items.map(({ photoId, ...i }) => ({ ...i, photoUrl: this.uploads.url(photoId, 400) })), openNow: isOpenAt(vendor.openingHours as OpeningHours, new Date(), vendor.paused), defaultAddress: await this.defaultAddress(user), dispatchFee: vendor.useDispatchers ? (await this.employment.get()).dispatchFee : 0, payToNumber: vendor.phone };
   }
 
   /** Suggests where to deliver: the customer's hostel room, private hostel or declared address this semester. */

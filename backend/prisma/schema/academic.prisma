@@ -21,6 +21,8 @@ model Department {
   staff      StaffProfile[]
   courses    Course[]
   associations   AssociationDepartment[]
+  /// Set by the Head of Department: mark students with unpaid compulsory dues on exam attendance registers. Nothing is ever blocked.
+  showDuesOnRegister Boolean @default(false)
 }
 
 model Programme {
@@ -32,6 +34,10 @@ model Programme {
   levelCode      String
   level          ProgrammeLevel   @relation(fields: [levelCode], references: [code])
   durationYears  Int
+  /// Overrides the programme type's number of semesters when set.
+  semesters      Int?
+  /// The programme's own code in index numbers, e.g. DCE, when its type's format uses {PROG}.
+  indexCode      String?          @unique
   isActive       Boolean          @default(true)
   isDemo         Boolean          @default(false)
   createdAt      DateTime         @default(now())

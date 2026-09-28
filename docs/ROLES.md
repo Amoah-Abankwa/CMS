@@ -16,7 +16,7 @@ A **staff member can hold several roles** (for example Lecturer and Head of Depa
 | | Academic Advisor | Department | | Advises students, approves course registration | Registration approvals for the department | Now |
 | | Lecturer | | | Teaching, attendance, internal marks | Attendance (self check-in and registers), class lists, marks, sharing marks, submitting results (lead lecturer) | Now |
 | | Teaching Assistant | | | Helps with attendance and assessment | Attendance, class lists and marks entry | Now |
-| Registry and exams | Registrar | | | Student records, academic structure | Register students, semesters, grading scale, all offerings and approvals, publish results | Now |
+| Registry and exams | Registrar | | | Student records, academic structure | Register students, semesters, grading scale, all offerings and approvals, publish results; schools, departments, programmes and programme types, index number formats, and the exam fee clearance percentage | Now |
 | | Admissions Officer | | | Admissions, registering new students | Register and view students | Phase 1 (now) |
 | | Exam Coordinator | | | Exam timetable, eligibility, results publishing | Exam venues, timetable, eligibility, exam holds, publishing results | Now |
 | | QA Officer | | | Quality assurance, lecturer evaluations | View students | Phase 9 |
@@ -28,7 +28,7 @@ A **staff member can hold several roles** (for example Lecturer and Head of Depa
 | | Hostel Manager | | | University hostels and allocations | Halls and rooms, applications, allocation and offers, verifying private hostels, owner accounts | Now |
 | Library | Librarian | | | Catalogue, policies and fines | Catalogue, circulation desk, fines including waivers, library rules | Now |
 | | Library Assistant | | | Issues and receives books | Circulation desk, reservations shelf, taking fine payments | Now |
-| Finance, HR, ICT, security | Finance Officer | | | Fees, payments, financial clearance | Fee clearance for exams, including pasted lists of index numbers; food vendor settlements and payouts, including dispatcher payouts; fee schedules, bills, bank payments, waivers, the fee clearance rule, and dues payouts to associations | Online fee payments later |
+| Finance, HR, ICT, security | Finance Officer | | | Fees, payments, financial clearance | Fee clearance for exams, including pasted lists of index numbers; food vendor settlements and payouts, including dispatcher payouts; fee items, fee schedules (cedis or dollars), bills, bank payments, waivers, receipts, and dues payouts to associations | Online fee payments later |
 | | HR Officer | | | Staff records | View staff | Later phase |
 | | ICT Support | | | Sign-in help, failed messages | View students and staff, failed messages | Phase 1 (now) |
 | | Security Officer | | | Campus and hostel access records | Where every student lives this semester | Now |
