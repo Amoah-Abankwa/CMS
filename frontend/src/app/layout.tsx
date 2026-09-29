@@ -1,14 +1,23 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { Public_Sans } from 'next/font/google';
 import { themeBootScript } from '@/lib/theme';
 import { Providers } from './providers';
 import './globals.css';
 
-const publicSans = Public_Sans({ subsets: ['latin'], variable: '--font-public-sans', display: 'swap' });
+const publicSans = Public_Sans({
+  subsets: ['latin'],
+  variable: '--font-public-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: { default: 'All Nations University', template: '%s | All Nations University' },
-  description: 'University management and campus services platform for All Nations University.',
+  title: {
+    default: 'All Nations University',
+    template: '%s | All Nations University',
+  },
+  description:
+    'University management and campus services platform for All Nations University.',
 };
 
 export const viewport: Viewport = {
@@ -20,16 +29,34 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
-    <html lang="en-GH" className={publicSans.variable} suppressHydrationWarning>
+    <html
+      lang="en-GH"
+      className={publicSans.variable}
+      suppressHydrationWarning
+    >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: themeBootScript }}
+        />
       </head>
+
       <body>
-        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2"
+        >
           Skip to content
         </a>
+
         <Providers>{children}</Providers>
       </body>
     </html>
