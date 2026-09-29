@@ -76,6 +76,10 @@ export const PERMISSIONS = {
   DUES_COLLECT: 'dues.collect',
   /** Assign students to their own academic advisor (Heads of Department within their department, and the Registry). */
   ADVISORS_ASSIGN: 'advisors.assign',
+  /** Pay students for approved timesheets (Finance and HR). */
+  PAYROLL_MANAGE: 'payroll.manage',
+  /** Import records from the previous system (each kind also needs its own permission). */
+  DATA_IMPORT: 'data.import',
   // Audit
   AUDIT_READ_ALL: 'audit.read_all',
   AUDIT_EXPORT: 'audit.export',
@@ -113,6 +117,7 @@ export const ACADEMIC_DECISION_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.ASSOCIATIONS_MANAGE,
   PERMISSIONS.DUES_COLLECT,
   PERMISSIONS.ADVISORS_ASSIGN,
+  PERMISSIONS.PAYROLL_MANAGE,
 ];
 
 /** Permissions that are only granted while a DeveloperAccessGrant is active. */

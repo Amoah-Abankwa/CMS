@@ -1,3 +1,4 @@
+import { parseTrustProxy } from './core/context/client-ip';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
@@ -13,8 +14,8 @@ async function bootstrap() {
   const env = loadEnv();
   // rawBody lets the Paystack webhook check its signature against the exact bytes received.
   const app = await NestFactory.create(AppModule, { rawBody: true });
-  // Required behind Render/Railway/Nginx so req.ip is the client address.
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // How many proxies (load balancer, Nginx, the Next.js relay) to trust so req.ip is the visitor, not a proxy.
+  app.getHttpAdapter().getInstance().set('trust proxy', parseTrustProxy(env.TRUST_PROXY));
 
   app.use(helmet());
   app.use(cookieParser());

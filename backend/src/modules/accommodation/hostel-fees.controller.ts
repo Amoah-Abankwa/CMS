@@ -20,6 +20,12 @@ class ListQuery {
   @Transform(trim) @IsOptional() @IsString() @MaxLength(60) search?: string;
   @Transform(({ value }) => value === 'true' || value === true) @IsOptional() @IsBoolean() unpaidOnly?: boolean;
 }
+class PayoutDetailsDto {
+  @IsUUID() hostelId: string;
+  @IsIn(['MTN', 'Telecel', 'AirtelTigo']) network: string;
+  @Transform(trim) @IsString() @MinLength(9) @MaxLength(15) number: string;
+  @Transform(trim) @IsString() @MinLength(3) @MaxLength(80) name: string;
+}
 class PayoutDto {
   @IsUUID() hostelId: string;
   @Type(() => Number) @IsInt() @Min(1) @Max(100_000_000) amount: number;
@@ -42,6 +48,7 @@ export class HostelFeesController {
   @Get() list(@CurrentUser() u: AuthUser, @Query() q: ListQuery) { return this.fees.list(u, q); }
   @Post(':id/payments') record(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RecordDto) { return this.fees.record(u, id, dto); }
   @Post('payments/:id/reverse') @HttpCode(200) reverse(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto) { return this.fees.reverse(u, id, dto.reason); }
+  @Post('payout-details') @HttpCode(200) payoutDetails(@CurrentUser() u: AuthUser, @Body() dto: PayoutDetailsDto) { return this.fees.setPayoutDetails(u, dto); }
   @Get('payments/:id/pdf') async pdf(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) { sendPdf(res, await this.fees.receiptPdf(u, id)); }
 }
 

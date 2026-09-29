@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { APPLICATION_STATUS_LABEL, formatCedis, PAY_UNIT_LABEL } from '@anu/shared';
+import { APPLICATION_STATUS_LABEL, formatCedis, PAY_UNIT_LABEL, JOB_KIND_LABEL } from '@anu/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -46,7 +46,7 @@ export function JobsBoard() {
               <li key={j.id}>
                 <Link href={`/jobs/${j.id}`} className="flex flex-col gap-1 px-4 py-3 hover:bg-surface-muted sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <span className="min-w-0 text-sm">
-                    <span className="font-medium">{j.title}</span> <span className="text-muted">{j.unit}</span>
+                    {j.kind && j.kind !== 'CAMPUS_JOB' && <Badge>{JOB_KIND_LABEL[j.kind]}</Badge>} <span className="font-medium">{j.title}</span> <span className="text-muted">{j.organisation ?? j.unit}{j.location ? `, ${j.location}` : ''}</span>{j.applyUrl && <a className="ml-2 text-xs text-primary hover:underline" href={j.applyUrl} target="_blank" rel="noreferrer">Apply on their site</a>}
                     <span className="block text-xs text-muted">
                       {formatCedis(j.payRate)} {PAY_UNIT_LABEL[j.payUnit]}, about {j.hoursPerWeek} hours a week. Closes {formatDate(j.closesAt)}.{j.minCgpa ? ` Needs a CGPA of ${j.minCgpa.toFixed(2)}.` : ''}
                     </span>

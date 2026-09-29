@@ -77,6 +77,8 @@ export class ApplicationDto {
   @Transform(trim) @IsOptional() @IsString() @MaxLength(500) specialNeeds?: string;
   /** Only used if the student's record has no gender yet. */
   @IsOptional() @IsIn(['Female', 'Male']) gender?: 'Female' | 'Male';
+  /** Index number of the student to share a room with (they must name you too). */
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() || null : value)) @IsOptional() @IsString() @MaxLength(20) roommateIndex?: string | null;
 }
 
 export class SpecialNeedsDto {

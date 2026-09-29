@@ -1,6 +1,6 @@
 import { HostelFeesService } from './hostel-fees.service';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { allocateBeds, formatCedis, priorityGroup, type Applicant, type Gender } from '@anu/shared';
+import { allocateBeds, formatCedis, priorityGroup, type Applicant, type Gender, mutualRoommates } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { JobsService, QUEUES } from '../../core/jobs/jobs.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -123,7 +123,7 @@ export class AllocationService implements OnModuleInit {
     const [apps, rooms] = await Promise.all([
       this.prisma.hostelApplication.findMany({
         where: { semesterId: semester.id, status: { in: ['SUBMITTED', 'UNPLACED'] }, student: { status: 'ACTIVE', roomAllocations: { none: { semesterId: semester.id, status: { in: ['OFFERED', 'ACCEPTED'] } } } } },
-        include: { student: { select: { studentProfile: { select: { gender: true, currentLevel: true, programme: { select: { durationYears: true } } } } } } },
+        include: { student: { select: { indexNumber: true, studentProfile: { select: { gender: true, currentLevel: true, programme: { select: { durationYears: true } } } } } } },
       }),
       this.prisma.room.findMany({
         where: { isActive: true, hostel: { kind: 'UNIVERSITY', isActive: true, gender: { in: ['MALE', 'FEMALE'] } } },
@@ -144,6 +144,10 @@ export class AllocationService implements OnModuleInit {
       preferences: a.preferences as Applicant['preferences'],
       acceptAny: a.acceptAny,
     }));
+    // Roommate requests count when both named each other and are the same gender.
+    const byIndex = new Map(apps.map((a) => [a.student.indexNumber, a.studentId]));
+    const mates = mutualRoommates(applicants.map((x, i) => ({ studentId: x.studentId, gender: x.gender, wantsStudentId: apps[i].roommateIndex ? byIndex.get(apps[i].roommateIndex) ?? null : null })));
+    for (const x of applicants) x.roommateStudentId = mates.get(x.studentId) ?? null;
     const { placements, unplaced } = allocateBeds(
       applicants,
       rooms.map((r) => ({ roomId: r.id, hostelId: r.hostel.id, hostelGender: r.hostel.gender as Gender, roomType: r.roomType, label: r.number, capacity: r.capacity, occupied: r._count.allocations })),

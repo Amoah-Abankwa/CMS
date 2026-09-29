@@ -1,4 +1,4 @@
-import type { ApplicationStatus, DeliveryStatus, DispatcherStatus, EmploymentRules, JobPayUnit, WorkEligibility } from '@anu/shared';
+import type { ApplicationStatus, DeliveryStatus, DispatcherStatus, EmploymentRules, JobPayUnit, WorkEligibility , JobKind } from '@anu/shared';
 import { api } from '@/lib/axios';
 
 export interface Job {
@@ -12,7 +12,11 @@ export interface Job {
   positions: number;
   minCgpa: number | null;
   closesAt: string;
-  status: 'DRAFT' | 'OPEN' | 'CLOSED';
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'OPEN' | 'CLOSED';
+  kind?: JobKind;
+  organisation?: string | null;
+  location?: string | null;
+  applyUrl?: string | null;
 }
 
 export interface MyApplication {
@@ -153,6 +157,7 @@ export interface DispatchState {
     };
   }>;
   today: { deliveries: number; earned: number };
+  rating?: number | null;
 }
 
 export interface Earnings {

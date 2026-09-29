@@ -173,7 +173,8 @@ export const accommodationApi = {
 
   // Student
   mine: () => api.get<MyAccommodation>('/me/accommodation').then((r) => r.data),
-  apply: (dto: { preferences: Array<{ hostelId: string; roomType: string | null }>; acceptAny: boolean; specialNeeds?: string; gender?: 'Female' | 'Male' }) => api.put('/me/accommodation/application', dto),
+  apply: (dto: { preferences: Array<{ hostelId: string; roomType: string | null }>; acceptAny: boolean; specialNeeds?: string; gender?: 'Female' | 'Male'; roommateIndex?: string | null }) => api.put('/me/accommodation/application', dto),
+  roommate: () => api.get<{ roommateIndex: string | null; mutual: boolean }>('/me/accommodation/roommate').then((r) => r.data),
   withdraw: () => api.post('/me/accommodation/application/withdraw'),
   respond: (accept: boolean) => api.post<MyAccommodation>(`/me/accommodation/offer/${accept ? 'accept' : 'decline'}`).then((r) => r.data),
   browsePrivate: () => api.get<PrivateHostel[]>('/me/accommodation/private').then((r) => r.data),

@@ -96,3 +96,39 @@ export function canTransition(from: OrderStatus, to: OrderStatus, actor: OrderAc
 }
 
 export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['PLACED', 'ACCEPTED', 'READY', 'OUT_FOR_DELIVERY'];
+
+// ----- Scheduled orders -----
+
+/**
+ * Whether an order can be scheduled for a time: at least the preparation time plus 15 minutes ahead,
+ * at most two days ahead, and inside the vendor's opening hours. Returns a reason, or null if fine.
+ */
+export function scheduleProblem(at: Date, now: Date, prepMinutes: number, hours: OpeningHours): string | null {
+  const earliest = now.getTime() + (prepMinutes + 15) * 60_000;
+  if (at.getTime() < earliest) return `Choose a time at least ${prepMinutes + 15} minutes from now.`;
+  if (at.getTime() > now.getTime() + 2 * 86_400_000) return 'You can schedule up to two days ahead.';
+  if (!isOpenAt(hours, at)) return 'The vendor is closed at that time.';
+  return null;
+}
+
+// ----- Meal plans -----
+
+/** A meal on a plan covers one eligible dish: the dearest eligible dish in the basket. */
+export function mealCredit(lines: Array<{ menuItemId: string; price: number }>, eligibleItemIds: string[]) {
+  const eligible = lines.filter((l) => eligibleItemIds.includes(l.menuItemId));
+  if (!eligible.length) return null;
+  const best = eligible.reduce((a, b) => (b.price > a.price ? b : a));
+  return { menuItemId: best.menuItemId, amount: best.price };
+}
+
+// ----- Ratings -----
+
+export function averageStars(stars: number[]) {
+  if (!stars.length) return null;
+  return Math.round((stars.reduce((t, s) => t + s, 0) / stars.length) * 10) / 10;
+}
+
+// ----- Paystack mobile money transfer codes (Ghana) -----
+
+/** Paystack bank codes for mobile money recipients in Ghana, by the network names used on the platform. */
+export const MOMO_BANK_CODE: Record<string, string> = { MTN: 'MTN', Telecel: 'VOD', AirtelTigo: 'ATL' };

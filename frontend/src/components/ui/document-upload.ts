@@ -1,7 +1,8 @@
 import { api } from '@/lib/axios';
 
 const MAX_BYTES = 10 * 1024 * 1024;
-type Purpose = 'HOSTEL_FORM' | 'HOSTEL_FORM_SUBMISSION' | 'EXCUSE';
+const EBOOK_MAX_BYTES = 50 * 1024 * 1024;
+type Purpose = 'HOSTEL_FORM' | 'HOSTEL_FORM_SUBMISSION' | 'EXCUSE' | 'EBOOK';
 
 /**
  * Uploads a private document straight to Cloudinary (as "authenticated", so it has no public address)
@@ -9,7 +10,7 @@ type Purpose = 'HOSTEL_FORM' | 'HOSTEL_FORM_SUBMISSION' | 'EXCUSE';
  */
 export async function uploadDocument(purpose: Purpose, file: File, targetId?: string): Promise<{ id: string; originalName: string }> {
   if (!/^(application\/pdf|image\/(jpeg|png))$/.test(file.type)) throw new Error('Upload a PDF, JPG or PNG.');
-  if (file.size > MAX_BYTES) throw new Error('Documents can be at most 10 MB.');
+  if (file.size > (purpose === 'EBOOK' ? EBOOK_MAX_BYTES : MAX_BYTES)) throw new Error(purpose === 'EBOOK' ? 'E-books can be at most 50 MB.' : 'Documents can be at most 10 MB.');
   const s = (await api.post<{ cloudName: string; apiKey: string; timestamp: number; folder: string; allowedFormats: string; type: string; signature: string }>('/documents/sign', { purpose, targetId })).data;
   const form = new FormData();
   form.append('file', file);

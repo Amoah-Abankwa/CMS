@@ -58,3 +58,9 @@ Super Admins (and the Vice-Chancellor and Internal Auditor) see all activity gro
 3. Add its name, description and permissions to `ROLE_DEFS` in `backend/prisma/seed/data.ts`, then run `pnpm db:seed`.
 
 Super Admins manage accounts and settings but cannot approve or publish results. Academic decisions stay with academic roles.
+
+
+`payroll.manage` (Finance Officer, HR Officer): pay students for approved timesheets.
+
+
+Head of Department: may also be named **patron** of a departmental association (by the Dean of Students office) and then sets that association's dues each semester. Association officers collect dues; they do not set them.

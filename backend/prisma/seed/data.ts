@@ -14,13 +14,7 @@ const READ_STUDENTS = [P.STUDENTS_READ, P.ACADEMICS_READ];
  * Every role, with the permissions it holds today. Later phases add module permissions
  * (results, attendance, library, hostels and so on) to these same roles.
  */
-export const ROLE_DEFS: Array<{
-  key: RoleKey;
-  name: string;
-  description: string;
-  permissions: PermissionKey[];
-  logGroup: (typeof ROLE_LOG_GROUP)[RoleKey];
-}> = [
+export const ROLE_DEFS: Array<{ key: RoleKey; name: string; description: string; permissions: PermissionKey[]; logGroup: (typeof ROLE_LOG_GROUP)[RoleKey];}> = [
   { key: ROLE_KEYS.SUPER_ADMIN, name: 'Super Admin', description: 'Full control of accounts, roles and settings', permissions: ALL },
   { key: ROLE_KEYS.DEVELOPER, name: 'Developer', description: 'System diagnostics; enabled temporarily by a Super Admin', permissions: [P.SYSTEM_DIAGNOSTICS_READ] },
 

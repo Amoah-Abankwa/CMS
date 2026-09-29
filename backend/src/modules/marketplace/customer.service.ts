@@ -1,6 +1,8 @@
+import { PaymentsService } from '../payments/payments.service';
+import { averageStars } from '@anu/shared';
 import { EmploymentRulesService } from '../employment/employment-rules.service';
 import { UploadsService } from '../uploads/uploads.service';
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { isOpenAt, type OpeningHours } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -19,6 +21,7 @@ export class CustomerService {
     private readonly orders: OrdersService,
     private readonly uploads: UploadsService,
     private readonly employment: EmploymentRulesService,
+    private readonly payments: PaymentsService,
   ) {}
 
   private assertCustomer(user: AuthUser) {
@@ -29,8 +32,12 @@ export class CustomerService {
     this.assertCustomer(user);
     const now = new Date();
     const vendors = await this.prisma.vendor.findMany({ where: { status: 'APPROVED' }, orderBy: { name: 'asc' }, select: { ...VENDOR_PUBLIC, _count: { select: { items: { where: { isAvailable: true } } } } } });
+    const ratings = await this.prisma.orderRating.findMany({ where: { vendorId: { in: vendors.map((v) => v.id) } }, select: { vendorId: true, vendorStars: true } });
     return vendors
-      .map(({ _count, ...v }) => ({ ...v, openNow: isOpenAt(v.openingHours as OpeningHours, now, v.paused), itemsAvailable: _count.items }))
+      .map(({ _count, ...v }) => {
+        const stars = ratings.filter((r) => r.vendorId === v.id).map((r) => r.vendorStars);
+        return { ...v, openNow: isOpenAt(v.openingHours as OpeningHours, now, v.paused), itemsAvailable: _count.items, rating: averageStars(stars), ratings: stars.length };
+      })
       .sort((a, b) => Number(b.openNow) - Number(a.openNow));
   }
 
@@ -75,11 +82,45 @@ export class CustomerService {
   async order(user: AuthUser, id: string) {
     const o = await this.orders.get(id);
     if (o.customer.id !== user.id) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Order not found.' });
-    return o;
+    // The dispatcher's location is shared only while they are bringing this order, and only if fresh.
+    const d = o.delivery?.dispatcher;
+    const live = o.delivery?.status === 'PICKED_UP' && d?.lastLocationAt && Date.now() - d.lastLocationAt.getTime() < 5 * 60_000;
+    return { ...o, delivery: o.delivery ? { ...o.delivery, dispatcher: d ? { transport: d.transport, student: d.student, location: live ? { lat: d.lastLat, lng: d.lastLng, accuracy: d.lastAccuracy, at: d.lastLocationAt } : null } : null } : null };
   }
 
   async cancel(user: AuthUser, id: string) {
     await this.order(user, id);
     return this.orders.move(id, 'CANCELLED', 'CUSTOMER', { reason: 'Cancelled by the customer', byUser: user });
+  }
+
+  // ----- Ratings -----
+
+  async rate(user: AuthUser, orderId: string, dto: { vendorStars: number; vendorComment?: string; dispatcherStars?: number }) {
+    const o = await this.prisma.foodOrder.findUnique({ where: { id: orderId }, select: { customerId: true, status: true, vendorId: true, delivery: { select: { status: true, dispatcherId: true } }, rating: { select: { id: true } } } });
+    if (!o || o.customerId !== user.id) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Order not found.' });
+    if (o.status !== 'COMPLETED') throw new ConflictException({ code: 'NOT_DONE', message: 'You can rate an order once you have it.' });
+    if (o.rating) throw new ConflictException({ code: 'RATED', message: 'You have already rated this order.' });
+    const dispatcherId = o.delivery?.status === 'DELIVERED' ? o.delivery.dispatcherId : null;
+    const r = await this.prisma.orderRating.create({ data: { orderId, vendorId: o.vendorId, customerId: user.id, vendorStars: dto.vendorStars, vendorComment: dto.vendorComment || null, dispatcherId, dispatcherStars: dispatcherId ? dto.dispatcherStars ?? null : null } });
+    return r;
+  }
+
+  // ----- Meal plans -----
+
+  plansFor(vendorId: string) {
+    return this.prisma.mealPlan.findMany({ where: { vendorId, isActive: true, vendor: { status: 'APPROVED' } }, orderBy: { price: 'asc' }, select: { id: true, name: true, meals: true, price: true, validDays: true, eligibleItemIds: true } });
+  }
+
+  async myPlans(user: AuthUser) {
+    return this.prisma.mealPlanPurchase.findMany({ where: { customerId: user.id, status: { in: ['ACTIVE', 'USED_UP', 'EXPIRED'] } }, orderBy: { createdAt: 'desc' }, take: 30, select: { id: true, mealsTotal: true, mealsLeft: true, status: true, expiresAt: true, paidAt: true, plan: { select: { id: true, name: true, eligibleItemIds: true, vendor: { select: { id: true, name: true } } } } } });
+  }
+
+  async buyPlan(user: AuthUser, planId: string) {
+    this.assertCustomer(user);
+    const plan = await this.prisma.mealPlan.findUnique({ where: { id: planId }, include: { vendor: { select: { name: true, status: true } } } });
+    if (!plan || !plan.isActive || plan.vendor.status !== 'APPROVED') throw new NotFoundException({ code: 'NOT_FOUND', message: 'Meal plan not available.' });
+    const m = await this.prisma.mealPlanPurchase.create({ data: { planId, customerId: user.id, mealsTotal: plan.meals, mealsLeft: plan.meals, price: plan.price } });
+    const started = await this.payments.start({ purpose: 'MEAL_PLAN', userId: user.id, subjectId: m.id, amount: plan.price, returnPath: '/food/plans', description: `${plan.vendor.name}: ${plan.name}` });
+    return { paymentUrl: started.authorizationUrl };
   }
 }

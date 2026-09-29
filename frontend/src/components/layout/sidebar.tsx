@@ -82,7 +82,7 @@ export function Sidebar() {
           </div>
           <SidebarUser collapsed={false} />
           <div className="flex-1 overflow-y-auto px-3 py-4">
-            <SidebarNav collapsed={false} onNavigate={() => setMobileOpen(false)} />
+            <SidebarNav collapsed={false} onNavigateAction={() => setMobileOpen(false)} />
           </div>
         </aside>
       </div>

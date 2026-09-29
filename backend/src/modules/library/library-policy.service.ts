@@ -4,9 +4,9 @@ import {
   validateLibraryPolicy,
   type LibraryPolicy,
 } from '@anu/shared';
+import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { Prisma } from '../../generated/prisma/client';
 
 const KEY = 'library.policy';
 
@@ -22,8 +22,7 @@ export class LibraryPolicyService {
       where: { key: KEY },
     });
 
-    const stored =
-      (row?.value as Partial<LibraryPolicy>) ?? {};
+    const stored = (row?.value as Partial<LibraryPolicy>) ?? {};
 
     return {
       ...DEFAULT_LIBRARY_POLICY,
@@ -43,9 +42,7 @@ export class LibraryPolicyService {
   async set(policy: LibraryPolicy) {
     const clean = {
       ...policy,
-      closedDays: [
-        ...new Set(policy.closedDays),
-      ].sort(),
+      closedDays: [...new Set(policy.closedDays)].sort(),
     };
 
     const problems = validateLibraryPolicy(clean);
@@ -60,17 +57,14 @@ export class LibraryPolicyService {
 
     const before = await this.get();
 
-    const jsonValue =
-      clean as unknown as Prisma.InputJsonValue;
-
     await this.prisma.systemSetting.upsert({
       where: { key: KEY },
       create: {
         key: KEY,
-        value: jsonValue,
+        value: clean as unknown as Prisma.InputJsonValue,
       },
       update: {
-        value: jsonValue,
+        value: clean as unknown as Prisma.InputJsonValue,
       },
     });
 

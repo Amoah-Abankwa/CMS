@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AdvisorsService } from './advisors.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -12,7 +13,6 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EVENT_KEYS } from '../notifications/templates';
 import { SemestersService } from '../academics/semesters.service';
-import { AdvisorsService } from './advisors.service';
 import { ListRegistrationsDto } from './dto/registration.dto';
 
 const LIST_SELECT = {
@@ -103,15 +103,19 @@ export class RegistrationReviewService {
   async list(user: AuthUser, q: ListRegistrationsDto) {
     const semester = await this.semesters.resolve(q.semesterId);
 
+    const departmentIds = await this.scope.departmentFilter(user);
     const adviseeIds = await this.advisors.adviseeFilter(user);
-    const departmentId = await this.scope.departmentFilter(user);
 
     const studentWhere: Prisma.UserWhereInput = {
-      studentProfile: {
+      ...(departmentIds
+        ? {
+            studentProfile: {
         programme: {
-          departmentId,
+        departmentId: departmentIds,
         },
-      },
+       },
+          }
+        : {}),
 
       ...(adviseeIds
         ? {
@@ -127,19 +131,19 @@ export class RegistrationReviewService {
               {
                 indexNumber: {
                   contains: q.search,
-                  mode: 'insensitive',
+                  mode: 'insensitive' as const,
                 },
               },
               {
                 firstName: {
                   contains: q.search,
-                  mode: 'insensitive',
+                  mode: 'insensitive' as const,
                 },
               },
               {
                 lastName: {
                   contains: q.search,
-                  mode: 'insensitive',
+                  mode: 'insensitive' as const,
                 },
               },
             ],
@@ -330,14 +334,11 @@ export class RegistrationReviewService {
       },
     });
 
-    return {
-      status: 'DRAFT',
-    };
+    return { status: 'DRAFT' };
   }
 
   async reject(user: AuthUser, id: string, note: string) {
     const reg = await this.loadSubmitted(user, id);
-
     return this.decide(user, reg.id, 'REJECTED', note);
   }
 

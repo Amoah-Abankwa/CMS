@@ -1,3 +1,4 @@
+import { averageStars } from '@anu/shared';
 import { UploadsService } from '../uploads/uploads.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { isOpenAt, validateHours, type OpeningHours } from '@anu/shared';
@@ -107,7 +108,8 @@ export class VendorService {
       this.prisma.foodOrder.findMany({ where: { vendorId: v.id, status: { in: ['COMPLETED', 'CANCELLED', 'REJECTED'] }, updatedAt: { gte: today } }, orderBy: { updatedAt: 'desc' }, take: 50, select: ORDER_SELECT }),
     ]);
     // The customer's code is only for the customer; the vendor must ask for it.
-    const hide = <T extends { pickupCode: string }>(o: T) => ({ ...o, pickupCode: undefined });
+    // The customer's code is for the customer, and the dispatcher's location for the customer alone.
+    const hide = <T extends { pickupCode: string; delivery: { dispatcher: { lastLat: number | null } | null } | null }>(o: T) => ({ ...o, pickupCode: undefined, delivery: o.delivery ? { ...o.delivery, dispatcher: o.delivery.dispatcher ? { ...o.delivery.dispatcher, lastLat: null, lastLng: null, lastAccuracy: null, lastLocationAt: null } : null } : null });
     const sales = done.filter((o) => o.status === 'COMPLETED').reduce((s, o) => s + o.total, 0);
     return { vendor: { id: v.id, name: v.name, paused: v.paused, openNow: v.openNow, status: v.status }, active: active.map(hide), done: done.map(hide), salesToday: sales };
   }
@@ -124,5 +126,26 @@ export class VendorService {
     if (!order || order.vendorId !== v.id) throw new ForbiddenException({ code: 'NOT_YOURS', message: 'This is not one of your orders.' });
     const o = await this.orders.move(orderId, dto.to, 'VENDOR', { reason: dto.reason, code: dto.code, byUser: user });
     return { ...o, pickupCode: undefined };
+  }
+
+  async ratings(user: AuthUser) {
+    const v = await this.mine(user);
+    const rows = await this.prisma.orderRating.findMany({ where: { vendorId: v.id }, orderBy: { createdAt: 'desc' }, take: 100, select: { vendorStars: true, vendorComment: true, hiddenAt: true, createdAt: true, order: { select: { number: true } } } });
+    return { average: averageStars(rows.map((r) => r.vendorStars)), count: rows.length, rows: rows.map((r) => ({ ...r, vendorComment: r.hiddenAt ? null : r.vendorComment })) };
+  }
+
+  async plans(user: AuthUser) {
+    const v = await this.mine(user);
+    return this.prisma.mealPlan.findMany({ where: { vendorId: v.id }, orderBy: { createdAt: 'desc' }, select: { id: true, name: true, meals: true, price: true, validDays: true, eligibleItemIds: true, isActive: true, _count: { select: { purchases: { where: { status: { in: ['ACTIVE', 'USED_UP', 'EXPIRED'] } } } } } } });
+  }
+
+  async savePlan(user: AuthUser, dto: { name: string; meals: number; price: number; validDays: number; eligibleItemIds: string[]; isActive?: boolean }, id?: string) {
+    const v = await this.mine(user);
+    if (dto.eligibleItemIds.some((i) => !v.items.some((x) => x.id === i))) throw new BadRequestException({ code: 'ITEMS', message: 'Choose dishes from your own menu.' });
+    const plan = id
+      ? await this.prisma.mealPlan.update({ where: { id, vendorId: v.id }, data: dto })
+      : await this.prisma.mealPlan.create({ data: { ...dto, vendorId: v.id } });
+    await this.audit.record({ action: id ? 'marketplace.meal_plan_updated' : 'marketplace.meal_plan_created', module: 'marketplace', targetType: 'MealPlan', targetId: plan.id, after: { name: dto.name, meals: dto.meals, price: dto.price } });
+    return plan;
   }
 }

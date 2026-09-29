@@ -23,34 +23,16 @@ import {
 
 type Dlg =
   | { kind: 'school'; s: SchoolRow | null }
-  | { kind: 'department'; d: DepartmentRow | null; schoolId: string }
+  | {
+      kind: 'department';
+      d: DepartmentRow | null;
+      schoolId: string;
+    }
   | {
       kind: 'programme';
       p: ProgrammeRow | null;
       departmentId: string;
     };
-
-type FormState = {
-  code: string;
-  name: string;
-  schoolId: string;
-  departmentId: string;
-  levelCode: string;
-  semesters: string;
-  indexCode: string;
-  isActive: boolean;
-};
-
-const emptyForm: FormState = {
-  code: '',
-  name: '',
-  schoolId: '',
-  departmentId: '',
-  levelCode: '',
-  semesters: '',
-  indexCode: '',
-  isActive: true,
-};
 
 /** Schools, their departments, and the programmes each department runs. */
 export function AcademicStructure() {
@@ -116,7 +98,9 @@ export function AcademicStructure() {
 
   return (
     <div className="flex flex-col gap-4">
-      {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+      {msg && (
+        <Alert tone={msg.tone}>{msg.text}</Alert>
+      )}
 
       <div>
         <Button
@@ -192,8 +176,8 @@ export function AcademicStructure() {
                       </span>{' '}
                       <span className="text-muted">
                         {d.code}. {d.programmes.length}{' '}
-                        programmes, {d._count.courses} courses,{' '}
-                        {d._count.staff} staff.
+                        programmes, {d._count.courses}{' '}
+                        courses, {d._count.staff} staff.
                       </span>
                     </span>
 
@@ -267,15 +251,17 @@ export function AcademicStructure() {
                                       t.mode
                                     ].toLowerCase()}`
                                   : p.levelCode}
-                                ,{' '}
-                                {p.semesters ??
+                                , {p.semesters ??
                                   t?.semesters ??
                                   '?'}{' '}
                                 semesters.{' '}
-                                {p._count.students} students.
+                                {p._count.students}{' '}
+                                students.
                               </span>{' '}
                               {!p.isActive && (
-                                <Badge>not admitting</Badge>
+                                <Badge>
+                                  not admitting
+                                </Badge>
                               )}
                             </span>
 
@@ -338,42 +324,41 @@ export function AcademicStructure() {
   );
 }
 
-type EditDialogProps = {
-  dlg: Dlg;
-  schools: SchoolRow[];
-  types: ProgrammeType[];
-  onClose: () => void;
-  onDone: () => void;
-};
-
 function EditDialog({
   dlg,
   schools,
   types,
   onClose,
   onDone,
-}: EditDialogProps) {
-  const initialForm: FormState =
+}: {
+  dlg: Dlg;
+  schools: SchoolRow[];
+  types: ProgrammeType[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const init: Record<string, string | boolean> =
     dlg.kind === 'school'
       ? {
-          ...emptyForm,
           code: dlg.s?.code ?? '',
           name: dlg.s?.name ?? '',
         }
       : dlg.kind === 'department'
         ? {
-            ...emptyForm,
             code: dlg.d?.code ?? '',
             name: dlg.d?.name ?? '',
             schoolId:
-              dlg.d?.schoolId ?? dlg.schoolId,
+              dlg.d?.schoolId ??
+              dlg.schoolId ??
+              '',
           }
         : {
-            ...emptyForm,
             code: dlg.p?.code ?? '',
             name: dlg.p?.name ?? '',
             departmentId:
-              dlg.p?.departmentId ?? dlg.departmentId,
+              dlg.p?.departmentId ??
+              dlg.departmentId ??
+              '',
             levelCode:
               dlg.p?.levelCode ??
               types.find((t) => t.isActive)?.code ??
@@ -385,13 +370,19 @@ function EditDialog({
             isActive: dlg.p?.isActive ?? true,
           };
 
-  const [f, setF] = useState<FormState>(initialForm);
-  const [error, setError] = useState<string | null>(null);
+  const [f, setF] = useState<
+    Record<string, string | boolean>
+  >(init);
+
+  const [error, setError] = useState<string | null>(
+    null,
+  );
+
   const [busy, setBusy] = useState(false);
 
-  const set = <K extends keyof FormState>(
-    key: K,
-    value: FormState[K],
+  const set = (
+    key: string,
+    value: string | boolean,
   ) => {
     setF((current) => ({
       ...current,
@@ -400,10 +391,12 @@ function EditDialog({
   };
 
   const departments = schools.flatMap(
-    (s) => s.departments,
+    (school) => school.departments,
   );
 
-  const type = types.find((t) => t.code === f.levelCode);
+  const type = types.find(
+    (t) => t.code === String(f.levelCode),
+  );
 
   const save = async () => {
     setBusy(true);
@@ -413,34 +406,34 @@ function EditDialog({
       if (dlg.kind === 'school') {
         await registryApi.saveSchool(
           {
-            code: f.code,
-            name: f.name,
+            code: String(f.code),
+            name: String(f.name),
           },
           dlg.s?.id,
         );
       } else if (dlg.kind === 'department') {
         await registryApi.saveDepartment(
           {
-            code: f.code,
-            name: f.name,
-            schoolId: f.schoolId,
+            code: String(f.code),
+            name: String(f.name),
+            schoolId: String(f.schoolId),
           },
           dlg.d?.id,
         );
       } else {
         await registryApi.saveProgramme(
           {
-            code: f.code,
-            name: f.name,
-            departmentId: f.departmentId,
-            levelCode: f.levelCode,
+            code: String(f.code),
+            name: String(f.name),
+            departmentId: String(f.departmentId),
+            levelCode: String(f.levelCode),
             semesters: f.semesters
               ? Number(f.semesters)
               : null,
             indexCode: type?.usesProgrammeCode
-              ? f.indexCode
+              ? String(f.indexCode)
               : null,
-            isActive: f.isActive,
+            isActive: Boolean(f.isActive),
           },
           dlg.p?.id,
         );
@@ -474,13 +467,18 @@ function EditDialog({
       title={editing ? `Edit ${what}` : `Add ${what}`}
     >
       <div className="flex flex-col gap-4">
-        {error && <Alert tone="danger">{error}</Alert>}
+        {error && (
+          <Alert tone="danger">{error}</Alert>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Code" htmlFor="rs-code">
+          <Field
+            label="Code"
+            htmlFor="rs-code"
+          >
             <Input
               id="rs-code"
-              value={f.code}
+              value={String(f.code)}
               maxLength={20}
               placeholder={
                 dlg.kind === 'programme'
@@ -497,10 +495,13 @@ function EditDialog({
           </Field>
 
           <div className="sm:col-span-2">
-            <Field label="Name" htmlFor="rs-name">
+            <Field
+              label="Name"
+              htmlFor="rs-name"
+            >
               <Input
                 id="rs-name"
-                value={f.name}
+                value={String(f.name)}
                 maxLength={120}
                 placeholder={
                   dlg.kind === 'programme'
@@ -516,16 +517,22 @@ function EditDialog({
         </div>
 
         {dlg.kind === 'department' && (
-          <Field label="School" htmlFor="rs-school">
+          <Field
+            label="School"
+            htmlFor="rs-school"
+          >
             <Select
               id="rs-school"
-              value={f.schoolId}
+              value={String(f.schoolId)}
               onChange={(e) =>
                 set('schoolId', e.target.value)
               }
             >
               {schools.map((s) => (
-                <option key={s.id} value={s.id}>
+                <option
+                  key={s.id}
+                  value={s.id}
+                >
                   {s.name}
                 </option>
               ))}
@@ -542,7 +549,7 @@ function EditDialog({
               >
                 <Select
                   id="rs-dept"
-                  value={f.departmentId}
+                  value={String(f.departmentId)}
                   onChange={(e) =>
                     set(
                       'departmentId',
@@ -551,7 +558,10 @@ function EditDialog({
                   }
                 >
                   {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
+                    <option
+                      key={d.id}
+                      value={d.id}
+                    >
                       {d.name}
                     </option>
                   ))}
@@ -571,7 +581,7 @@ function EditDialog({
               >
                 <Select
                   id="rs-type"
-                  value={f.levelCode}
+                  value={String(f.levelCode)}
                   onChange={(e) =>
                     set(
                       'levelCode',
@@ -608,20 +618,23 @@ function EditDialog({
                 >
                   <Input
                     id="rs-icode"
-                    value={f.indexCode}
+                    value={String(f.indexCode)}
                     maxLength={6}
                     placeholder={
-                      suggestIndexCode(f.name) ||
-                      'DCE'
+                      suggestIndexCode(
+                        String(f.name),
+                      ) || 'DCE'
                     }
                     onFocus={() => {
                       if (
                         !f.indexCode &&
-                        f.name.trim()
+                        String(f.name).trim()
                       ) {
                         set(
                           'indexCode',
-                          suggestIndexCode(f.name),
+                          suggestIndexCode(
+                            String(f.name),
+                          ),
                         );
                       }
                     }}
@@ -645,9 +658,12 @@ function EditDialog({
                   type="number"
                   min={1}
                   max={24}
-                  value={f.semesters}
+                  value={String(f.semesters)}
                   onChange={(e) =>
-                    set('semesters', e.target.value)
+                    set(
+                      'semesters',
+                      e.target.value,
+                    )
                   }
                 />
               </Field>
@@ -657,9 +673,12 @@ function EditDialog({
               <input
                 type="checkbox"
                 className="size-4"
-                checked={f.isActive}
+                checked={Boolean(f.isActive)}
                 onChange={(e) =>
-                  set('isActive', e.target.checked)
+                  set(
+                    'isActive',
+                    e.target.checked,
+                  )
                 }
               />
               Admitting new students
@@ -671,6 +690,7 @@ function EditDialog({
           <Button
             variant="secondary"
             onClick={onClose}
+            disabled={busy}
           >
             Cancel
           </Button>
@@ -678,12 +698,12 @@ function EditDialog({
           <Button
             loading={busy}
             disabled={
-              f.code.length < 2 ||
-              f.name.trim().length < 3 ||
+              String(f.code).length < 2 ||
+              String(f.name).trim().length < 3 ||
               (dlg.kind === 'programme' &&
                 !!type?.usesProgrammeCode &&
                 !/^[A-Z][A-Z0-9]{1,5}$/.test(
-                  f.indexCode,
+                  String(f.indexCode),
                 ))
             }
             onClick={save}

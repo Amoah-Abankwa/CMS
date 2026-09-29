@@ -128,11 +128,8 @@ export class AmendmentsService {
     const scale = await this.prisma.gradingScale.findUnique({ where: { id: a.result.sheet.scaleId ?? '' }, include: { bands: true } });
     if (!scale) throw new BadRequestException({ code: 'NO_SCALE', message: 'The grading scale for this sheet is missing.' });
     const devotion = a.result.devotionExempt ? { exempt: true as const } : a.result.devotionScore !== null ? { score: a.result.devotionScore } : null;
-const after = amendedResult(
-  a.newCaScore,
-  a.newExamScore,
-  scale.bands as never,
-);    await this.prisma.$transaction(async (tx) => {
+    const after = amendedResult(a.newCaScore, a.newExamScore, scale.bands as never, devotion);
+    await this.prisma.$transaction(async (tx) => {
       const moved = await tx.resultAmendment.updateMany({ where: { id, status: 'DEAN_APPROVED' }, data: { status: 'APPLIED', appliedById: user.id, appliedAt: now, after } });
       if (moved.count !== 1) throw new ConflictException({ code: 'CHANGED', message: 'This amendment was just updated. Refresh.' });
       await tx.courseResult.update({ where: { id: a.result.id }, data: after });

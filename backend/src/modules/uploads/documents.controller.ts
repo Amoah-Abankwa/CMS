@@ -5,7 +5,7 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { DocumentsService, type DocPurpose } from './documents.service';
 
-const PURPOSES = ['HOSTEL_FORM', 'HOSTEL_FORM_SUBMISSION', 'EXCUSE'];
+const PURPOSES = ['HOSTEL_FORM', 'HOSTEL_FORM_SUBMISSION', 'EXCUSE', 'EBOOK'];
 class SignDto {
   @IsIn(PURPOSES) purpose: DocPurpose;
   @IsOptional() @IsString() @MaxLength(60) targetId?: string;

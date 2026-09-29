@@ -1,3 +1,4 @@
+import { JobsService, QUEUES } from '../../core/jobs/jobs.service';
 import { PdfDoc } from '../../core/pdf/pdf';
 import {
   BadRequestException,
@@ -13,6 +14,10 @@ import {
   convertMoney,
   rateAt,
   billBalance,
+  indexNumbersIn,
+  instalmentPlanProblem,
+  instalmentStatus,
+  type Instalment,
   FEE_METHOD_LABEL,
   feeClearanceChange,
   feeStatement,
@@ -51,7 +56,11 @@ const BILL_SELECT = {
     select: {
       id: true,
       number: true,
-      academicYear: { select: { label: true } },
+      academicYear: {
+        select: {
+          label: true,
+        },
+      },
     },
   },
   student: {
@@ -66,13 +75,19 @@ const BILL_SELECT = {
         select: {
           currentLevel: true,
           nationality: true,
-          programme: { select: { name: true } },
+          programme: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },
   },
   adjustments: {
-    orderBy: { createdAt: 'asc' as const },
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
     select: {
       id: true,
       amount: true,
@@ -81,7 +96,9 @@ const BILL_SELECT = {
     },
   },
   payments: {
-    orderBy: { createdAt: 'asc' as const },
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
     select: {
       id: true,
       amount: true,
@@ -120,12 +137,7 @@ const figures = (
   });
 
 const newReceipt = () =>
-  `ANU-F-${new Date()
-    .toISOString()
-    .slice(2, 10)
-    .replace(/-/g, '')}-${randomBytes(3)
-    .toString('hex')
-    .toUpperCase()}`;
+  `ANU-F-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomBytes(3).toString('hex').toUpperCase()}`;
 
 /**
  * Fee schedules, student bills and fee payments. After every payment, reversal or adjustment the
@@ -142,9 +154,19 @@ export class FeesService implements OnModuleInit {
     private readonly payments: PaymentsService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly jobs: JobsService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    await this.jobs.work(
+      QUEUES.FEES_LATE_CHARGES,
+      async () => {
+        await this.applyLateCharges();
+      },
+    );
+
+    await this.jobs.schedule(QUEUES.FEES_LATE_CHARGES, '30 6 * * *');
+
     this.payments.onSucceeded('FEES', async (p) => {
       if (!p.subjectId) return;
 
@@ -189,12 +211,19 @@ export class FeesService implements OnModuleInit {
           id: true,
           number: true,
           isCurrent: true,
-          academicYear: { select: { label: true } },
+          academicYear: {
+            select: {
+              label: true,
+            },
+          },
         },
       }),
       this.prisma.programme.findMany({
         orderBy: { name: 'asc' },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+        },
       }),
     ]);
 
@@ -227,8 +256,14 @@ export class FeesService implements OnModuleInit {
   async currentRate() {
     return rateAt(
       await this.prisma.exchangeRate.findMany({
-        where: { effectiveFrom: { lte: new Date() } },
-        orderBy: { effectiveFrom: 'desc' },
+        where: {
+          effectiveFrom: {
+            lte: new Date(),
+          },
+        },
+        orderBy: {
+          effectiveFrom: 'desc',
+        },
         take: 1,
       }),
     );
@@ -281,14 +316,17 @@ export class FeesService implements OnModuleInit {
     const used = await this.prisma.feePayment.count({
       where: {
         exchangeRate: r.cedisPerDollar,
-        createdAt: { gte: r.effectiveFrom },
+        createdAt: {
+          gte: r.effectiveFrom,
+        },
       },
     });
 
     if (used) {
       throw new ConflictException({
         code: 'IN_USE',
-        message: 'Payments were converted at this rate. Add a new rate instead.',
+        message:
+          'Payments were converted at this rate. Add a new rate instead.',
       });
     }
 
@@ -301,7 +339,9 @@ export class FeesService implements OnModuleInit {
       module: 'fees',
       targetType: 'ExchangeRate',
       targetId: id,
-      before: { cedisPerDollar: r.cedisPerDollar },
+      before: {
+        cedisPerDollar: r.cedisPerDollar,
+      },
     });
 
     return { ok: true };
@@ -321,7 +361,11 @@ export class FeesService implements OnModuleInit {
         name: true,
         description: true,
         isActive: true,
-        _count: { select: { lines: true } },
+        _count: {
+          select: {
+            lines: true,
+          },
+        },
       },
     });
   }
@@ -381,9 +425,15 @@ export class FeesService implements OnModuleInit {
         level: true,
         studentGroup: true,
         currency: true,
-        programme: { select: { name: true } },
+        programme: {
+          select: {
+            name: true,
+          },
+        },
         lines: {
-          orderBy: { position: 'asc' },
+          orderBy: {
+            position: 'asc',
+          },
           select: {
             id: true,
             feeItemId: true,
@@ -391,16 +441,16 @@ export class FeesService implements OnModuleInit {
             amount: true,
           },
         },
-        _count: { select: { bills: true } },
+        _count: {
+          select: {
+            bills: true,
+          },
+        },
       },
     });
   }
 
-  async saveSchedule(
-    user: AuthUser,
-    dto: ScheduleDto,
-    id?: string,
-  ) {
+  async saveSchedule(user: AuthUser, dto: ScheduleDto, id?: string) {
     const target = {
       id: id ?? '',
       programmeId: dto.programmeId ?? null,
@@ -409,7 +459,9 @@ export class FeesService implements OnModuleInit {
     };
 
     const others = await this.prisma.feeSchedule.findMany({
-      where: { semesterId: dto.semesterId },
+      where: {
+        semesterId: dto.semesterId,
+      },
       select: {
         id: true,
         programmeId: true,
@@ -428,7 +480,9 @@ export class FeesService implements OnModuleInit {
 
     const items = await this.prisma.feeItem.findMany({
       where: {
-        id: { in: dto.lines.map((l) => l.feeItemId) },
+        id: {
+          in: dto.lines.map((l) => l.feeItemId),
+        },
       },
       select: {
         id: true,
@@ -472,7 +526,9 @@ export class FeesService implements OnModuleInit {
             where: { id },
             data: {
               ...data,
-              lines: { create: lines },
+              lines: {
+                create: lines,
+              },
             },
           });
         })
@@ -480,14 +536,14 @@ export class FeesService implements OnModuleInit {
           data: {
             ...data,
             createdById: user.id,
-            lines: { create: lines },
+            lines: {
+              create: lines,
+            },
           },
         });
 
     await this.audit.record({
-      action: id
-        ? 'fees.schedule_updated'
-        : 'fees.schedule_created',
+      action: id ? 'fees.schedule_updated' : 'fees.schedule_created',
       module: 'fees',
       targetType: 'FeeSchedule',
       targetId: schedule.id,
@@ -509,7 +565,11 @@ export class FeesService implements OnModuleInit {
       where: { id },
       select: {
         name: true,
-        _count: { select: { bills: true } },
+        _count: {
+          select: {
+            bills: true,
+          },
+        },
       },
     });
 
@@ -537,26 +597,33 @@ export class FeesService implements OnModuleInit {
       module: 'fees',
       targetType: 'FeeSchedule',
       targetId: id,
-      before: { name: s.name },
+      before: {
+        name: s.name,
+      },
     });
 
     return { ok: true };
   }
 
   /** Starts a new semester from last semester's schedules. Skips any that would clash. */
-  async copySchedules(
-    user: AuthUser,
-    dto: CopySchedulesDto,
-  ) {
+  async copySchedules(user: AuthUser, dto: CopySchedulesDto) {
     const [from, existing] = await Promise.all([
       this.prisma.feeSchedule.findMany({
-        where: { semesterId: dto.fromSemesterId },
+        where: {
+          semesterId: dto.fromSemesterId,
+        },
         include: {
-          lines: { orderBy: { position: 'asc' } },
+          lines: {
+            orderBy: {
+              position: 'asc',
+            },
+          },
         },
       }),
       this.prisma.feeSchedule.findMany({
-        where: { semesterId: dto.toSemesterId },
+        where: {
+          semesterId: dto.toSemesterId,
+        },
         select: {
           id: true,
           programmeId: true,
@@ -622,43 +689,53 @@ export class FeesService implements OnModuleInit {
 
   /** Issues a bill to every active student who has none yet this semester. Safe to run again after adding students. */
   async issueBills(user: AuthUser, semesterId: string) {
-    const semester =
-      await this.prisma.semester.findUniqueOrThrow({
-        where: { id: semesterId },
-        include: { academicYear: true },
-      });
+    const semester = await this.prisma.semester.findUniqueOrThrow({
+      where: { id: semesterId },
+      include: {
+        academicYear: true,
+      },
+    });
 
-    const [schedules, students, billed, rules] =
-      await Promise.all([
-        this.prisma.feeSchedule.findMany({
-          where: { semesterId },
-          include: {
-            lines: { orderBy: { position: 'asc' } },
-          },
-        }),
-        this.prisma.user.findMany({
-          where: {
-            type: 'STUDENT',
-            status: { in: ['ACTIVE', 'PENDING_SETUP'] },
-            studentProfile: { isNot: null },
-          },
-          select: {
-            id: true,
-            studentProfile: {
-              select: {
-                programmeId: true,
-                currentLevel: true,
-                nationality: true,
-              },
+    const [schedules, students, billed, rules] = await Promise.all([
+      this.prisma.feeSchedule.findMany({
+        where: { semesterId },
+        include: {
+          lines: {
+            orderBy: {
+              position: 'asc',
             },
           },
-        }),
-        this.prisma.studentBill.findMany({
-          where: { semesterId },
-          select: { studentId: true },
-        }),
-        this.rules.get(),
-      ]);
+        },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          type: 'STUDENT',
+          status: {
+            in: ['ACTIVE', 'PENDING_SETUP'],
+          },
+          studentProfile: {
+            isNot: null,
+          },
+        },
+        select: {
+          id: true,
+          studentProfile: {
+            select: {
+              programmeId: true,
+              currentLevel: true,
+              nationality: true,
+            },
+          },
+        },
+      }),
+      this.prisma.studentBill.findMany({
+        where: { semesterId },
+        select: {
+          studentId: true,
+        },
+      }),
+      this.rules.get(),
+    ]);
 
     if (!schedules.length) {
       throw new BadRequestException({
@@ -668,16 +745,17 @@ export class FeesService implements OnModuleInit {
       });
     }
 
-    const already = new Set(
-      billed.map((b) => b.studentId),
-    );
+    const already = new Set(billed.map((b) => b.studentId));
 
     const issued: Array<{
       studentId: string;
       scheduleId: string;
       currency: Currency;
       total: number;
-      lines: Array<{ name: string; amount: number }>;
+      lines: Array<{
+        name: string;
+        amount: number;
+      }>;
     }> = [];
 
     let noSchedule = 0;
@@ -688,9 +766,7 @@ export class FeesService implements OnModuleInit {
       const s = pickSchedule(schedules, {
         programmeId: st.studentProfile!.programmeId,
         level: st.studentProfile!.currentLevel,
-        group: studentGroupOf(
-          st.studentProfile!.nationality,
-        ),
+        group: studentGroupOf(st.studentProfile!.nationality),
       });
 
       if (!s) {
@@ -707,10 +783,7 @@ export class FeesService implements OnModuleInit {
         studentId: st.id,
         scheduleId: s.id,
         currency: s.currency,
-        total: lines.reduce(
-          (t, l) => t + l.amount,
-          0,
-        ),
+        total: lines.reduce((t, l) => t + l.amount, 0),
         lines,
       });
     }
@@ -757,10 +830,7 @@ export class FeesService implements OnModuleInit {
             lines: b.lines
               .map(
                 (l) =>
-                  `${l.name}: ${formatMoney(
-                    l.amount,
-                    b.currency,
-                  )}`,
+                  `${l.name}: ${formatMoney(l.amount, b.currency)}`,
               )
               .join('\n'),
             percent: rules.clearancePercent,
@@ -796,9 +866,7 @@ export class FeesService implements OnModuleInit {
         page: q.page,
         pageSize: q.pageSize,
         summary: null,
-        clearancePercent: (
-          await this.rules.get()
-        ).clearancePercent,
+        clearancePercent: (await this.rules.get()).clearancePercent,
       };
     }
 
@@ -835,25 +903,28 @@ export class FeesService implements OnModuleInit {
     };
 
     // Status filters need the computed balance, so filtering happens after loading this semester's bills.
-    const [rows, rules, clearances] =
-      await Promise.all([
-        this.prisma.studentBill.findMany({
-          where,
-          orderBy: {
-            student: { indexNumber: 'asc' },
+    const [rows, rules, clearances] = await Promise.all([
+      this.prisma.studentBill.findMany({
+        where,
+        orderBy: {
+          student: {
+            indexNumber: 'asc',
           },
-          select: BILL_SELECT,
-        }),
-        this.rules.get(),
-        this.prisma.financialClearance.findMany({
-          where: { semesterId: semester.id },
-          select: {
-            studentId: true,
-            cleared: true,
-            source: true,
-          },
-        }),
-      ]);
+        },
+        select: BILL_SELECT,
+      }),
+      this.rules.get(),
+      this.prisma.financialClearance.findMany({
+        where: {
+          semesterId: semester.id,
+        },
+        select: {
+          studentId: true,
+          cleared: true,
+          source: true,
+        },
+      }),
+    ]);
 
     const cl = new Map(
       clearances.map((c) => [c.studentId, c]),
@@ -867,12 +938,15 @@ export class FeesService implements OnModuleInit {
 
     const filtered = all.filter((b) => {
       if (!q.status) return true;
+
       if (q.status === 'UNPAID') {
         return b.percentPaid === 0 && b.due > 0;
       }
+
       if (q.status === 'PAID') {
         return b.balance <= 0;
       }
+
       if (q.status === 'CLEARED') {
         return !!b.clearance?.cleared;
       }
@@ -887,54 +961,40 @@ export class FeesService implements OnModuleInit {
 
     const summary = {
       bills: all.length,
-      cleared: all.filter(
-        (b) => b.clearance?.cleared,
-      ).length,
+      cleared: all.filter((b) => b.clearance?.cleared).length,
       byCurrency: currencies.map((c) => {
-        const bs = all.filter(
-          (b) => b.currency === c,
-        );
+        const bs = all.filter((b) => b.currency === c);
 
         return {
           currency: c,
           bills: bs.length,
-          due: bs.reduce(
-            (t, b) => t + b.due,
-            0,
-          ),
+          due: bs.reduce((t, b) => t + b.due, 0),
           collected: bs.reduce(
-            (t, b) =>
-              t + (b.due - b.balance),
+            (t, b) => t + (b.due - b.balance),
             0,
           ),
         };
       }),
     };
 
-    const start =
-      (q.page - 1) * q.pageSize;
+    const start = (q.page - 1) * q.pageSize;
 
     return {
-      items: filtered.slice(
-        start,
-        start + q.pageSize,
-      ),
+      items: filtered.slice(start, start + q.pageSize),
       total: filtered.length,
       page: q.page,
       pageSize: q.pageSize,
       summary,
-      clearancePercent:
-        rules.clearancePercent,
+      clearancePercent: rules.clearancePercent,
       semesterId: semester.id,
     };
   }
 
   async bill(id: string) {
-    const b =
-      await this.prisma.studentBill.findUnique({
-        where: { id },
-        select: BILL_SELECT,
-      });
+    const b = await this.prisma.studentBill.findUnique({
+      where: { id },
+      select: BILL_SELECT,
+    });
 
     if (!b) {
       throw new NotFoundException({
@@ -944,21 +1004,19 @@ export class FeesService implements OnModuleInit {
     }
 
     const clearance =
-      await this.prisma.financialClearance.findUnique(
-        {
-          where: {
-            studentId_semesterId: {
-              studentId: b.student.id,
-              semesterId: b.semesterId,
-            },
-          },
-          select: {
-            cleared: true,
-            source: true,
-            note: true,
+      await this.prisma.financialClearance.findUnique({
+        where: {
+          studentId_semesterId: {
+            studentId: b.student.id,
+            semesterId: b.semesterId,
           },
         },
-      );
+        select: {
+          cleared: true,
+          source: true,
+          note: true,
+        },
+      });
 
     const rate = await this.currentRate();
 
@@ -966,11 +1024,8 @@ export class FeesService implements OnModuleInit {
       ...b,
       ...figures(b),
       clearance,
-      clearancePercent: (
-        await this.rules.get()
-      ).clearancePercent,
-      cedisPerDollar:
-        rate?.cedisPerDollar ?? null,
+      clearancePercent: (await this.rules.get()).clearancePercent,
+      cedisPerDollar: rate?.cedisPerDollar ?? null,
     };
   }
 
@@ -984,8 +1039,7 @@ export class FeesService implements OnModuleInit {
     if (new Date(dto.paidOn) > new Date()) {
       throw new BadRequestException({
         code: 'FUTURE',
-        message:
-          'The payment date cannot be in the future.',
+        message: 'The payment date cannot be in the future.',
       });
     }
 
@@ -1002,26 +1056,21 @@ export class FeesService implements OnModuleInit {
       dto.paidCurrency &&
       dto.paidCurrency !== b.currency
     ) {
-      const rates =
-        await this.prisma.exchangeRate.findMany({
-          where: {
-            effectiveFrom: {
-              lte: new Date(
-                dto.paidOn + 'T23:59:59Z',
-              ),
-            },
+      const rates = await this.prisma.exchangeRate.findMany({
+        where: {
+          effectiveFrom: {
+            lte: new Date(`${dto.paidOn}T23:59:59Z`),
           },
-          orderBy: {
-            effectiveFrom: 'desc',
-          },
-          take: 1,
-        });
+        },
+        orderBy: {
+          effectiveFrom: 'desc',
+        },
+        take: 1,
+      });
 
       const rate = rateAt(
         rates,
-        new Date(
-          dto.paidOn + 'T23:59:59Z',
-        ),
+        new Date(`${dto.paidOn}T23:59:59Z`),
       );
 
       if (!rate) {
@@ -1041,27 +1090,24 @@ export class FeesService implements OnModuleInit {
 
       original = {
         originalAmount: dto.amount,
-        originalCurrency:
-          dto.paidCurrency,
-        exchangeRate:
-          rate.cedisPerDollar,
+        originalCurrency: dto.paidCurrency,
+        exchangeRate: rate.cedisPerDollar,
       };
     }
 
     try {
-      const p =
-        await this.prisma.feePayment.create({
-          data: {
-            billId,
-            amount,
-            method: dto.method,
-            reference: dto.reference,
-            receiptNumber: newReceipt(),
-            paidOn: new Date(dto.paidOn),
-            recordedById: user.id,
-            ...(original ?? {}),
-          },
-        });
+      const p = await this.prisma.feePayment.create({
+        data: {
+          billId,
+          amount,
+          method: dto.method,
+          reference: dto.reference,
+          receiptNumber: newReceipt(),
+          paidOn: new Date(dto.paidOn),
+          recordedById: user.id,
+          ...(original ?? {}),
+        },
+      });
 
       await this.audit.record({
         action: 'fees.payment_recorded',
@@ -1077,30 +1123,23 @@ export class FeesService implements OnModuleInit {
         },
       });
 
-      await this.afterChange(
-        billId,
-        user.id,
-        {
-          amount,
-          method: dto.method,
-          receipt: p.receiptNumber,
-        },
-      );
+      await this.afterChange(billId, user.id, {
+        amount,
+        method: dto.method,
+        receipt: p.receiptNumber,
+      });
 
       return this.bill(billId);
     } catch (err) {
       if (
-        err instanceof
-          Prisma.PrismaClientKnownRequestError &&
+        err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
         throw new ConflictException({
           code: 'DUPLICATE',
           message: `A ${FEE_METHOD_LABEL[
             dto.method
-          ].toLowerCase()} with reference ${
-            dto.reference
-          } has already been recorded.`,
+          ].toLowerCase()} with reference ${dto.reference} has already been recorded.`,
         });
       }
 
@@ -1138,10 +1177,7 @@ export class FeesService implements OnModuleInit {
       },
     });
 
-    await this.afterChange(
-      billId,
-      user.id,
-    );
+    await this.afterChange(billId, user.id);
 
     return this.bill(billId);
   }
@@ -1152,16 +1188,14 @@ export class FeesService implements OnModuleInit {
     paymentId: string,
     reason: string,
   ) {
-    const p =
-      await this.prisma.feePayment.findUnique({
-        where: { id: paymentId },
-      });
+    const p = await this.prisma.feePayment.findUnique({
+      where: { id: paymentId },
+    });
 
     if (!p || p.reversedAt) {
       throw new NotFoundException({
         code: 'NOT_FOUND',
-        message:
-          'Payment not found or already reversed.',
+        message: 'Payment not found or already reversed.',
       });
     }
 
@@ -1191,13 +1225,12 @@ export class FeesService implements OnModuleInit {
         amount: p.amount,
         receipt: p.receiptNumber,
       },
-      after: { reason },
+      after: {
+        reason,
+      },
     });
 
-    await this.afterChange(
-      p.billId,
-      user.id,
-    );
+    await this.afterChange(p.billId, user.id);
 
     return this.bill(p.billId);
   }
@@ -1230,30 +1263,28 @@ export class FeesService implements OnModuleInit {
     const label = semesterLabel(b.semester);
 
     if (change) {
-      await this.prisma.financialClearance.upsert(
-        {
-          where: {
-            studentId_semesterId: {
-              studentId: b.student.id,
-              semesterId: b.semesterId,
-            },
-          },
-          create: {
+      await this.prisma.financialClearance.upsert({
+        where: {
+          studentId_semesterId: {
             studentId: b.student.id,
             semesterId: b.semesterId,
-            cleared: change.cleared,
-            source: 'FEES',
-            note: `Fee rule: ${b.percentPaid}% paid`,
-            updatedById: actorId,
-          },
-          update: {
-            cleared: change.cleared,
-            source: 'FEES',
-            note: `Fee rule: ${b.percentPaid}% paid`,
-            updatedById: actorId,
           },
         },
-      );
+        create: {
+          studentId: b.student.id,
+          semesterId: b.semesterId,
+          cleared: change.cleared,
+          source: 'FEES',
+          note: `Fee rule: ${b.percentPaid}% paid`,
+          updatedById: actorId,
+        },
+        update: {
+          cleared: change.cleared,
+          source: 'FEES',
+          note: `Fee rule: ${b.percentPaid}% paid`,
+          updatedById: actorId,
+        },
+      });
 
       await this.audit.record({
         action: change.cleared
@@ -1265,37 +1296,30 @@ export class FeesService implements OnModuleInit {
         metadata: {
           semester: label,
           percentPaid: b.percentPaid,
-          threshold:
-            b.clearancePercent,
+          threshold: b.clearancePercent,
         },
       });
 
       await this.notifications.notify({
         eventKey: EVENT_KEYS.FEES_CLEARED,
         recipients: [
-          { userId: b.student.id },
+          {
+            userId: b.student.id,
+          },
         ],
-        channels: [
-          'IN_APP',
-          'SMS',
-          'EMAIL',
-        ],
+        channels: ['IN_APP', 'SMS', 'EMAIL'],
         sharedVars: change.cleared
           ? {
               semester: label,
               headline: 'you are cleared',
               detail: `You have paid ${b.percentPaid}% of your fees, so you are fee-cleared for exams. Your balance is ${formatMoney(
-                Math.max(
-                  0,
-                  b.balance,
-                ),
+                Math.max(0, b.balance),
                 b.currency,
               )}.`,
             }
           : {
               semester: label,
-              headline:
-                'clearance withdrawn',
+              headline: 'clearance withdrawn',
               detail: `After a correction to your fees you have paid ${b.percentPaid}%, below the ${b.clearancePercent}% needed. Contact the Finance Office.`,
             },
         link: '/fees',
@@ -1308,46 +1332,30 @@ export class FeesService implements OnModuleInit {
         b.payments
           .filter(
             (p) =>
-              p.method ===
-                paid.method &&
-              p.amount ===
-                paid.amount,
+              p.method === paid.method &&
+              p.amount === paid.amount,
           )
-          .at(-1)
-          ?.receiptNumber ??
+          .at(-1)?.receiptNumber ??
         '';
 
       await this.notifications.notify({
-        eventKey:
-          EVENT_KEYS.FEES_PAYMENT_RECEIVED,
+        eventKey: EVENT_KEYS.FEES_PAYMENT_RECEIVED,
         recipients: [
-          { userId: b.student.id },
+          {
+            userId: b.student.id,
+          },
         ],
-        channels: [
-          'IN_APP',
-          'EMAIL',
-          'SMS',
-        ],
+        channels: ['IN_APP', 'EMAIL', 'SMS'],
         sharedVars: {
-          amount: formatMoney(
-            paid.amount,
-            b.currency,
-          ),
-          method:
-            FEE_METHOD_LABEL[
-              paid.method
-            ],
+          amount: formatMoney(paid.amount, b.currency),
+          method: FEE_METHOD_LABEL[paid.method],
           receipt,
           semester: label,
           balance: formatMoney(
-            Math.max(
-              0,
-              b.balance,
-            ),
+            Math.max(0, b.balance),
             b.currency,
           ),
-          percentPaid:
-            b.percentPaid,
+          percentPaid: b.percentPaid,
         },
         link: '/fees',
       });
@@ -1356,31 +1364,32 @@ export class FeesService implements OnModuleInit {
 
   /** After the clearance percentage changes, applies the new rule to this semester's bills. */
   async reapplyRule(actorId: string) {
-    const semester =
-      await this.prisma.semester.findFirst({
-        where: { isCurrent: true },
-        select: { id: true },
-      });
+    const semester = await this.prisma.semester.findFirst({
+      where: {
+        isCurrent: true,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!semester) return 0;
 
-    const bills =
-      await this.prisma.studentBill.findMany({
-        where: {
-          semesterId: semester.id,
-        },
-        select: { id: true },
-      });
+    const bills = await this.prisma.studentBill.findMany({
+      where: {
+        semesterId: semester.id,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     for (const b of bills) {
-      await this.afterChange(
-        b.id,
-        actorId,
-      ).catch((err) =>
+      await this.afterChange(b.id, actorId).catch((err) =>
         this.logger.error(
-          `Clearance recheck failed for ${
-            b.id
-          }: ${(err as Error).message}`,
+          `Clearance recheck failed for ${b.id}: ${
+            (err as Error).message
+          }`,
         ),
       );
     }
@@ -1394,62 +1403,65 @@ export class FeesService implements OnModuleInit {
     if (user.type !== 'STUDENT') {
       throw new ForbiddenException({
         code: 'STUDENTS_ONLY',
-        message:
-          'Fees are for students.',
+        message: 'Fees are for students.',
       });
     }
 
-    const [bills, rules] =
-      await Promise.all([
-        this.prisma.studentBill.findMany({
-          where: {
-            studentId: user.id,
-          },
-          orderBy: {
-            issuedAt: 'desc',
-          },
-          select: BILL_SELECT,
-        }),
-        this.rules.get(),
-      ]);
+    const [bills, rules] = await Promise.all([
+      this.prisma.studentBill.findMany({
+        where: {
+          studentId: user.id,
+        },
+        orderBy: {
+          issuedAt: 'desc',
+        },
+        select: BILL_SELECT,
+      }),
+      this.rules.get(),
+    ]);
 
     const clearances =
-      await this.prisma.financialClearance.findMany(
-        {
-          where: {
-            studentId: user.id,
-          },
-          select: {
-            semesterId: true,
-            cleared: true,
-          },
+      await this.prisma.financialClearance.findMany({
+        where: {
+          studentId: user.id,
         },
-      );
+        select: {
+          semesterId: true,
+          cleared: true,
+        },
+      });
 
     const cl = new Map(
-      clearances.map((c) => [
-        c.semesterId,
-        c.cleared,
+      clearances.map((c) => [c.semesterId, c.cleared]),
+    );
+
+    const plans = new Map(
+      (
+        await this.prisma.feeInstalmentPlan.findMany({
+          where: {
+            semesterId: {
+              in: bills.map((b) => b.semesterId),
+            },
+          },
+        })
+      ).map((p) => [
+        p.semesterId,
+        p.instalments as unknown as Instalment[],
       ]),
     );
 
-    const rate =
-      await this.currentRate();
+    const rate = await this.currentRate();
 
     return {
       rules,
-      cedisPerDollar:
-        rate?.cedisPerDollar ?? null,
-      provider:
-        this.payments.providerName,
+      cedisPerDollar: rate?.cedisPerDollar ?? null,
+      provider: this.payments.providerName,
       bills: bills.map((b) => ({
         ...b,
         ...figures(b),
-        semesterLabel:
-          semesterLabel(b.semester),
-        cleared:
-          cl.get(b.semesterId) ??
-          false,
+        instalments: this.instalmentsFor(plans, b),
+        semesterLabel: semesterLabel(b.semester),
+        cleared: cl.get(b.semesterId) ?? false,
         statement: feeStatement({
           ...b,
           lines: b.lines as Array<{
@@ -1467,16 +1479,13 @@ export class FeesService implements OnModuleInit {
     billId: string,
     amount: number,
   ) {
-    const b =
-      await this.prisma.studentBill.findFirst(
-        {
-          where: {
-            id: billId,
-            studentId: user.id,
-          },
-          select: BILL_SELECT,
-        },
-      );
+    const b = await this.prisma.studentBill.findFirst({
+      where: {
+        id: billId,
+        studentId: user.id,
+      },
+      select: BILL_SELECT,
+    });
 
     if (!b) {
       throw new NotFoundException({
@@ -1485,11 +1494,8 @@ export class FeesService implements OnModuleInit {
       });
     }
 
-    const { balance } =
-      figures(b);
-
-    const rules =
-      await this.rules.get();
+    const { balance } = figures(b);
+    const rules = await this.rules.get();
 
     const min =
       b.currency === 'USD'
@@ -1499,8 +1505,7 @@ export class FeesService implements OnModuleInit {
     if (balance <= 0) {
       throw new ConflictException({
         code: 'PAID',
-        message:
-          'This bill is fully paid.',
+        message: 'This bill is fully paid.',
       });
     }
 
@@ -1514,10 +1519,7 @@ export class FeesService implements OnModuleInit {
       });
     }
 
-    if (
-      amount <
-      Math.min(min, balance)
-    ) {
+    if (amount < Math.min(min, balance)) {
       throw new BadRequestException({
         code: 'TOO_LITTLE',
         message: `The smallest online payment is ${formatMoney(
@@ -1527,52 +1529,43 @@ export class FeesService implements OnModuleInit {
       });
     }
 
-    const started =
-      await this.payments.start({
-        purpose: 'FEES',
-        userId: user.id,
-        subjectId: billId,
-        amount,
-        currency: b.currency,
-        returnPath: '/fees',
-        description: `Fees for ${semesterLabel(
-          b.semester,
-        )}`,
-      });
+    const started = await this.payments.start({
+      purpose: 'FEES',
+      userId: user.id,
+      subjectId: billId,
+      amount,
+      currency: b.currency,
+      returnPath: '/fees',
+      description: `Fees for ${semesterLabel(b.semester)}`,
+    });
 
     return {
-      paymentUrl:
-        started.authorizationUrl,
+      paymentUrl: started.authorizationUrl,
     };
   }
 
   /** A receipt for one payment, for the student (their own only) or Finance. */
-  async receipt(
-    paymentId: string,
-    user?: AuthUser,
-  ) {
-    const p =
-      await this.prisma.feePayment.findUnique({
-        where: { id: paymentId },
-        select: {
-          id: true,
-          amount: true,
-          method: true,
-          reference: true,
-          receiptNumber: true,
-          paidOn: true,
-          createdAt: true,
-          reversedAt: true,
-          reversalReason: true,
-          billId: true,
-
-          // Required for receipts of payments made
-          // in a different currency from the bill.
-          originalAmount: true,
-          originalCurrency: true,
-          exchangeRate: true,
-        },
-      });
+  async receipt(paymentId: string, user?: AuthUser) {
+    const p = await this.prisma.feePayment.findUnique({
+      where: {
+        id: paymentId,
+      },
+      select: {
+        id: true,
+        amount: true,
+        method: true,
+        reference: true,
+        receiptNumber: true,
+        paidOn: true,
+        createdAt: true,
+        reversedAt: true,
+        reversalReason: true,
+        originalAmount: true,
+        originalCurrency: true,
+        exchangeRate: true,
+        billId: true,
+      },
+    });
 
     if (!p) {
       throw new NotFoundException({
@@ -1581,22 +1574,16 @@ export class FeesService implements OnModuleInit {
       });
     }
 
-    const b = await this.bill(
-      p.billId,
-    );
+    const b = await this.bill(p.billId);
 
-    if (
-      user &&
-      b.student.id !== user.id
-    ) {
+    if (user && b.student.id !== user.id) {
       throw new NotFoundException({
         code: 'NOT_FOUND',
         message: 'Receipt not found.',
       });
     }
 
-    // Balance straight after this payment,
-    // as a receipt would have shown it.
+    // Balance straight after this payment, as a receipt would have shown it.
     const statement = feeStatement({
       ...b,
       lines: b.lines as Array<{
@@ -1605,35 +1592,24 @@ export class FeesService implements OnModuleInit {
       }>,
     });
 
-    const at =
-      statement.findIndex(
-        (e) =>
-          e.receipt ===
-            p.receiptNumber &&
-          e.credit > 0,
-      );
+    const at = statement.findIndex(
+      (e) => e.receipt === p.receiptNumber && e.credit > 0,
+    );
 
     return {
       ...p,
       currency: b.currency,
-      semester: semesterLabel(
-        b.semester,
-      ),
+      semester: semesterLabel(b.semester),
       student: {
         name: `${b.student.firstName} ${b.student.lastName}`,
-        indexNumber:
-          b.student.indexNumber,
+        indexNumber: b.student.indexNumber,
         programme:
-          b.student.studentProfile
-            ?.programme.name ?? null,
+          b.student.studentProfile?.programme.name ?? null,
         level:
-          b.student.studentProfile
-            ?.currentLevel ?? null,
+          b.student.studentProfile?.currentLevel ?? null,
       },
       balanceAfter:
-        at >= 0
-          ? statement[at].balance
-          : b.balance,
+        at >= 0 ? statement[at].balance : b.balance,
       balanceNow: b.balance,
     };
   }
@@ -1644,11 +1620,7 @@ export class FeesService implements OnModuleInit {
     paymentId: string,
     user?: AuthUser,
   ) {
-    const r =
-      await this.receipt(
-        paymentId,
-        user,
-      );
+    const r = await this.receipt(paymentId, user);
 
     const d = await PdfDoc.create(
       'Official receipt: school fees',
@@ -1658,15 +1630,10 @@ export class FeesService implements OnModuleInit {
     );
 
     d.rows([
-      [
-        'Receipt number',
-        r.receiptNumber,
-      ],
+      ['Receipt number', r.receiptNumber],
       [
         'Student',
-        `${r.student.name} (${
-          r.student.indexNumber ?? ''
-        })`,
+        `${r.student.name} (${r.student.indexNumber ?? ''})`,
       ],
       [
         'Programme',
@@ -1676,59 +1643,32 @@ export class FeesService implements OnModuleInit {
             : ''
         }`,
       ],
-      [
-        'Fees for',
-        r.semester,
-      ],
+      ['Fees for', r.semester],
       [
         'Amount received',
-        formatMoney(
-          r.amount,
-          r.currency,
-        ),
+        formatMoney(r.amount, r.currency),
       ],
-      ...(r.originalAmount &&
-      r.originalCurrency
+      ...(r.originalAmount && r.originalCurrency
         ? [
             [
               'Paid as',
               `${formatMoney(
                 r.originalAmount,
                 r.originalCurrency,
-              )} at ${
-                r.exchangeRate
-              } cedis per dollar`,
-            ] as [
-              string,
-              string,
-            ],
+              )} at ${r.exchangeRate} cedis per dollar`,
+            ] as [string, string],
           ]
         : []),
-      [
-        'Paid by',
-        FEE_METHOD_LABEL[
-          r.method
-        ],
-      ],
-      [
-        'Reference',
-        r.reference,
-      ],
+      ['Paid by', FEE_METHOD_LABEL[r.method]],
+      ['Reference', r.reference],
       [
         'Date paid',
-        new Date(
-          r.paidOn,
-        )
-          .toISOString()
-          .slice(0, 10),
+        new Date(r.paidOn).toISOString().slice(0, 10),
       ],
       [
         'Balance after this payment',
         formatMoney(
-          Math.max(
-            0,
-            r.balanceAfter,
-          ),
+          Math.max(0, r.balanceAfter),
           r.currency,
         ),
       ],
@@ -1751,17 +1691,12 @@ export class FeesService implements OnModuleInit {
     billId: string,
     user?: AuthUser,
   ) {
-    const b =
-      await this.bill(billId);
+    const b = await this.bill(billId);
 
-    if (
-      user &&
-      b.student.id !== user.id
-    ) {
+    if (user && b.student.id !== user.id) {
       throw new NotFoundException({
         code: 'NOT_FOUND',
-        message:
-          'Statement not found.',
+        message: 'Statement not found.',
       });
     }
 
@@ -1774,17 +1709,10 @@ export class FeesService implements OnModuleInit {
     });
 
     const m = (n: number) =>
-      n
-        ? formatMoney(
-            n,
-            b.currency,
-          )
-        : '';
+      n ? formatMoney(n, b.currency) : '';
 
     const d = await PdfDoc.create(
-      `Fees statement: ${semesterLabel(
-        b.semester,
-      )}`,
+      `Fees statement: ${semesterLabel(b.semester)}`,
       `${b.student.firstName} ${b.student.lastName} (${
         b.student.indexNumber ?? ''
       })${
@@ -1795,13 +1723,7 @@ export class FeesService implements OnModuleInit {
     );
 
     d.table(
-      [
-        'Date',
-        'Details',
-        'Debit',
-        'Credit',
-        'Balance',
-      ],
+      ['Date', 'Details', 'Debit', 'Credit', 'Balance'],
       entries.map((e) => [
         e.date.slice(0, 10),
         e.receipt
@@ -1809,18 +1731,9 @@ export class FeesService implements OnModuleInit {
           : e.description,
         m(e.debit),
         m(e.credit),
-        formatMoney(
-          e.balance,
-          b.currency,
-        ),
+        formatMoney(e.balance, b.currency),
       ]),
-      [
-        0.14,
-        0.44,
-        0.14,
-        0.14,
-        0.14,
-      ],
+      [0.14, 0.44, 0.14, 0.14, 0.14],
       [2, 3, 4],
     );
 
@@ -1828,31 +1741,400 @@ export class FeesService implements OnModuleInit {
 
     d.text(
       `Balance ${
-        b.balance < 0
-          ? 'in your favour'
-          : 'owed'
+        b.balance < 0 ? 'in your favour' : 'owed'
       }: ${formatMoney(
         Math.abs(b.balance),
         b.currency,
-      )}. Paid: ${
-        b.percentPaid
-      }%.`,
-      { bold: true },
+      )}. Paid: ${b.percentPaid}%.`,
+      {
+        bold: true,
+      },
     );
 
     return {
       filename: `fees-statement-${
-        b.student.indexNumber ??
-        b.id
+        b.student.indexNumber ?? b.id
       }.pdf`,
       buffer: await d.toBuffer(
         `Generated ${new Date()
           .toISOString()
-          .slice(
-            0,
-            10,
-          )} from the ANU platform.`,
+          .slice(0, 10)} from the ANU platform.`,
       ),
     };
+  }
+
+  // ----- Instalments and late payment charges -----
+
+  private instalmentsFor(
+    plans: Map<string, Instalment[]>,
+    b: Pick<
+      BillRow,
+      'semesterId' | 'charged' | 'adjustments' | 'payments'
+    >,
+  ) {
+    const plan = plans.get(b.semesterId);
+
+    if (!plan) return null;
+
+    const f = figures(b);
+
+    return {
+      plan,
+      ...instalmentStatus(
+        f.due,
+        f.due - f.balance,
+        plan,
+        new Date().toISOString().slice(0, 10),
+      ),
+    };
+  }
+
+  async instalmentPlan(semesterId: string) {
+    const p =
+      await this.prisma.feeInstalmentPlan.findUnique({
+        where: { semesterId },
+      });
+
+    return {
+      semesterId,
+      instalments:
+        (p?.instalments as unknown as Instalment[]) ?? [],
+    };
+  }
+
+  async setInstalmentPlan(
+    user: AuthUser,
+    semesterId: string,
+    instalments: Instalment[],
+  ) {
+    if (instalments.length) {
+      const problem =
+        instalmentPlanProblem(instalments);
+
+      if (problem) {
+        throw new BadRequestException({
+          code: 'PLAN',
+          message: problem,
+        });
+      }
+
+      await this.prisma.feeInstalmentPlan.upsert({
+        where: { semesterId },
+        create: {
+          semesterId,
+          instalments: instalments as never,
+          updatedById: user.id,
+        },
+        update: {
+          instalments: instalments as never,
+          updatedById: user.id,
+        },
+      });
+    } else {
+      await this.prisma.feeInstalmentPlan.deleteMany({
+        where: { semesterId },
+      });
+    }
+
+    await this.audit.record({
+      action: 'fees.instalments_set',
+      module: 'fees',
+      targetType: 'Semester',
+      targetId: semesterId,
+      after: {
+        instalments,
+      },
+    });
+
+    return this.instalmentPlan(semesterId);
+  }
+
+  /**
+   * Daily: when the Finance Office has turned late charges on, adds the charge once for each
+   * instalment a bill missed. Nothing happens while they are off (the default).
+   */
+  async applyLateCharges() {
+    const rules = await this.rules.get();
+
+    if (!rules.lateFeeEnabled) {
+      return { charged: 0 };
+    }
+
+    const today = new Date()
+      .toISOString()
+      .slice(0, 10);
+
+    let charged = 0;
+
+    for (const plan of await this.prisma.feeInstalmentPlan.findMany()) {
+      const instalments =
+        plan.instalments as unknown as Instalment[];
+
+      if (!instalments.some((i) => i.dueDate < today)) {
+        continue;
+      }
+
+      const bills =
+        await this.prisma.studentBill.findMany({
+          where: {
+            semesterId: plan.semesterId,
+          },
+          select: BILL_SELECT,
+        });
+
+      const done =
+        await this.prisma.feeLateCharge.findMany({
+          where: {
+            billId: {
+              in: bills.map((b) => b.id),
+            },
+          },
+          select: {
+            billId: true,
+            instalmentIndex: true,
+          },
+        });
+
+      for (const b of bills) {
+        const f = figures(b);
+
+        const { missed } = instalmentStatus(
+          f.due,
+          f.due - f.balance,
+          instalments,
+          today,
+        );
+
+        for (const m of missed) {
+          if (
+            done.some(
+              (d) =>
+                d.billId === b.id &&
+                d.instalmentIndex === m.index,
+            )
+          ) {
+            continue;
+          }
+
+          const amount =
+            b.currency === 'USD'
+              ? rules.lateFeeUsd
+              : rules.lateFee;
+
+          if (amount <= 0) continue;
+
+          const adj =
+            await this.prisma.feeAdjustment.create({
+              data: {
+                billId: b.id,
+                amount,
+                reason: `Late payment: instalment ${
+                  m.index + 1
+                } (due ${m.dueDate})`,
+                createdById: plan.updatedById,
+              },
+            });
+
+          await this.prisma.feeLateCharge.create({
+            data: {
+              billId: b.id,
+              instalmentIndex: m.index,
+              adjustmentId: adj.id,
+            },
+          });
+
+          await this.afterChange(
+            b.id,
+            plan.updatedById,
+          );
+
+          charged++;
+        }
+      }
+    }
+
+    if (charged) {
+      await this.audit.record({
+        action: 'fees.late_charges_added',
+        module: 'fees',
+        metadata: {
+          charged,
+        },
+      });
+    }
+
+    return { charged };
+  }
+
+  // ----- Bank statements -----
+
+  /** Suggests which bill each statement line pays, from index numbers in the narration. */
+  async matchStatement(
+    semesterId: string | null,
+    currency: 'GHS' | 'USD',
+    rows: Array<{
+      date: string;
+      amount: number;
+      reference: string;
+      narration: string;
+    }>,
+  ) {
+    const semester =
+      semesterId ??
+      (
+        await this.prisma.semester.findFirst({
+          where: {
+            isCurrent: true,
+          },
+          select: {
+            id: true,
+          },
+        })
+      )?.id;
+
+    const refs = await this.prisma.feePayment.findMany({
+      where: {
+        method: 'BANK',
+        reference: {
+          in: rows.map((r) =>
+            r.reference.toUpperCase(),
+          ),
+        },
+      },
+      select: {
+        reference: true,
+      },
+    });
+
+    const seen = new Set(
+      refs.map((r) => r.reference),
+    );
+
+    const indexes = [
+      ...new Set(
+        rows.flatMap((r) =>
+          indexNumbersIn(r.narration),
+        ),
+      ),
+    ];
+
+    const bills =
+      await this.prisma.studentBill.findMany({
+        where: {
+          semesterId: semester,
+          student: {
+            indexNumber: {
+              in: indexes,
+            },
+          },
+        },
+        select: {
+          id: true,
+          currency: true,
+          student: {
+            select: {
+              indexNumber: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+
+    return rows.map((r, i) => {
+      const found = indexNumbersIn(
+        r.narration,
+      )
+        .map((x) =>
+          bills.find(
+            (b) =>
+              b.student.indexNumber === x,
+          ),
+        )
+        .filter(Boolean);
+
+      const bill =
+        found.length === 1
+          ? found[0]!
+          : null;
+
+      const why = seen.has(
+        r.reference.toUpperCase(),
+      )
+        ? 'Already recorded.'
+        : found.length > 1
+          ? 'More than one student named.'
+          : !bill
+            ? 'No index number with a bill this semester.'
+            : null;
+
+      return {
+        line: i + 1,
+        ...r,
+        bill: why ? null : bill,
+        problem: why,
+      };
+    });
+  }
+
+  async applyStatement(
+    user: AuthUser,
+    currency: 'GHS' | 'USD',
+    items: Array<{
+      billId: string;
+      amount: number;
+      reference: string;
+      paidOn: string;
+    }>,
+  ) {
+    const out: Array<{
+      reference: string;
+      ok: boolean;
+      message?: string;
+    }> = [];
+
+    for (const it of items) {
+      try {
+        await this.recordPayment(
+          user,
+          it.billId,
+          {
+            amount: it.amount,
+            method: 'BANK',
+            reference: it.reference,
+            paidOn: it.paidOn.slice(0, 10),
+            paidCurrency: currency,
+          } as never,
+        );
+
+        out.push({
+          reference: it.reference,
+          ok: true,
+        });
+      } catch (err) {
+        out.push({
+          reference: it.reference,
+          ok: false,
+          message:
+            (err as {
+              response?: {
+                message?: string;
+              };
+            }).response?.message ??
+            (err as Error).message,
+        });
+      }
+    }
+
+    await this.audit.record({
+      action: 'fees.statement_imported',
+      module: 'fees',
+      metadata: {
+        recorded: out.filter((o) => o.ok).length,
+        failed: out.filter((o) => !o.ok).length,
+      },
+    });
+
+    return out;
   }
 }

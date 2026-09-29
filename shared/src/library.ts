@@ -120,3 +120,41 @@ export function renewBlock(loan: { dueAt: Date; renewals: number }, reservedByOt
   if (reservedByOthers) return 'RESERVED';
   return null;
 }
+
+// ----- Graduation clearance -----
+
+/**
+ * Whether a student is clear with the library for graduation: every book returned, no fines owed, and
+ * any lost book paid for. Returns the plain reasons when not.
+ */
+export function libraryClearance(s: { booksOut: number; interLibraryOut: number; finesOwed: number }) {
+  const reasons: string[] = [];
+  if (s.booksOut) reasons.push(`${s.booksOut} book${s.booksOut === 1 ? '' : 's'} still out. Return ${s.booksOut === 1 ? 'it' : 'them'} to the library.`);
+  if (s.interLibraryOut) reasons.push(`${s.interLibraryOut} inter-library loan${s.interLibraryOut === 1 ? '' : 's'} still out.`);
+  if (s.finesOwed > 0) reasons.push(`GH₵ ${(s.finesOwed / 100).toFixed(2)} in library fines to pay.`);
+  return { clear: reasons.length === 0, reasons };
+}
+
+// ----- Inter-library loans -----
+
+export type IllStatus = 'REQUESTED' | 'ORDERED' | 'ARRIVED' | 'ON_LOAN' | 'RETURNED' | 'REJECTED' | 'CANCELLED';
+export const ILL_STATUS_LABEL: Record<IllStatus, string> = {
+  REQUESTED: 'Requested', ORDERED: 'Ordered from the other library', ARRIVED: 'Arrived: collect at the desk', ON_LOAN: 'With you', RETURNED: 'Returned', REJECTED: 'Could not be obtained', CANCELLED: 'Cancelled',
+};
+
+/** Steps the Librarian can take; a member can only cancel a request not yet ordered. */
+export function illNext(from: IllStatus): IllStatus[] {
+  const map: Record<IllStatus, IllStatus[]> = {
+    REQUESTED: ['ORDERED', 'REJECTED'], ORDERED: ['ARRIVED', 'REJECTED'], ARRIVED: ['ON_LOAN', 'RETURNED'], ON_LOAN: ['RETURNED'], RETURNED: [], REJECTED: [], CANCELLED: [],
+  };
+  return map[from];
+}
+
+// ----- Reading lists -----
+
+/** Essential titles short of copies for the number of students: fewer than one copy per `perCopy` students, and no e-book. */
+export function readingShortfall(o: { students: number; copies: number; hasEbook: boolean; perCopy?: number }) {
+  if (o.hasEbook || o.students === 0) return 0;
+  const needed = Math.ceil(o.students / (o.perCopy ?? 10));
+  return Math.max(0, needed - o.copies);
+}

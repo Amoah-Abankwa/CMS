@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested,
+  IsNumber, ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested,
 } from 'class-validator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
@@ -98,6 +98,10 @@ export class PlaceOrderDto {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => OrderLineDto) lines: OrderLineDto[];
   @IsIn(['PICKUP', 'DELIVERY']) fulfilment: 'PICKUP' | 'DELIVERY';
   @IsIn(['ONLINE', 'ON_PICKUP']) paymentOption: 'ONLINE' | 'ON_PICKUP';
+  /** Later today or the next two days, inside opening hours. */
+  @IsOptional() @IsDateString() scheduledFor?: string;
+  /** Use one meal from this meal plan on this order. */
+  @IsOptional() @IsUUID() mealPlanPurchaseId?: string;
   /** Campus-dispatcher deliveries: include the dispatcher's fee in the payment, or pay the dispatcher on delivery. */
   @IsOptional() @IsIn(['INCLUDED', 'ON_DELIVERY']) dispatchFeeMode?: 'INCLUDED' | 'ON_DELIVERY';
   @Transform(trim) @IsOptional() @IsString() @MaxLength(200) deliveryAddress?: string;
@@ -131,4 +135,25 @@ export class DispatcherPayoutDto {
 export class MarkPaidDto {
   @IsIn(['CASH', 'MOMO']) via: 'CASH' | 'MOMO';
   @Transform(trim) @IsOptional() @IsString() @MaxLength(60) reference?: string;
+}
+
+export class RatingDto {
+  @Type(() => Number) @IsInt() @Min(1) @Max(5) vendorStars: number;
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(500) vendorComment?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) dispatcherStars?: number;
+}
+
+export class MealPlanDto {
+  @Transform(trim) @IsString() @MinLength(3) @MaxLength(80) name: string;
+  @Type(() => Number) @IsInt() @Min(2) @Max(200) meals: number;
+  @Type(() => Number) @IsInt() @Min(100) @Max(10_000_000) price: number;
+  @Type(() => Number) @IsInt() @Min(1) @Max(180) validDays: number;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @IsUUID('4', { each: true }) eligibleItemIds: string[];
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class LocationDto {
+  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) lat: number;
+  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) lng: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(100000) accuracy?: number;
 }

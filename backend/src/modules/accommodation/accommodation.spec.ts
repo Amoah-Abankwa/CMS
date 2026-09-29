@@ -54,3 +54,28 @@ describe('hostel allocation', () => {
     expect(formatCedis(185000)).toBe('GH₵ 1,850.00');
   });
 });
+
+import { allocateBeds as allocate2, mutualRoommates } from '@anu/shared';
+
+describe('roommate requests', () => {
+  it('counts only mutual, same-gender requests', () => {
+    const m = mutualRoommates([
+      { studentId: 'a', gender: 'FEMALE', wantsStudentId: 'b' },
+      { studentId: 'b', gender: 'FEMALE', wantsStudentId: 'a' },
+      { studentId: 'c', gender: 'FEMALE', wantsStudentId: 'a' },
+      { studentId: 'd', gender: 'MALE', wantsStudentId: 'e' },
+      { studentId: 'e', gender: 'FEMALE', wantsStudentId: 'd' },
+    ]);
+    expect([...m.entries()].sort()).toEqual([['a', 'b'], ['b', 'a']]);
+  });
+  it('places mutual roommates in the same room when two beds are free', () => {
+    const t = new Date('2026-08-01');
+    const app = (id: string, mate: string | null, group: 'FIRST_YEAR' | 'CONTINUING') => ({ applicationId: id, studentId: id, gender: 'FEMALE' as const, group, submittedAt: t, preferences: [{ hostelId: 'h', roomType: null }], acceptAny: false, roommateStudentId: mate });
+    const rooms = [{ roomId: 'r1', hostelId: 'h', hostelGender: 'FEMALE' as const, roomType: 'Double', label: 'G1', capacity: 2, occupied: 1 }, { roomId: 'r2', hostelId: 'h', hostelGender: 'FEMALE' as const, roomType: 'Double', label: 'G2', capacity: 2, occupied: 0 }];
+    const { placements } = allocate2([app('x', null, 'FIRST_YEAR'), app('a', 'b', 'CONTINUING'), app('b', 'a', 'CONTINUING')], rooms);
+    const room = (s: string) => placements.find((p) => p.studentId === s)!.roomId;
+    expect(room('a')).toBe(room('b'));
+    expect(room('a')).toBe('r2');
+    expect(placements).toHaveLength(3);
+  });
+});

@@ -1,5 +1,3 @@
-// frontend/src/features/library/components/title-form.tsx
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,23 +9,19 @@ import { Input, Textarea } from '@/components/ui/input';
 import { errorMessage } from '@/lib/axios';
 import type { TitleInput } from '../api';
 
-type TitleFormInitial = Omit<Partial<TitleInput>, 'description'> & {
-  description?: string | null;
-};
-
-type TitleFormDialogProps = {
-  open: boolean;
-  initial?: TitleFormInitial;
-  onCloseAction: () => void;
-  onSaveAction: (dto: TitleInput) => Promise<unknown>;
-  onSavedAction: (result: unknown) => void;
-};
-
 const split = (s: string) =>
   s
     .split(/[;\n]/)
     .map((x) => x.trim())
     .filter(Boolean);
+
+type TitleFormDialogProps = {
+  open: boolean;
+  initial?: Partial<TitleInput> & { description?: string | null };
+  onCloseAction: () => void;
+  onSaveAction: (dto: TitleInput) => Promise<unknown>;
+  onSavedAction: (result: unknown) => void;
+};
 
 export function TitleFormDialog({
   open,
@@ -85,7 +79,7 @@ export function TitleFormDialog({
     setError(null);
 
     try {
-      const dto: TitleInput = {
+      const result = await onSaveAction({
         title: f.title.trim(),
         subtitle: f.subtitle.trim() || undefined,
         authors: split(f.authors),
@@ -96,9 +90,8 @@ export function TitleFormDialog({
         callNumber: f.callNumber.trim() || undefined,
         subjects: split(f.subjects),
         description: f.description.trim() || undefined,
-      };
+      });
 
-      const result = await onSaveAction(dto);
       onSavedAction(result);
     } catch (err) {
       setError(errorMessage(err));
@@ -219,8 +212,8 @@ export function TitleFormDialog({
 
         <div className="flex justify-end gap-2">
           <Button
-            type="button"
             variant="secondary"
+            type="button"
             onClick={onCloseAction}
           >
             Cancel

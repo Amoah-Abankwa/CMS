@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { TransfersService } from '../payments/transfers.service';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ROLE_KEYS } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
@@ -15,13 +16,28 @@ const DEFAULT_HOURS = { '0': [], '1': [['08:00', '18:00']], '2': [['08:00', '18:
 
 /** Dean of Students and Finance: vendors, approvals, settlements and payouts. */
 @Injectable()
-export class VendorsAdminService {
+export class VendorsAdminService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly setup: AccountSetupService,
+    private readonly transfers: TransfersService,
   ) {}
+
+  onModuleInit() {
+    this.transfers.register('VENDOR', {
+      recipient: async (vendorId, meta) => {
+        const v = await this.prisma.vendor.findUniqueOrThrow({ where: { id: vendorId }, select: { name: true, payoutNetwork: true, payoutNumber: true, payoutName: true } });
+        if (!meta.periodFrom || !meta.periodTo) throw new BadRequestException({ code: 'PERIOD', message: 'Choose the settlement period first.' });
+        const row = (await this.settlements(meta.periodFrom, meta.periodTo)).find((r) => r.vendor.id === vendorId);
+        return { network: v.payoutNetwork, number: v.payoutNumber, name: v.payoutName, owed: row?.owed ?? 0, label: v.name };
+      },
+      record: async (actorId, vendorId, amount, reference, meta) => {
+        await this.recordPayout({ id: actorId } as AuthUser, { vendorId, periodFrom: meta.periodFrom!, periodTo: meta.periodTo!, amount, reference, note: 'Paystack transfer' });
+      },
+    });
+  }
 
   async list() {
     const since = new Date(Date.now() - 30 * 86_400_000);
@@ -81,20 +97,24 @@ export class VendorsAdminService {
    * already recorded for that period. Pay-at-counter sales go straight to the vendor and are shown for reference.
    */
   async settlements(from: string, to: string) {
+    const settingsPercent = ((await this.prisma.systemSetting.findUnique({ where: { key: 'marketplace.settings' } }))?.value as { commissionPercent?: number } | null)?.commissionPercent ?? 0;
     const start = new Date(from);
     const end = new Date(to);
-    const [vendors, orders, payouts, deliveries] = await Promise.all([
+    const [vendors, orders, payouts, deliveries, plans] = await Promise.all([
       this.prisma.vendor.findMany({ where: { status: { not: 'REJECTED' } }, orderBy: { name: 'asc' }, select: { id: true, name: true, payoutNetwork: true, payoutNumber: true, payoutName: true } }),
       this.prisma.foodOrder.findMany({ where: { status: 'COMPLETED', completedAt: { gte: start, lte: end } }, select: { vendorId: true, paymentOption: true, total: true, commission: true } }),
       this.prisma.vendorPayout.findMany({ where: { periodFrom: { gte: start }, periodTo: { lte: end } }, orderBy: { createdAt: 'desc' } }),
       // Campus dispatchers are paid per delivery by Finance, and that cost comes out of the vendor's share.
       this.prisma.delivery.findMany({ where: { status: 'DELIVERED', feeSettlement: 'UNIVERSITY', order: { completedAt: { gte: start, lte: end } } }, select: { fee: true, order: { select: { vendorId: true } } } }),
+      // Meal plans are sold online and belong to the vendor from the day they are paid.
+      this.prisma.mealPlanPurchase.findMany({ where: { paidAt: { gte: start, lte: end } }, select: { price: true, plan: { select: { vendorId: true } } } }),
     ]);
     return vendors.map((v) => {
       const mine = orders.filter((o) => o.vendorId === v.id);
       const online = mine.filter((o) => o.paymentOption === 'ONLINE');
-      const gross = online.reduce((s, o) => s + o.total, 0);
-      const commissionTotal = online.reduce((s, o) => s + o.commission, 0);
+      const planSales = plans.filter((p) => p.plan.vendorId === v.id).reduce((s, p) => s + p.price, 0);
+      const gross = online.reduce((s, o) => s + o.total, 0) + planSales;
+      const commissionTotal = online.reduce((s, o) => s + o.commission, 0) + Math.round((planSales * settingsPercent) / 100);
       const paidOut = payouts.filter((p) => p.vendorId === v.id).reduce((s, p) => s + p.amount, 0);
       const dispatchFees = deliveries.filter((d) => d.order.vendorId === v.id).reduce((s, d) => s + d.fee, 0);
       return {
@@ -121,5 +141,15 @@ export class VendorsAdminService {
     });
     await this.audit.record({ action: 'marketplace.payout_recorded', module: 'marketplace', targetType: 'Vendor', targetId: dto.vendorId, after: { amount: dto.amount, reference: dto.reference, period: `${dto.periodFrom} to ${dto.periodTo}` } });
     return payout;
+  }
+
+  ratings() {
+    return this.prisma.orderRating.findMany({ where: { vendorComment: { not: null } }, orderBy: { createdAt: 'desc' }, take: 200, select: { id: true, vendorStars: true, vendorComment: true, hiddenAt: true, createdAt: true, order: { select: { number: true, vendor: { select: { name: true } } } } } });
+  }
+
+  async hideRating(user: AuthUser, id: string, hide: boolean) {
+    await this.prisma.orderRating.update({ where: { id }, data: hide ? { hiddenAt: new Date(), hiddenById: user.id } : { hiddenAt: null, hiddenById: null } });
+    await this.audit.record({ action: hide ? 'marketplace.rating_hidden' : 'marketplace.rating_shown', module: 'marketplace', targetType: 'OrderRating', targetId: id });
+    return { hidden: hide };
   }
 }

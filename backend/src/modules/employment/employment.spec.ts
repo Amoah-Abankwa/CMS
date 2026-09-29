@@ -56,3 +56,24 @@ describe('dispatcher deliveries', () => {
     expect(deliveryArea(null)).toBe('Campus');
   });
 });
+
+import { hoursProblems, timesheetAmount, weekOf } from '@anu/shared';
+
+describe('timesheets', () => {
+  it('works out pay for hourly, per-task and monthly jobs', () => {
+    expect(timesheetAmount('HOUR', 1200, [{ quantity: 3.5 }, { quantity: 4 }])).toBe(9000);
+    expect(timesheetAmount('TASK', 5000, [{ quantity: 2 }])).toBe(10000);
+    expect(timesheetAmount('MONTH', 30000, [])).toBe(30000);
+  });
+  it('groups days into weeks starting on Monday', () => {
+    expect(weekOf('2026-09-27')).toBe('2026-09-21');
+    expect(weekOf('2026-09-28')).toBe('2026-09-28');
+  });
+  it("keeps to the job's weekly hours and the 20-hour limit across jobs", () => {
+    const week = [{ date: '2026-09-28', quantity: 4 }, { date: '2026-09-29', quantity: 4 }];
+    expect(hoursProblems(week, 10)).toEqual([]);
+    expect(hoursProblems(week, 6)[0]).toMatch("more than this job's 6 hours");
+    expect(hoursProblems(week, 10, { '2026-09-28': 14 })[0]).toMatch('20-hour weekly limit');
+    expect(hoursProblems([{ date: '2026-09-28', quantity: 2.3 }], 10)[0]).toMatch('quarter hours');
+  });
+});

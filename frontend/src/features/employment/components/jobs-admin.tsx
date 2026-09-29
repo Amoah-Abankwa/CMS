@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatCedis, PAY_UNIT_LABEL, type JobPayUnit } from '@anu/shared';
+import { formatCedis, PAY_UNIT_LABEL, type JobPayUnit, JOB_KIND_LABEL } from '@anu/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -15,8 +15,8 @@ import { errorMessage } from '@/lib/axios';
 import { formatDate } from '@/lib/format';
 import { workApi, type AdminJob, type Job } from '../api';
 
-const STATUS_TONE = { DRAFT: 'neutral', OPEN: 'success', CLOSED: 'neutral' } as const;
-const STATUS_LABEL = { DRAFT: 'Draft', OPEN: 'Open', CLOSED: 'Closed' } as const;
+const STATUS_TONE = { DRAFT: 'neutral', PENDING_REVIEW: 'warning', OPEN: 'success', CLOSED: 'neutral' } as const;
+const STATUS_LABEL = { DRAFT: 'Draft', PENDING_REVIEW: 'Waiting for approval', OPEN: 'Open', CLOSED: 'Closed' } as const;
 
 export function JobsAdmin() {
   const [jobs, setJobs] = useState<AdminJob[] | null>(null);
@@ -45,14 +45,14 @@ export function JobsAdmin() {
             {jobs.map((j) => (
               <li key={j.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <Link href={`/employment/jobs/${j.id}`} className="min-w-0 text-sm hover:underline">
-                  <span className="flex flex-wrap items-center gap-2 font-medium">{j.title} <Badge tone={STATUS_TONE[j.status]}>{STATUS_LABEL[j.status]}</Badge>{j.waiting > 0 && <Badge tone="primary">{j.waiting} new</Badge>}</span>
+                  <span className="flex flex-wrap items-center gap-2 font-medium">{j.title} {j.kind && j.kind !== 'CAMPUS_JOB' && <Badge>{JOB_KIND_LABEL[j.kind]}</Badge>} <Badge tone={STATUS_TONE[j.status]}>{STATUS_LABEL[j.status]}</Badge>{j.waiting > 0 && <Badge tone="primary">{j.waiting} new</Badge>}</span>
                   <span className="block text-xs text-muted">
                     {j.unit}. {formatCedis(j.payRate)} {PAY_UNIT_LABEL[j.payUnit]}, {j.hoursPerWeek} h a week. {j.hired} of {j.positions} hired, {j.applicants} applicants. Closes {formatDate(j.closesAt)}.
                   </span>
                 </Link>
                 <span className="flex shrink-0 gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setEditing(j)}>Edit</Button>
-                  {j.status !== 'OPEN' && <Button variant="secondary" size="sm" onClick={() => setStatus(j, 'OPEN')}>Open</Button>}
+                  {j.status !== 'OPEN' && <Button variant="secondary" size="sm" onClick={() => setStatus(j, 'OPEN')}>{j.status === 'PENDING_REVIEW' ? 'Approve and open' : 'Open'}</Button>}
                   {j.status === 'OPEN' && <Button variant="secondary" size="sm" onClick={() => setStatus(j, 'CLOSED')}>Close</Button>}
                 </span>
               </li>

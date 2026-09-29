@@ -1,3 +1,4 @@
+import { RequireRecentMfa } from '../../common/decorators/require-recent-mfa.decorator';
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { PermissionResolverService } from '../rbac/permission-resolver.service';
@@ -17,7 +18,7 @@ import { FeesService } from './fees.service';
 import { DuesService } from './dues.service';
 import { HallChargesService } from './hall-charges.service';
 import {
-  AdjustmentDto, AssociationDto, BillsQuery, ClearanceRuleDto, ExchangeRateDto, FeeItemDto, CashDto, CopySchedulesDto, DuesPayoutDto, FeeRulesDto, LevyDto, LevyOpenDto, OfficerDto, PayFeesDto, ReasonDto, RecordFeePaymentDto, ScheduleDto, SemesterBody,
+  AdjustmentDto, AssociationDto, PatronDto, BillsQuery, ClearanceRuleDto, ExchangeRateDto, InstalmentPlanDto, StatementApplyDto, StatementDto, FeeItemDto, CashDto, CopySchedulesDto, DuesPayoutDto, FeeRulesDto, LevyDto, LevyOpenDto, OfficerDto, PayFeesDto, ReasonDto, RecordFeePaymentDto, ScheduleDto, SemesterBody,
 } from './dto/fees.dto';
 
 /** Finance Office: schedules, bills, payments, clearance rule, and paying associations their online dues. */
@@ -34,6 +35,10 @@ export class FeesAdminController {
     return (await this.rules.setFinance(dto)).after;
   }
 
+  @Get('instalments/:semesterId') instalments(@Param('semesterId', ParseUUIDPipe) id: string) { return this.fees.instalmentPlan(id); }
+  @Put('instalments/:semesterId') setInstalments(@CurrentUser() u: AuthUser, @Param('semesterId', ParseUUIDPipe) id: string, @Body() dto: InstalmentPlanDto) { return this.fees.setInstalmentPlan(u, id, dto.instalments); }
+  @Post('bank-statement/match') @HttpCode(200) matchStatement(@Body() dto: StatementDto) { return this.fees.matchStatement(null, dto.currency, dto.rows); }
+  @Post('bank-statement/apply') @HttpCode(200) @RequireRecentMfa() applyStatement(@CurrentUser() u: AuthUser, @Body() dto: StatementApplyDto) { return this.fees.applyStatement(u, dto.currency, dto.items); }
   @Get('rates') rates() { return this.fees.rates(); }
   @Post('rates') addRate(@CurrentUser() u: AuthUser, @Body() dto: ExchangeRateDto) { return this.fees.addRate(u, dto); }
   @Delete('rates/:id') deleteRate(@Param('id', ParseUUIDPipe) id: string) { return this.fees.deleteRate(id); }
@@ -102,18 +107,27 @@ export class AssociationsAdminController {
   @Put(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssociationDto) { return this.dues.saveAssociation(dto, id); }
   @Post(':id/officers') appoint(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: OfficerDto) { return this.dues.appoint(u, id, dto); }
   @Post('officers/:id/end') @HttpCode(200) end(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto) { return this.dues.endTerm(id, dto.reason); }
+  @Put(':id/patron') patron(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PatronDto) { return this.dues.setPatron(u, id, dto.email ?? null); }
   @Get(':id/receipts') receipts(@Param('id', ParseUUIDPipe) id: string) { return this.dues.receipts(id); }
   @Post('receipts/:id/void') @HttpCode(200) void(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto) { return this.dues.voidPayment(u, id, dto.reason); }
 }
 
-/** Elected association officers. */
+/** The patron (a Head of Department) sets the association's dues; checked in the service. */
+@Controller('dues-patron')
+export class PatronController {
+  constructor(private readonly dues: DuesService) {}
+  @Get() mine(@CurrentUser() u: AuthUser) { return this.dues.myPatronages(u); }
+  @Post(':associationId/levies') levy(@CurrentUser() u: AuthUser, @Param('associationId', ParseUUIDPipe) id: string, @Body() dto: LevyDto) { return this.dues.createLevy(u, id, dto); }
+  @Post('levies/:id/open') @HttpCode(200) open(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LevyOpenDto) { return this.dues.setLevyOpen(u, id, dto.isOpen); }
+  @Get('levies/:id') members(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) { return this.dues.levyMembers(u, id); }
+}
+
+/** Elected association officers: collect cash and see who has paid. */
 @Controller('association')
 @RequirePermission(PERMISSIONS.DUES_COLLECT)
 export class OfficerController {
   constructor(private readonly dues: DuesService) {}
   @Get() mine(@CurrentUser() u: AuthUser) { return this.dues.myOffices(u); }
-  @Post(':associationId/levies') levy(@CurrentUser() u: AuthUser, @Param('associationId', ParseUUIDPipe) id: string, @Body() dto: LevyDto) { return this.dues.createLevy(u, id, dto); }
-  @Post('levies/:id/open') @HttpCode(200) open(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LevyOpenDto) { return this.dues.setLevyOpen(u, id, dto.isOpen); }
   @Get('levies/:id') members(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) { return this.dues.levyMembers(u, id); }
   @Post('levies/:id/cash') cash(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CashDto) { return this.dues.recordCash(u, id, dto.indexNumber); }
 }

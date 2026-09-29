@@ -11,6 +11,9 @@ export interface TitleRow {
   year: number | null;
   edition: string | null;
   callNumber: string | null;
+  hasEbook?: boolean;
+  ebookUrl?: string | null;
+  ebookDocumentId?: string | null;
   subjects: string[];
   copies: number;
   lendable: number;

@@ -125,6 +125,7 @@ export class HostelsController {
 @Controller('me/accommodation')
 export class MyAccommodationController {
   constructor(private readonly student: StudentAccommodationService) {}
+  @Get('roommate') roommate(@CurrentUser() u: AuthUser) { return this.student.roommate(u); }
 
   @Get()
   overview(@CurrentUser() u: AuthUser) {

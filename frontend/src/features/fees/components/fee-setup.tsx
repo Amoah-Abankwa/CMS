@@ -11,6 +11,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Select } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
 import { errorMessage } from '@/lib/axios';
+import { InstalmentPlan } from './instalments-and-statement';
 import { feesApi, type FeeItem, type FeeOptions, type Schedule } from '../api';
 
 /** Fee schedules for a semester, issuing bills, and the clearance rule. */
@@ -37,6 +38,7 @@ export function FeeSetup() {
 
   return (
     <div className="flex flex-col gap-4">
+      <InstalmentPlan />
       {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
       <Card>
         <CardHeader title="Fee schedules" description="What students are charged each semester. Each student gets the most specific schedule that fits them: programme and level, then programme, then level, then everyone."
@@ -70,13 +72,13 @@ export function FeeSetup() {
 }
 
 function RulesCard() {
-  const [r, setR] = useState<{ clearancePercent: number; minOnlinePayment: string; minOnlinePaymentUsd: string } | null>(null);
+  const [r, setR] = useState<{ clearancePercent: number; minOnlinePayment: string; minOnlinePaymentUsd: string; lateFeeEnabled: boolean; lateFee: string; lateFeeUsd: string } | null>(null);
   const [msg, setMsg] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
-  useEffect(() => { feesApi.rules().then((x: FeeRules) => setR({ clearancePercent: x.clearancePercent, minOnlinePayment: String(x.minOnlinePayment / 100), minOnlinePaymentUsd: String(x.minOnlinePaymentUsd / 100) })).catch(() => undefined); }, []);
+  useEffect(() => { feesApi.rules().then((x: FeeRules) => setR({ clearancePercent: x.clearancePercent, minOnlinePayment: String(x.minOnlinePayment / 100), minOnlinePaymentUsd: String(x.minOnlinePaymentUsd / 100), lateFeeEnabled: x.lateFeeEnabled, lateFee: String(x.lateFee / 100), lateFeeUsd: String(x.lateFeeUsd / 100) })).catch(() => undefined); }, []);
   if (!r) return null;
   const save = async () => {
     try {
-      await feesApi.saveRules({ minOnlinePayment: Math.round(Number(r.minOnlinePayment) * 100), minOnlinePaymentUsd: Math.round(Number(r.minOnlinePaymentUsd) * 100) });
+      await feesApi.saveRules({ minOnlinePayment: Math.round(Number(r.minOnlinePayment) * 100), minOnlinePaymentUsd: Math.round(Number(r.minOnlinePaymentUsd) * 100), lateFeeEnabled: r.lateFeeEnabled, lateFee: Math.round(Number(r.lateFee) * 100), lateFeeUsd: Math.round(Number(r.lateFeeUsd) * 100) });
       setMsg({ tone: 'success', text: 'Saved.' });
     } catch (err) { setMsg({ tone: 'danger', text: errorMessage(err) }); }
   };
@@ -89,6 +91,14 @@ function RulesCard() {
           <Field label="Smallest online payment (GH₵)" htmlFor="fr-min"><Input id="fr-min" type="number" value={r.minOnlinePayment} onChange={(e) => setR({ ...r, minOnlinePayment: e.target.value })} /></Field>
           <Field label="Smallest online payment (US$)" htmlFor="fr-usd"><Input id="fr-usd" type="number" value={r.minOnlinePaymentUsd} onChange={(e) => setR({ ...r, minOnlinePaymentUsd: e.target.value })} /></Field>
         </div>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={r.lateFeeEnabled} onChange={(e) => setR({ ...r, lateFeeEnabled: e.target.checked })} /> Charge for late payment (off by default)</label>
+        {r.lateFeeEnabled && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Charge per missed instalment (GH₵)" htmlFor="fr-lf"><Input id="fr-lf" type="number" value={r.lateFee} onChange={(e) => setR({ ...r, lateFee: e.target.value })} /></Field>
+            <Field label="On dollar bills (US$)" htmlFor="fr-lfu"><Input id="fr-lfu" type="number" value={r.lateFeeUsd} onChange={(e) => setR({ ...r, lateFeeUsd: e.target.value })} /></Field>
+          </div>
+        )}
+        {r.lateFeeEnabled && <p className="text-xs text-muted">Each morning, a bill that has not reached an instalment's share by its date gets this charge once for that instalment. It shows on the student's statement and can be waived like any charge.</p>}
         <div><Button variant="secondary" onClick={save}>Save</Button></div>
       </CardBody>
     </Card>

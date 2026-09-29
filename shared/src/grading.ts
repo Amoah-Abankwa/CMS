@@ -58,11 +58,28 @@ export function gradeFor(total: number, bands: Band[]): Band {
   return sorted.find((b) => total >= b.minScore) ?? sorted[sorted.length - 1];
 }
 
-export function weightsProblem(components: Component[]): string | null {
+/**
+ * Assessments must add up to 100%, or to 95% when morning devotion supplies the last 5% of every
+ * course (ANU's policy, switched on by the Registrar).
+ */
+export function weightsProblem(components: Component[], target = 100): string | null {
   if (components.length === 0) return 'Add at least one assessment.';
   const sum = round2(components.reduce((s, c) => s + c.weight, 0));
-  if (sum !== 100) return `The weights add up to ${sum}%. They must add up to exactly 100%.`;
+  if (sum !== target) return `The weights add up to ${sum}%. They must add up to exactly ${target}%${target === 95 ? ', because morning devotion adds the last 5%' : ''}.`;
   return null;
+}
+
+/** Share of every course that morning devotion supplies when it counts in course totals. */
+export const DEVOTION_SHARE = 5;
+
+/**
+ * A course total with morning devotion. Course marks are out of 95 and the devotion score (out of 5)
+ * is added. Students exempt from devotion (weekend students) have their 95 scaled to 100 instead.
+ * Rounded to a whole number, half up, before grading.
+ */
+export function courseTotalWithDevotion(courseMarks: number, devotion: { score: number } | { exempt: true }) {
+  const raw = 'exempt' in devotion ? (courseMarks * 100) / (100 - DEVOTION_SHARE) : courseMarks + devotion.score;
+  return Math.round(Math.min(100, raw) + 1e-9);
 }
 
 /**
@@ -114,8 +131,9 @@ export function carryOverCourses(attempts: Array<{ courseId: string; isPass: boo
 }
 
 /** The new result after an amendment: the scores as corrected, graded on the sheet's own scale. */
-export function amendedResult(ca: number, exam: number, bands: Band[]) {
-  const total = Math.round(ca + exam + 1e-9);
+export function amendedResult(ca: number, exam: number, bands: Band[], devotion?: { score: number } | { exempt: true } | null) {
+  // The student's devotion part (or weekend scaling) stays as it was when the results were published.
+  const total = devotion ? courseTotalWithDevotion(ca + exam, devotion) : Math.round(ca + exam + 1e-9);
   const band = gradeFor(total, bands);
   return { caScore: round2(ca), examScore: round2(exam), total, grade: band.letter, gradePoint: band.gradePoint, isPass: band.isPass, incomplete: false };
 }

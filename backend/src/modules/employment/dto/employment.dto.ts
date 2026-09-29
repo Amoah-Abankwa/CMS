@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, IsArray, ArrayMaxSize, ValidateNested } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const PHONE = /^(\+?233|0)?\d{9}$/;
@@ -18,13 +18,35 @@ export class JobDto {
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(80) unit: string;
   @Transform(trim) @IsString() @MinLength(20) @MaxLength(3000) description: string;
   @Type(() => Number) @IsInt() @Min(1) @Max(20) hoursPerWeek: number;
-  @Type(() => Number) @IsInt() @Min(100) @Max(500_000) payRate: number;
+  /** 0 for an unpaid internship. */
+  @Type(() => Number) @IsInt() @Min(0) @Max(500_000) payRate: number;
   @IsIn(['HOUR', 'MONTH', 'TASK']) payUnit: 'HOUR' | 'MONTH' | 'TASK';
   @Type(() => Number) @IsInt() @Min(1) @Max(50) positions: number;
   @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(4) minCgpa?: number | null;
   @IsDateString() closesAt: string;
   /** The staff member the student reports to. */
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() || undefined : value)) @IsOptional() @IsEmail() supervisorEmail?: string;
+  @IsOptional() @IsIn(['CAMPUS_JOB', 'INTERNSHIP', 'TEACHING_ASSISTANT', 'RESEARCH_ASSISTANT']) kind?: 'CAMPUS_JOB' | 'INTERNSHIP' | 'TEACHING_ASSISTANT' | 'RESEARCH_ASSISTANT';
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(120) organisation?: string;
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(120) location?: string;
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(500) applyUrl?: string;
+}
+
+export class PayoutDetailsDto {
+  @IsIn(['MTN', 'Telecel', 'AirtelTigo']) network: string;
+  @Transform(trim) @IsString() @MinLength(9) @MaxLength(15) number: string;
+  @Transform(trim) @IsString() @MinLength(3) @MaxLength(80) name: string;
+}
+
+export class TimesheetEntryDto {
+  @IsDateString() date: string;
+  @Type(() => Number) @IsNumber() @Min(0.25) @Max(12) quantity: number;
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(200) note?: string;
+}
+
+export class TimesheetDto {
+  @IsArray() @ArrayMaxSize(62) @ValidateNested({ each: true }) @Type(() => TimesheetEntryDto) entries: TimesheetEntryDto[];
+  @Transform(trim) @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 
 export class JobStatusDto {

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
 import { errorMessage } from '@/lib/axios';
 import { feesApi, type DuesSettlement } from '../api';
+import { PayNowButton } from './pay-now';
 
 /** Online dues the university holds for each association, and payouts to them. */
 export function DuesSettlements() {
@@ -29,7 +30,7 @@ export function DuesSettlements() {
             <li key={a.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <span><span className="font-medium">{a.code}</span> {a.name}
                 <span className="block text-xs text-muted">Online {formatCedis(a.online)}, paid out {formatCedis(a.paidOut)}. Cash held by officers {formatCedis(a.cash)}. Payout: {a.payoutNumber ? `${a.payoutNetwork} ${a.payoutNumber}, ${a.payoutName ?? ''}` : 'not set by the Dean of Students office'}.</span></span>
-              <span className="flex items-center gap-3"><span className="font-medium tabular-nums">{formatCedis(a.owed)} owed</span>{a.owed > 0 && <Button size="sm" variant="secondary" onClick={() => setPaying(a)}>Record payout</Button>}</span>
+              <span className="flex items-center gap-3"><span className="font-medium tabular-nums">{formatCedis(a.owed)} owed</span>{a.owed > 0 && <PayNowButton purpose="ASSOCIATION" subjectId={a.id} amount={a.owed} label={a.code} onDone={load} />}{a.owed > 0 && <Button size="sm" variant="secondary" onClick={() => setPaying(a)}>Record payout</Button>}</span>
             </li>
           ))}
         </ul>

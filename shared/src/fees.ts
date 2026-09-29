@@ -92,14 +92,21 @@ export interface FeeRules {
   minOnlinePayment: number;
   /** The same for bills in US dollars (cents). */
   minOnlinePaymentUsd: number;
+  /** Late payment charges: off unless the Finance Office turns them on. */
+  lateFeeEnabled: boolean;
+  /** Charged once for each instalment missed: pesewas on cedi bills, cents on dollar bills. */
+  lateFee: number;
+  lateFeeUsd: number;
 }
-export const DEFAULT_FEE_RULES: FeeRules = { clearancePercent: 70, minOnlinePayment: 5000, minOnlinePaymentUsd: 1000 };
+export const DEFAULT_FEE_RULES: FeeRules = { clearancePercent: 70, minOnlinePayment: 5000, minOnlinePaymentUsd: 1000, lateFeeEnabled: false, lateFee: 5000, lateFeeUsd: 500 };
 
 export function validateFeeRules(r: FeeRules): string[] {
   const p: string[] = [];
   if (!(r.clearancePercent >= 1 && r.clearancePercent <= 100)) p.push('The clearance percentage must be between 1 and 100.');
   if (!(r.minOnlinePayment >= 100 && r.minOnlinePayment <= 500_000)) p.push('The smallest online payment must be between GH₵ 1.00 and GH₵ 5,000.00.');
   if (!(r.minOnlinePaymentUsd >= 100 && r.minOnlinePaymentUsd <= 100_000)) p.push('The smallest dollar payment must be between US$ 1.00 and US$ 1,000.00.');
+  const lf = r.lateFee ?? 0, lfu = r.lateFeeUsd ?? 0;
+  if (!(lf >= 0 && lf <= 1_000_000) || !(lfu >= 0 && lfu <= 100_000)) p.push('The late payment charge is out of range.');
   return p;
 }
 
@@ -196,4 +203,40 @@ export type DispatchFeeSettlement = 'UNIVERSITY' | 'VENDOR' | 'CUSTOMER';
 export function dispatchFeeSettlement(mode: DispatchFeeMode, payment: 'ONLINE' | 'ON_PICKUP'): DispatchFeeSettlement {
   if (mode === 'ON_DELIVERY') return 'CUSTOMER';
   return payment === 'ONLINE' ? 'UNIVERSITY' : 'VENDOR';
+}
+
+// ----- Instalments -----
+
+/** A semester's instalment plan: by each date, at least this share of the bill must be paid (rising to 100). */
+export interface Instalment { dueDate: string; cumulativePercent: number }
+
+export function instalmentPlanProblem(plan: Instalment[]): string | null {
+  if (!plan.length) return 'Add at least one instalment.';
+  for (let i = 0; i < plan.length; i++) {
+    const p = plan[i];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.dueDate)) return 'Each instalment needs a date.';
+    if (!(p.cumulativePercent > 0 && p.cumulativePercent <= 100)) return 'Each share must be between 1% and 100%.';
+    if (i > 0 && (p.dueDate <= plan[i - 1].dueDate || p.cumulativePercent <= plan[i - 1].cumulativePercent)) return 'Dates and shares must both go up from one instalment to the next.';
+  }
+  if (plan[plan.length - 1].cumulativePercent !== 100) return 'The last instalment must bring the total to 100%.';
+  return null;
+}
+
+/**
+ * Where a bill stands against the plan on a day: the next instalment and what must be paid by then,
+ * and every instalment whose date has passed without enough paid.
+ */
+export function instalmentStatus(due: number, paid: number, plan: Instalment[], today: string) {
+  const need = (p: Instalment) => Math.ceil((due * p.cumulativePercent) / 100);
+  const missed = plan.map((p, i) => ({ ...p, index: i, required: need(p) })).filter((p) => p.dueDate < today && paid < p.required);
+  const next = plan.map((p, i) => ({ ...p, index: i, required: need(p) })).find((p) => p.dueDate >= today && paid < p.required) ?? null;
+  return { missed, next: next ? { ...next, toPay: next.required - paid } : null };
+}
+
+// ----- Bank statements -----
+
+/** Index numbers mentioned in a bank narration (e.g. "FEES ANU25400001 AMA MENSAH"). */
+export function indexNumbersIn(narration: string): string[] {
+  const found = narration.toUpperCase().match(/\b[A-Z]{1,6}[/-]?\d{2}[/-]?[A-Z0-9]{0,4}[/-]?\d{3,6}\b/g) ?? [];
+  return [...new Set(found.filter((t) => /\d{5,}/.test(t.replace(/[^0-9]/g, ''))))];
 }

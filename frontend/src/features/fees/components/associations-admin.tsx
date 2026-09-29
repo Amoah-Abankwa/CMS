@@ -34,6 +34,10 @@ export function AssociationsAdmin() {
           <CardBody className="flex flex-col gap-3 text-sm">
             <div>
               <p className="mb-1 font-medium">Officers</p>
+              <p className="flex flex-wrap items-center gap-2">
+                <span><span className="font-medium">Patron:</span> {a.patron ? `${a.patron.firstName} ${a.patron.lastName} (${a.patron.email ?? ''})` : 'none. The patron, a Head of Department of one of its departments, sets the dues.'}</span>
+                <Button size="sm" variant="ghost" onClick={() => { const email = window.prompt(`Staff email of ${a.code}'s patron (a Head of Department of one of its departments). Leave empty to clear.`, a.patron?.email ?? ''); if (email === null) return; feesApi.setPatron(a.id, email.trim() || null).then(load).catch((err) => window.alert(errorMessage(err))); }}>{a.patron ? 'Change patron' : 'Name patron'}</Button>
+              </p>
               {a.officers.length === 0 ? <p className="text-muted">None recorded. Record the elected president after the election.</p> : (
                 <ul className="flex flex-col gap-1">
                   {a.officers.map((o) => (

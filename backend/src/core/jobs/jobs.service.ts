@@ -13,6 +13,8 @@ export const QUEUES = {
   DISPATCH_MINUTELY: 'dispatch-every-5-minutes',
   EMPLOYMENT_DAILY: 'employment-daily',
   HOUSEKEEPING: 'housekeeping',
+  FEES_LATE_CHARGES: 'fees-late-charges',
+  CLOUDINARY_DESTROY: 'cloudinary-destroy',
   ASSOCIATION_TERMS: 'association-terms',
 } as const;
 

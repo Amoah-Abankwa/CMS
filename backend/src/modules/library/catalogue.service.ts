@@ -28,7 +28,7 @@ export class CatalogueService {
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
         select: {
-          id: true, title: true, subtitle: true, authors: true, isbn: true, publisher: true, year: true, edition: true, callNumber: true, subjects: true,
+          id: true, title: true, subtitle: true, authors: true, isbn: true, publisher: true, year: true, edition: true, callNumber: true, ebookUrl: true, ebookDocumentId: true, subjects: true,
           copies: { select: { status: true, isReference: true } },
           _count: { select: { reservations: { where: { status: { in: ['WAITING', 'READY'] } } } } },
         },
@@ -39,8 +39,9 @@ export class CatalogueService {
       total,
       page: q.page,
       pageSize: q.pageSize,
-      items: rows.map(({ copies, _count, ...t }) => ({
+      items: rows.map(({ copies, _count, ebookDocumentId, ...t }) => ({
         ...t,
+        hasEbook: !!(t.ebookUrl || ebookDocumentId),
         copies: copies.length,
         lendable: copies.filter((c) => !c.isReference && !['LOST', 'WITHDRAWN'].includes(c.status)).length,
         available: copies.filter((c) => c.status === 'AVAILABLE' && !c.isReference).length,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatCedis } from '@anu/shared';
+import { PayNowButton } from '@/features/fees/components/pay-now';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -79,7 +80,7 @@ export function Settlements() {
                     <td className="px-3 py-2 text-right tabular-nums">{formatCedis(r.paidOut)}</td>
                     <td className="px-3 py-2 text-right font-medium tabular-nums">{formatCedis(r.owed)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted">{formatCedis(r.counterGross)}<span className="block text-xs">{r.counterOrders} orders</span></td>
-                    <td className="px-4 py-2 text-right">{r.owed > 0 && <Button variant="secondary" size="sm" onClick={() => setPaying(r)}>Record payout</Button>}</td>
+                    <td className="px-4 py-2 text-right">{r.owed > 0 && <span className="inline-flex items-start gap-2"><PayNowButton purpose="VENDOR" subjectId={r.vendor.id} amount={r.owed} label={r.vendor.name} period={range()} onDone={load} /><Button variant="secondary" size="sm" onClick={() => setPaying(r)}>Record payout</Button></span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -146,7 +147,7 @@ function DispatcherSettlements({ period }: { period: { from: string; to: string 
                   <td className="px-3 py-2 text-right tabular-nums">{r.deliveries}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCedis(r.earned)}</td>
                   <td className="px-3 py-2 text-right font-medium tabular-nums">{formatCedis(r.owed)}</td>
-                  <td className="px-4 py-2 text-right">{r.owed > 0 && <Button variant="secondary" size="sm" onClick={() => open(r)}>Record payout</Button>}</td>
+                  <td className="px-4 py-2 text-right">{r.owed > 0 && <span className="inline-flex items-start gap-2"><PayNowButton purpose="DISPATCHER" subjectId={r.id} amount={r.owed} label={`${r.student.firstName} ${r.student.lastName}`} period={period} onDone={() => window.location.reload()} /><Button variant="secondary" size="sm" onClick={() => open(r)}>Record payout</Button></span>}</td>
                 </tr>
               ))}
             </tbody>

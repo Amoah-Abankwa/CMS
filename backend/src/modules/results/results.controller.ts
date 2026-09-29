@@ -152,12 +152,12 @@ export class ResultSheetsController {
 @Controller('me')
 export class MyResultsController {
   constructor(
-    private readonly studentResults: StudentResultsService,
+    private readonly resultsService: StudentResultsService,
   ) {}
 
   @Get('results')
   results(@CurrentUser() user: AuthUser) {
-    return this.studentResults.results(user);
+    return this.resultsService.results(user);
   }
 
   @Get('internals')
@@ -165,6 +165,6 @@ export class MyResultsController {
     @CurrentUser() user: AuthUser,
     @Query() q: SemesterQuery,
   ) {
-    return this.studentResults.internals(user, q.semesterId);
+    return this.resultsService.internals(user, q.semesterId);
   }
 }

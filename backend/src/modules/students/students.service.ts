@@ -4,24 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-
-import { ROLE_KEYS, indexPrefix, renderIndexNumber } from '@anu/shared';
-
-import { AuthUser } from '../../common/decorators/current-user.decorator';
-
+import { ROLE_KEYS } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { normaliseGhanaPhone } from '../../core/sms/sms.provider';
 import { loadEnv } from '../../core/config/env';
-
 import { AuditService } from '../audit/audit.service';
 import { AccountSetupService } from '../account-setup/account-setup.service';
-
 import { Prisma } from '../../generated/prisma/client';
-
-import {
-  ListStudentsDto,
-  RegisterStudentDto,
-} from './dto/student.dto';
+import { indexPrefix, renderIndexNumber } from '@anu/shared';
+import { ListStudentsDto, RegisterStudentDto } from './dto/student.dto';
+import type { AuthUser } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
 export class StudentsService {
@@ -37,7 +29,6 @@ export class StudentsService {
    */
   async register(dto: RegisterStudentDto) {
     let phone: string;
-
     try {
       phone = normaliseGhanaPhone(dto.phone);
     } catch (e) {
@@ -47,11 +38,10 @@ export class StudentsService {
       });
     }
 
-    const programme =
-      await this.prisma.programme.findUnique({
-        where: { id: dto.programmeId },
-        include: { level: true },
-      });
+    const programme = await this.prisma.programme.findUnique({
+      where: { id: dto.programmeId },
+      include: { level: true },
+    });
 
     if (!programme || !programme.isActive) {
       throw new BadRequestException({
@@ -63,137 +53,119 @@ export class StudentsService {
     if (!programme.level.isActive) {
       throw new BadRequestException({
         code: 'LEVEL_INACTIVE',
-        message:
-          'This programme level is not accepting registrations.',
+        message: 'This programme level is not accepting registrations.',
       });
     }
 
-    const studentRole =
-      await this.prisma.role.findUniqueOrThrow({
-        where: { key: ROLE_KEYS.STUDENT },
-      });
+    const studentRole = await this.prisma.role.findUniqueOrThrow({
+      where: { key: ROLE_KEYS.STUDENT },
+    });
 
     try {
-      const created =
-        await this.prisma.$transaction(async (tx) => {
-          // The Registrar's format for this programme type decides the number.
-          // The counter is keyed by everything except the running number, so
-          // formats that share a prefix share a sequence, and a new counter
-          // starts after the highest number already issued with that prefix.
-          const format = programme.level.indexFormat;
+      const created = await this.prisma.$transaction(async (tx) => {
+        // The Registrar's format for this programme type decides the number.
+        // The counter is keyed by everything except the running number, so
+        // formats that share a prefix share a sequence, and a new counter
+        // starts after the highest number already issued with that prefix.
+        const format = programme.level.indexFormat;
 
-          let prefix: string;
-
-          try {
-            prefix = indexPrefix(
-              format,
-              dto.admissionYear,
-              programme.levelCode,
-              programme.indexCode,
-            );
-          } catch (e) {
-            throw new BadRequestException({
-              code: 'INDEX_CODE',
-              message: (e as Error).message,
-            });
-          }
-
-          const digits =
-            Number(
-              /\{SEQ:(\d)\}/.exec(format)?.[1] ?? 5,
-            );
-
-          const pattern =
-            `^${prefix.replace(/[/-]/g, '\\$&')}[0-9]{${digits}}$`;
-
-          const [counter] =
-            await tx.$queryRaw<{ lastValue: number }[]>`
-              INSERT INTO "IndexNumberCounter"
-                ("admissionYear", "levelCode", "lastValue", "updatedAt")
-              VALUES (
-                ${dto.admissionYear},
-                ${prefix},
-                (
-                  SELECT COALESCE(
-                    MAX(
-                      CAST(
-                        RIGHT("indexNumber", ${digits})
-                        AS INTEGER
-                      )
-                    ),
-                    0
-                  ) + 1
-                  FROM "User"
-                  WHERE "indexNumber" ~ ${pattern}
-                ),
-                NOW()
-              )
-              ON CONFLICT ("admissionYear", "levelCode")
-              DO UPDATE SET
-                "lastValue" =
-                  "IndexNumberCounter"."lastValue" + 1,
-                "updatedAt" = NOW()
-              RETURNING "lastValue"
-            `;
-
-          const indexNumber = renderIndexNumber(
+        let prefix: string;
+        try {
+          prefix = indexPrefix(
             format,
-            {
-              year: dto.admissionYear,
-              code: programme.levelCode,
-              sequence: Number(counter.lastValue),
-              programmeCode: programme.indexCode,
-            },
+            dto.admissionYear,
+            programme.levelCode,
+            programme.indexCode,
           );
-
-          return tx.user.create({
-            data: {
-              type: 'STUDENT',
-              firstName: dto.firstName,
-              middleName: dto.middleName,
-              lastName: dto.lastName,
-              email: dto.email,
-              phone,
-              indexNumber,
-
-              // No password yet: the student chooses one from the emailed setup link.
-              status: 'PENDING_SETUP',
-
-              primaryRoleKey: ROLE_KEYS.STUDENT,
-              isDemo: loadEnv().DEMO_MODE,
-
-              roles: {
-                create: {
-                  roleId: studentRole.id,
-                },
-              },
-
-              studentProfile: {
-                create: {
-                  programmeId: programme.id,
-                  levelCode: programme.levelCode,
-                  admissionYear: dto.admissionYear,
-                  dateOfBirth: dto.dateOfBirth
-                    ? new Date(dto.dateOfBirth)
-                    : undefined,
-                  gender: dto.gender,
-                  nationality: dto.nationality,
-                },
-              },
-            },
-
-            select: {
-              id: true,
-              indexNumber: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-              status: true,
-              studentProfile: true,
-            },
+        } catch (e) {
+          throw new BadRequestException({
+            code: 'INDEX_CODE',
+            message: (e as Error).message,
           });
+        }
+
+        const digits = Number(
+          /\{SEQ:(\d)\}/.exec(format)?.[1] ?? 5,
+        );
+
+        const pattern = `^${prefix.replace(/[/-]/g, '\\$&')}[0-9]{${digits}}$`;
+
+        const [counter] = await tx.$queryRaw<{ lastValue: number }[]>`
+          INSERT INTO "IndexNumberCounter" ("admissionYear", "levelCode", "lastValue", "updatedAt")
+          VALUES (
+            ${dto.admissionYear},
+            ${prefix},
+            (
+              SELECT COALESCE(
+                MAX(CAST(RIGHT("indexNumber", ${digits}) AS INTEGER)),
+                0
+              ) + 1
+              FROM "User"
+              WHERE "indexNumber" ~ ${pattern}
+            ),
+            NOW()
+          )
+          ON CONFLICT ("admissionYear", "levelCode")
+          DO UPDATE SET
+            "lastValue" = "IndexNumberCounter"."lastValue" + 1,
+            "updatedAt" = NOW()
+          RETURNING "lastValue"
+        `;
+
+        const indexNumber = renderIndexNumber(format, {
+          year: dto.admissionYear,
+          code: programme.levelCode,
+          sequence: Number(counter.lastValue),
+          programmeCode: programme.indexCode,
         });
+
+        return tx.user.create({
+          data: {
+            type: 'STUDENT',
+            firstName: dto.firstName,
+            middleName: dto.middleName,
+            lastName: dto.lastName,
+            email: dto.email,
+            phone,
+            indexNumber,
+
+            // No password yet: the student chooses one from the emailed setup link.
+            status: 'PENDING_SETUP',
+            primaryRoleKey: ROLE_KEYS.STUDENT,
+            isDemo: loadEnv().DEMO_MODE,
+
+            roles: {
+              create: {
+                roleId: studentRole.id,
+              },
+            },
+
+            studentProfile: {
+              create: {
+                programmeId: programme.id,
+                levelCode: programme.levelCode,
+                admissionYear: dto.admissionYear,
+                dateOfBirth: dto.dateOfBirth
+                  ? new Date(dto.dateOfBirth)
+                  : undefined,
+                gender: dto.gender,
+                nationality: dto.nationality,
+              },
+            },
+          },
+
+          select: {
+            id: true,
+            indexNumber: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            status: true,
+            studentProfile: true,
+          },
+        });
+      });
 
       await this.audit.record({
         action: 'student.registered',
@@ -213,8 +185,7 @@ export class StudentsService {
       ) {
         throw new ConflictException({
           code: 'EMAIL_TAKEN',
-          message:
-            'An account with this email already exists.',
+          message: 'An account with this email already exists.',
         });
       }
 
@@ -223,16 +194,15 @@ export class StudentsService {
   }
 
   async resendSetup(id: string) {
-    const student =
-      await this.prisma.user.findFirst({
-        where: {
-          id,
-          type: 'STUDENT',
-        },
-        select: {
-          id: true,
-        },
-      });
+    const student = await this.prisma.user.findFirst({
+      where: {
+        id,
+        type: 'STUDENT',
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!student) {
       throw new NotFoundException({
@@ -298,46 +268,43 @@ export class StudentsService {
         : {}),
     };
 
-    const [items, total] =
-      await this.prisma.$transaction([
-        this.prisma.user.findMany({
-          where,
-          orderBy: {
-            indexNumber: 'asc',
-          },
-          skip: (q.page - 1) * q.pageSize,
-          take: q.pageSize,
-
-          select: {
-            id: true,
-            indexNumber: true,
-            firstName: true,
-            middleName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-            status: true,
-            isDemo: true,
-
-            studentProfile: {
-              select: {
-                admissionYear: true,
-                currentLevel: true,
-                programme: {
-                  select: {
-                    code: true,
-                    name: true,
-                  },
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        orderBy: {
+          indexNumber: 'asc',
+        },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        select: {
+          id: true,
+          indexNumber: true,
+          firstName: true,
+          middleName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          status: true,
+          isDemo: true,
+          studentProfile: {
+            select: {
+              admissionYear: true,
+              currentLevel: true,
+              programme: {
+                select: {
+                  code: true,
+                  name: true,
                 },
               },
             },
           },
-        }),
+        },
+      }),
 
-        this.prisma.user.count({
-          where,
-        }),
-      ]);
+      this.prisma.user.count({
+        where,
+      }),
+    ]);
 
     return {
       items,
@@ -348,41 +315,38 @@ export class StudentsService {
   }
 
   async get(id: string) {
-    const student =
-      await this.prisma.user.findFirst({
-        where: {
-          id,
-          type: 'STUDENT',
-        },
-
-        select: {
-          id: true,
-          indexNumber: true,
-          firstName: true,
-          middleName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          status: true,
-          createdAt: true,
-
-          studentProfile: {
-            include: {
-              programme: {
-                select: {
-                  code: true,
-                  name: true,
-                  department: {
-                    select: {
-                      name: true,
-                    },
+    const student = await this.prisma.user.findFirst({
+      where: {
+        id,
+        type: 'STUDENT',
+      },
+      select: {
+        id: true,
+        indexNumber: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        studentProfile: {
+          include: {
+            programme: {
+              select: {
+                code: true,
+                name: true,
+                department: {
+                  select: {
+                    name: true,
                   },
                 },
               },
             },
           },
         },
-      });
+      },
+    });
 
     if (!student) {
       throw new NotFoundException({
@@ -408,25 +372,20 @@ export class StudentsService {
   async setStatus(
     actor: AuthUser,
     id: string,
-    status:
-      | 'ACTIVE'
-      | 'SUSPENDED'
-      | 'DEACTIVATED',
+    status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED',
     reason: string,
   ) {
-    const student =
-      await this.prisma.user.findFirst({
-        where: {
-          id,
-          type: 'STUDENT',
-        },
-
-        select: {
-          id: true,
-          status: true,
-          indexNumber: true,
-        },
-      });
+    const student = await this.prisma.user.findFirst({
+      where: {
+        id,
+        type: 'STUDENT',
+      },
+      select: {
+        id: true,
+        status: true,
+        indexNumber: true,
+      },
+    });
 
     if (!student) {
       throw new NotFoundException({

@@ -7,6 +7,8 @@ const hex = (len: number) => z.string().regex(new RegExp(`^[0-9a-fA-F]{${len}}$`
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
+  /** Proxies in front of the backend to trust for the visitor's address: a hop count, or addresses and ranges. See docs/DEPLOYMENT.md. */
+  TRUST_PROXY: z.string().default('1'),
   WEB_ORIGIN: z.string().url(),
   DATABASE_URL: z.string().min(1),
   DIRECT_URL: z.string().min(1),

@@ -39,3 +39,31 @@ describe('library rules', () => {
     expect(validateLibraryPolicy(P)).toEqual([]);
   });
 });
+
+import { illNext, libraryClearance, readingShortfall } from '@anu/shared';
+
+describe('library clearance for graduation', () => {
+  it('is clear only with nothing out and nothing owed', () => {
+    expect(libraryClearance({ booksOut: 0, interLibraryOut: 0, finesOwed: 0 })).toEqual({ clear: true, reasons: [] });
+    const r = libraryClearance({ booksOut: 2, interLibraryOut: 1, finesOwed: 1200 });
+    expect(r.clear).toBe(false);
+    expect(r.reasons).toHaveLength(3);
+    expect(r.reasons[2]).toBe('GH₵ 12.00 in library fines to pay.');
+  });
+});
+
+describe('inter-library loans', () => {
+  it('moves only forward', () => {
+    expect(illNext('REQUESTED')).toEqual(['ORDERED', 'REJECTED']);
+    expect(illNext('ARRIVED')).toContain('ON_LOAN');
+    expect(illNext('RETURNED')).toEqual([]);
+  });
+});
+
+describe('reading list demand', () => {
+  it('flags essential titles short of copies, unless there is an e-book', () => {
+    expect(readingShortfall({ students: 45, copies: 2, hasEbook: false })).toBe(3);
+    expect(readingShortfall({ students: 45, copies: 5, hasEbook: false })).toBe(0);
+    expect(readingShortfall({ students: 45, copies: 0, hasEbook: true })).toBe(0);
+  });
+});

@@ -1,5 +1,6 @@
+import { TransfersService } from '../payments/transfers.service';
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { deliveryArea, formatCedis } from '@anu/shared';
+import { averageStars, deliveryArea, formatCedis } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { JobsService, QUEUES } from '../../core/jobs/jobs.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -28,9 +29,21 @@ export class DispatchService implements OnModuleInit {
     private readonly rules: EmploymentRulesService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly transfers: TransfersService,
   ) {}
 
   async onModuleInit() {
+    this.transfers.register('DISPATCHER', {
+      recipient: async (dispatcherId) => {
+        const p = await this.prisma.dispatcherProfile.findUniqueOrThrow({ where: { id: dispatcherId }, select: { payoutNetwork: true, payoutNumber: true, payoutName: true, student: { select: { firstName: true, lastName: true } } } });
+        const row = (await this.settlements('2000-01-01T00:00:00Z', new Date().toISOString())).find((r) => r.id === dispatcherId);
+        return { network: p.payoutNetwork, number: p.payoutNumber, name: p.payoutName, owed: row?.owed ?? 0, label: `${p.student.firstName} ${p.student.lastName}` };
+      },
+      record: async (actorId, dispatcherId, amount, reference, meta) => {
+        const now = new Date().toISOString();
+        await this.recordPayout({ id: actorId } as AuthUser, { dispatcherId, periodFrom: meta.periodFrom ?? now, periodTo: meta.periodTo ?? now, amount, reference, note: 'Paystack transfer' });
+      },
+    });
     await this.jobs.work(QUEUES.DISPATCH_MINUTELY, () => this.tick());
     await this.jobs.schedule(QUEUES.DISPATCH_MINUTELY, '*/5 * * * *');
   }
@@ -89,6 +102,7 @@ export class DispatchService implements OnModuleInit {
       available: available.map((d) => ({ id: d.id, fee: d.fee, feeSettlement: d.feeSettlement, offeredAt: d.offeredAt, number: d.order.number, vendor: d.order.vendor, area: deliveryArea(d.order.deliveryAddress), items: d.order._count.items })),
       mine,
       today: { deliveries: doneToday.length, earned: doneToday.reduce((s, d) => s + d.fee, 0) },
+      rating: averageStars((await this.prisma.orderRating.findMany({ where: { dispatcherId: p.id, dispatcherStars: { not: null } }, select: { dispatcherStars: true } })).map((r) => r.dispatcherStars!)),
     };
   }
 
@@ -148,6 +162,10 @@ export class DispatchService implements OnModuleInit {
   async delivered(user: AuthUser, deliveryId: string, code: string) {
     const { p, d } = await this.mineOrThrow(user, deliveryId);
     await this.orders.move(d.order.id, 'COMPLETED', 'DISPATCHER', { dispatcherId: p.id, code });
+    // Stop holding a location once nothing is being carried.
+    if (!(await this.prisma.delivery.count({ where: { dispatcherId: p.id, status: 'PICKED_UP' } }))) {
+      await this.prisma.dispatcherProfile.update({ where: { id: p.id }, data: { lastLat: null, lastLng: null, lastAccuracy: null, lastLocationAt: null } });
+    }
     return { ok: true, earned: d.fee };
   }
 
@@ -255,5 +273,17 @@ export class DispatchService implements OnModuleInit {
       link: '/dispatch/earnings',
     });
     return payout;
+  }
+
+  /** The dispatcher's phone reports its position while carrying an order; nothing is kept otherwise. */
+  async location(user: AuthUser, dto: { lat: number; lng: number; accuracy?: number }) {
+    const p = await this.profile(user);
+    const carrying = await this.prisma.delivery.count({ where: { dispatcherId: p.id, status: 'PICKED_UP' } });
+    if (!carrying) {
+      await this.prisma.dispatcherProfile.update({ where: { id: p.id }, data: { lastLat: null, lastLng: null, lastAccuracy: null, lastLocationAt: null } });
+      return { sharing: false };
+    }
+    await this.prisma.dispatcherProfile.update({ where: { id: p.id }, data: { lastLat: dto.lat, lastLng: dto.lng, lastAccuracy: dto.accuracy ?? null, lastLocationAt: new Date(), lastSeenAt: new Date() } });
+    return { sharing: true };
   }
 }

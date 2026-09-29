@@ -80,7 +80,7 @@
 - Returned copies go to the next person in the reservation queue and are kept for a set number of days; uncollected copies pass along the queue automatically.
 - Reminders: before the due date, the day after, then weekly (at most three), only between 07:00 and 20:00.
 - Two desks cannot issue the same copy at once.
-- Not yet: library clearance for graduation, e-books and journals, inter-library loans, and linking reading lists to courses (fines can be paid online).
+- Done since: graduation clearance, e-books, inter-library loans and course reading lists (see later sections).
 
 ## Phase 7 notes (food marketplace)
 
@@ -93,7 +93,7 @@
 - Refunds happen automatically when a paid order is declined or cancelled, or when a payment arrives after its order expired. Paystack refunds complete later and are marked refunded by webhook. A refund that fails is logged for Finance to resolve.
 - Online payments are collected into the university's account. **Vendor settlements** shows, per vendor and period, online sales, commission (0% by default), payouts recorded and what is owed. Recording a payout does not send money; Finance pays by mobile money and records the transaction ID. Pay-at-counter money goes straight to the vendor.
 - Vendors deliver with their own staff for now. Student dispatchers come with Phase 8.
-- Not yet: automatic payouts through Paystack transfers, ratings and reviews, meal plans or student wallet, and scheduled orders (dish photos are done).
+- Done since: Paystack transfers for payouts, ratings, meal plans, scheduled orders and live delivery tracking (see later sections). ANU decided no student wallet.
 
 ## Phase 8 notes (student employment and dispatchers)
 
@@ -175,4 +175,50 @@
 - **Excuse requests.** Students ask to be excused for a date range with a reason and a document (required for illness). The Health Centre or Dean of Students office excuses or declines; excusing records the excuse, which corrects class attendance and morning devotion.
 - **Individual devotion exemptions** by the Chaplaincy for the semester: exempt students are not expected at services and their course marks out of 95 are scaled to 100, like weekend students.
 - **Reopening an approved registration** by the advisor, Head of Department or Registry, with a reason, until results for any of its courses are submitted. The student changes it and submits again.
-- Next: the library (graduation clearance, e-books, inter-library loans, course reading lists).
+
+## Library (sixth round after the first run)
+
+- **Graduation clearance.** A student is clear when every book and inter-library loan is back and no fines are owed (lost books are charged as fines). Students see their status on their Library page; library staff and the Registry check a whole graduation list at once; library staff issue a numbered clearance certificate, downloadable as a PDF.
+- **E-books.** A title can link to a platform the university subscribes to, or hold a PDF the library has the right to share (stored privately in Cloudinary, up to 50 MB). Only students and staff can open them; openings are counted. "Read e-book" shows in the catalogue and on reading lists.
+- **Inter-library loans.** Members request a book the library does not hold (up to 3 open). Library staff move it through ordered, arrived (the member is told by SMS and email), issued with the lending library's due date, and returned, or say why it could not be obtained. Loans still out block clearance.
+- **Reading lists** are kept per course and carry over between semesters. Lecturers of the course this semester, or the Librarian, add catalogue books (essential or recommended) and other references with links. Students see the lists for their courses with how many copies are on the shelf and any e-book. The Librarian's **Reading lists** page shows essential books short of copies for this semester's enrolment (one per 10 students, unless there is an e-book).
+
+## Food and dispatch (seventh round after the first run)
+
+- **Ratings.** After a completed order the customer rates the vendor (1 to 5, optional comment) and the campus dispatcher if one delivered it. Vendor cards show the average; vendors see their ratings; dispatchers see theirs on the Deliveries page. The Dean of Students office can hide an abusive comment (the stars still count).
+- **Scheduled orders.** Customers choose a time up to two days ahead, at least the preparation time plus 15 minutes away and inside opening hours, including while the vendor is closed now.
+- **Meal plans.** Vendors sell bundles (for example 20 meals for GH₵ 300, valid 30 days) covering chosen dishes. Customers buy online, then choose the plan at checkout: one meal covers the dearest eligible dish, and anything else is paid as usual. A meal comes back if the order is declined or cancelled. Plan sales are in the vendor's settlement when paid; unused meals are not refunded after expiry. This is the vendor's prepaid product, not a balance held by the university (ANU decided no student wallet).
+- **Paystack Transfers for payouts.** Finance can press **Pay now** for vendors, dispatchers, associations and private hostel owners: the platform sends the amount owed to the payee's mobile money number through Paystack and records the payout only when Paystack confirms it (immediately, or by the transfer webhook). It needs the right permission and a fresh authenticator code; it cannot exceed what is owed or overlap a pending transfer. Owners now set their payout number on **Hostel fees**. Written to Paystack's published Transfers API but untested live: Paystack may require OTP approval for transfers unless ANU disables it, and the mobile money bank codes (MTN, VOD, ATL) should be confirmed with Paystack.
+- **Live delivery tracking.** While a dispatcher carries an order, their phone shares its location every 20 seconds, shown only to that order's customer (with a map link) and never to vendors; it is cleared at delivery and hidden once older than five minutes. The browser asks the dispatcher's permission; the site's Permissions-Policy now allows location for this site only.
+
+## Opportunities, timesheets and payroll (eighth round after the first run)
+
+- **Opportunities.** Postings are campus jobs (Career Services), internships (any staff member: organisation, location, and optionally the organisation's own application page), or teaching and research assistantships (lecturers, for a course or project). Postings by anyone other than Career Services wait for Career Services to approve and open them. The poster (or the supervisor they name, or Career Services) reviews applicants and takes students on, under **Opportunities**. Internships use only their own CGPA minimum and do not count towards the campus job limit; students see the kind on the jobs board.
+- **Timesheets.** A student taken on for paid work adds their mobile money number and keeps a monthly timesheet under **My work**: hours per day in quarter hours for hourly work (no more than the job's weekly hours, and no more than 20 hours a week across all their jobs), tasks for per-task work, or a simple confirmation for monthly work. They send it to their supervisor, who approves or returns it with a note.
+- **Payroll.** Finance and HR (the new payroll permission) see approved timesheets under **Student payroll** and pay each with **Pay now** (Paystack Transfers to the student's number, recorded when Paystack confirms) or record a payment made another way. Students are told at each step and download a payslip PDF.
+
+## Importing from the previous system (ninth round after the first run)
+
+- **Import data** (Registry) takes CSV files saved from the old system: schools, departments and programmes; courses and curriculum; staff; students; and past results. Columns are matched by heading (common headings recognised, adjustable), every row is checked in a dry run before anything is saved, rows with problems are listed and downloadable, and imports can be re-run safely (matched by index number, email or code). Imported accounts wait for set-up until the Registry sends set-up emails, which go out a few at a time. Past results count towards CGPA and carry-overs, are never put into the current semester, and never replace results entered on the platform. See `docs/DATA_IMPORT.md`.
+- Fixed: the Academic advisors page read the staff title from the wrong record and would have failed when opened.
+
+## Roommates, complaints, instalments and bank statements (tenth round, part 1)
+
+- **Roommate requests.** A student names one roommate by index number on their hall application. A request counts only when both name each other and are the same gender; the pair is then placed together, at the turn of whichever has the higher priority, in a room with two free beds (otherwise each is placed as usual). Students see whether their request is matched.
+- **Complaints about private hostels.** Students report safety, sanitation, water or power, the owner's conduct, charges, or other problems. The Hostel Office looks into each, then resolves or closes it with a note the student and owner see. Owners see complaints about their hostels and can respond, but see the student's name only if the student agreed.
+- **Instalments.** The Finance Office sets a plan per semester (for example 50% by one date, 75% by the next, 100% by the last). Students see the next amount and date on their fees page, and any dates missed.
+- **Late payment charges** are off by default. When the Finance Office turns them on (with an amount for cedi and dollar bills), each morning a bill that has not reached an instalment's share by its date gets the charge once for that instalment. It shows on the statement and can be waived like any charge.
+- **Bank statement import.** Finance uploads the bank's statement as CSV and chooses the date, amount, reference and narration columns. Deposits whose narration contains a student's index number are matched to that student's bill; Finance ticks which to record, each gets a receipt, and a bank reference is never recorded twice.
+
+## Photos, PDFs, security and retention (tenth round, part 2)
+
+- **Photos:** the real size of each upload is checked with Cloudinary (not trusted from the browser) and files over the limit are deleted and refused; replaced or removed photos are deleted from Cloudinary. **Profile photos** for everyone, on the Account page, shown in the sidebar.
+- **The cedi sign in PDFs:** receipts, statements, certificates and payslips embed DejaVu Sans, so GH₵ and accented names print as they are (falls back to GHS if the font cannot load).
+- **Stricter content security policy:** per-request nonces; no inline scripts except those the server marks.
+- **Records retention:** periods set by the Super Admin; nightly clean-up; the activity log is kept for good unless a period is set, and is then trimmed only through a database function.
+- The independent penetration test remains for ANU to commission (scope in `docs/SECURITY.md`).
+
+## Who sets fees and dues
+
+- **School fees** are set by the Finance Office (Finance Officer): fee schedules per semester (using the Accounts office's fee item names), bills, payments, instalments and, if turned on, late charges. The Registrar sets only the share of fees needed for exam clearance.
+- **Departmental dues** are set by the association's **patron**: one Head of Department of one of its departments, named by the Dean of Students office (for example the Head of Computer Science for EHASSA). The patron sets each semester's dues and opens or closes collection. The elected student officers collect cash, issue receipts and see who has paid; they no longer set dues. The Dean of Students office still alone cancels receipts. The patron must remain Head of Department of one of the association's departments; otherwise the Dean names a new one.

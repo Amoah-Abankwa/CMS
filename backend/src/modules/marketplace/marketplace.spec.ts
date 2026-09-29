@@ -40,3 +40,27 @@ describe('food marketplace rules', () => {
     expect(canTransition('COMPLETED', 'CANCELLED', 'VENDOR', 'PICKUP')).toBe(false);
   });
 });
+
+import { averageStars, mealCredit, scheduleProblem } from '@anu/shared';
+
+describe('scheduled orders', () => {
+  const hours = { '1': [['07:00', '21:00']] } as never;
+  const now = new Date('2026-09-28T08:00:00Z');
+  it('needs enough time to prepare, at most two days, and an open vendor', () => {
+    expect(scheduleProblem(new Date('2026-09-28T08:30:00Z'), now, 20, hours)).toMatch('35 minutes');
+    expect(scheduleProblem(new Date('2026-09-28T12:30:00Z'), now, 20, hours)).toBeNull();
+    expect(scheduleProblem(new Date('2026-09-28T22:00:00Z'), now, 20, hours)).toMatch('closed');
+    expect(scheduleProblem(new Date('2026-10-01T12:00:00Z'), now, 20, hours)).toMatch('two days');
+  });
+});
+
+describe('meal plans and ratings', () => {
+  it('covers the dearest eligible dish in the basket', () => {
+    expect(mealCredit([{ menuItemId: 'rice', price: 2500 }, { menuItemId: 'chicken', price: 3500 }, { menuItemId: 'drink', price: 500 }], ['rice', 'chicken'])).toEqual({ menuItemId: 'chicken', amount: 3500 });
+    expect(mealCredit([{ menuItemId: 'drink', price: 500 }], ['rice'])).toBeNull();
+  });
+  it('averages stars to one decimal place', () => {
+    expect(averageStars([5, 4, 4])).toBe(4.3);
+    expect(averageStars([])).toBeNull();
+  });
+});

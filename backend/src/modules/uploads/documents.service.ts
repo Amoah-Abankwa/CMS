@@ -6,8 +6,9 @@ import type { AuthUser } from '../../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { PermissionResolverService } from '../rbac/permission-resolver.service';
 import { belongsTo, privateDownloadUrl, signParams } from './cloudinary';
+import { CloudinaryAdminService } from './cloudinary-admin.service';
 
-export type DocPurpose = 'HOSTEL_FORM' | 'HOSTEL_FORM_SUBMISSION' | 'EXCUSE';
+export type DocPurpose = 'HOSTEL_FORM' | 'HOSTEL_FORM_SUBMISSION' | 'EXCUSE' | 'EBOOK';
 const FORMATS = 'pdf,jpg,jpeg,png';
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -19,7 +20,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 @Injectable()
 export class DocumentsService {
   private readonly env = loadEnv();
-  constructor(private readonly prisma: PrismaService, private readonly resolver: PermissionResolverService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly resolver: PermissionResolverService, private readonly audit: AuditService, private readonly admin: CloudinaryAdminService) {}
 
   private config() {
     const { CLOUDINARY_CLOUD_NAME: cloud, CLOUDINARY_API_KEY: key, CLOUDINARY_API_SECRET: secret } = this.env;
@@ -36,6 +37,11 @@ export class DocumentsService {
     if (purpose === 'EXCUSE') {
       if (user.type !== 'STUDENT') throw new ForbiddenException({ code: 'STUDENTS_ONLY', message: 'Students upload their own excuse documents.' });
       return `anu/docs/excuses/${user.id}`;
+    }
+    if (purpose === 'EBOOK') {
+      if (!(await this.perms(user)).has(PERMISSIONS.LIBRARY_MANAGE)) throw new ForbiddenException({ code: 'NOT_ALLOWED', message: 'Only the Librarian adds e-books.' });
+      if (!targetId) throw new BadRequestException({ code: 'TARGET', message: 'Say which title this e-book is for.' });
+      return `anu/docs/ebooks/${targetId}`;
     }
     if (purpose === 'HOSTEL_FORM') {
       // targetId: a hostel id, or "university" for every university hall.
@@ -67,7 +73,8 @@ export class DocumentsService {
     const folder = await this.folder(user, dto.purpose, dto.targetId);
     if (!belongsTo(dto.publicId, folder)) throw new BadRequestException({ code: 'WRONG_FOLDER', message: 'That file was not uploaded for this.' });
     if (!FORMATS.split(',').includes(dto.format.toLowerCase())) throw new BadRequestException({ code: 'FORMAT', message: 'Upload a PDF, JPG or PNG.' });
-    if (dto.bytes && dto.bytes > MAX_BYTES) throw new BadRequestException({ code: 'TOO_BIG', message: 'Documents can be at most 10 MB.' });
+    // Checked with Cloudinary rather than trusting the browser's figure.
+    await this.admin.assertSize(dto.publicId, 'authenticated', dto.purpose === 'EBOOK' ? 50 * 1024 * 1024 : MAX_BYTES);
     const doc = await this.prisma.storedDocument.create({ data: { publicId: dto.publicId, format: dto.format.toLowerCase(), bytes: dto.bytes ?? null, originalName: dto.originalName.slice(0, 200), purpose: dto.purpose, uploadedById: user.id } });
     return { id: doc.id, originalName: doc.originalName };
   }
@@ -80,12 +87,15 @@ export class DocumentsService {
         formTemplates: { select: { id: true } },
         formSubmissions: { select: { studentId: true, template: { select: { hostel: { select: { kind: true, ownerId: true } } } } } },
         excuseRequests: { select: { studentId: true } },
+        ebookTitles: { select: { id: true } },
       },
     });
     if (!doc) return null;
     if (doc.uploadedById === user.id) return doc;
     const perms = await this.perms(user);
     if (doc.purpose === 'HOSTEL_FORM' && doc.formTemplates.length) return doc; // blank forms are not private
+    // Library e-books: any student or staff member.
+    if (doc.purpose === 'EBOOK' && doc.ebookTitles.length && (user.type === 'STUDENT' || user.type === 'STAFF')) return doc;
     for (const s of doc.formSubmissions) {
       const h = s.template.hostel;
       if (s.studentId === user.id || (h ? (h.kind === 'PRIVATE' ? h.ownerId === user.id : perms.has(PERMISSIONS.HOSTELS_MANAGE)) : perms.has(PERMISSIONS.HOSTELS_MANAGE))) return doc;

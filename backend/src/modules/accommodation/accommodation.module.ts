@@ -1,3 +1,5 @@
+import { ComplaintsController } from './complaints.controller';
+import { ComplaintsService } from './complaints.service';
 import { HostelFormsController } from './hostel-forms.controller';
 import { HostelFormsService } from './hostel-forms.service';
 import { HostelFeesController, HostelOwnerPayoutsController } from './hostel-fees.controller';
@@ -13,7 +15,7 @@ import { ResidenceService } from './residence.service';
 
 @Module({
   imports: [FeesModule],
-  controllers: [HostelFormsController, HostelFeesController, HostelOwnerPayoutsController, HostelsController, MyAccommodationController, OwnerController, ResidenceController],
-  providers: [HostelFormsService, HostelFeesService, HostelsService, AllocationService, StudentAccommodationService, OwnerService, ResidenceService],
+  controllers: [ComplaintsController, HostelFormsController, HostelFeesController, HostelOwnerPayoutsController, HostelsController, MyAccommodationController, OwnerController, ResidenceController],
+  providers: [ComplaintsService, HostelFormsService, HostelFeesService, HostelsService, AllocationService, StudentAccommodationService, OwnerService, ResidenceService],
 })
 export class AccommodationModule {}

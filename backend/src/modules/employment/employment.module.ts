@@ -1,3 +1,5 @@
+import { MyTimesheetsController, OpportunitiesController, PayrollController } from './opportunities.controller';
+import { TimesheetsService } from './timesheets.service';
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { JobsService as QueueService, QUEUES } from '../../core/jobs/jobs.service';
 import { EmploymentAdminController, MyWorkController } from './employment.controller';
@@ -7,8 +9,8 @@ import { JobsService } from './jobs.service';
 import { DispatchersService } from './dispatchers.service';
 
 @Module({
-  controllers: [EmploymentAdminController, MyWorkController],
-  providers: [EmploymentRulesService, EligibilityService, JobsService, DispatchersService],
+  controllers: [OpportunitiesController, MyTimesheetsController, PayrollController, EmploymentAdminController, MyWorkController],
+  providers: [TimesheetsService, EmploymentRulesService, EligibilityService, JobsService, DispatchersService],
   exports: [EmploymentRulesService, EligibilityService],
 })
 export class EmploymentModule implements OnModuleInit {

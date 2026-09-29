@@ -9,6 +9,7 @@ export interface RoleSummary {
 
 export interface Me {
   id: string;
+  photoUrl?: string | null;
   type: 'STUDENT' | 'STAFF' | 'PARTNER';
   firstName: string;
   middleName: string | null;

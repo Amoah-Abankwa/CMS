@@ -49,6 +49,12 @@ export function MyFees() {
                 <p className="mt-1 text-xs text-muted">Pay at least {pct}% ({formatMoney(Math.ceil((b.due * pct) / 100), b.currency)}) to be cleared for exams. Clearance is automatic once the payment is recorded.</p>
               </div>
             )}
+            {b.instalments && b.balance > 0 && (
+              <p className="text-sm">
+                {b.instalments.next ? <>Next instalment: <span className="font-semibold">{formatMoney(b.instalments.next.toPay, b.currency)}</span> by {formatDate(b.instalments.next.dueDate)} ({b.instalments.next.cumulativePercent}% of the bill paid by then).</> : null}
+                {b.instalments.missed.length > 0 && <span className="block text-warning">{b.instalments.missed.length === 1 ? 'An instalment date has' : `${b.instalments.missed.length} instalment dates have`} passed without enough paid.</span>}
+              </p>
+            )}
             <div className="flex flex-wrap gap-4"><Link href={`/fees/statement/${b.id}`} className="text-sm text-primary hover:underline">Statement (debits, credits and balance)</Link><PdfLink api={`/me/fees/statements/${b.id}/pdf`} label="Statement as PDF" /></div>
             {b.currency === 'USD' && data.cedisPerDollar && b.balance > 0 && <p className="text-xs text-muted">At today&apos;s rate ({data.cedisPerDollar} cedis per dollar) the balance is {formatMoney(Math.round(b.balance * data.cedisPerDollar), 'GHS')}. You can pay in cedis at the bank; the Finance Office converts it at the rate on the day you pay.</p>}
             {b.balance > 0 && <div className="flex flex-wrap gap-2"><Button onClick={() => setPaying(b)}>Pay online</Button><p className="self-center text-xs text-muted">Or pay at the bank; the Finance Office records it against your bill.</p></div>}

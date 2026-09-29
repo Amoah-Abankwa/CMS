@@ -36,3 +36,8 @@ export function privateDownloadUrl(o: { cloudName: string; apiKey: string; apiSe
   const query = new URLSearchParams({ ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])), api_key: o.apiKey, signature });
   return `https://api.cloudinary.com/v1_1/${o.cloudName}/image/download?${query.toString()}`;
 }
+
+/** Admin API address for one stored file (to read its real size and format). */
+export function resourceUrl(cloudName: string, type: 'upload' | 'authenticated', publicId: string) {
+  return `https://api.cloudinary.com/v1_1/${cloudName}/resources/image/${type}/${publicId.split('/').map(encodeURIComponent).join('/')}`;
+}

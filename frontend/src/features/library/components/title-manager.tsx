@@ -1,465 +1,176 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
-import { Card, CardBody, CardHeader } from '@/components/ui/card';
-import { Dialog } from '@/components/ui/dialog';
-import { Field } from '@/components/ui/field';
-import { Input, Select, Textarea } from '@/components/ui/input';
-import { PageHeader } from '@/components/ui/page-header';
-import { Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
-import { formatDateTime } from '@/lib/format';
-import {
-  byLine,
-  COPY_STATUS,
-  dueLabel,
-  libraryApi,
-  type TitleDetail,
-  type TitleInput,
-} from '../api';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { libraryApi } from '../api';
+import type { TitleInput } from '../api';
 import { TitleFormDialog } from './title-form';
 
-export function TitleManager({ titleId }: { titleId: string }) {
-  const [t, setT] = useState<TitleDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [copy, setCopy] =
-    useState<TitleDetail['copies'][number] | null>(null);
+type LibraryTitle = TitleInput & {
+  id: string;
+  subtitle?: string | null;
+  isbn?: string | null;
+  publisher?: string | null;
+  year?: number | null;
+  edition?: string | null;
+  callNumber?: string | null;
+  description?: string | null;
+};
 
-  const load = () =>
-    libraryApi
-      .title(titleId)
-      .then(setT)
-      .catch((err) => setError(errorMessage(err)));
+export function TitleManager({ titleId }: { titleId?: string }) {
+  const [titles, setTitles] = useState<LibraryTitle[]>([]);
+  const [selected, setSelected] = useState<LibraryTitle | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await libraryApi.search({
+        page: 1,
+        pageSize: 100,
+      });
+
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data.items)
+          ? data.items
+          : [];
+
+      setTitles(items as LibraryTitle[]);
+
+      if (titleId) {
+        setSelected(
+          (items as LibraryTitle[]).find((t) => t.id === titleId) ?? null,
+        );
+      } else {
+        setSelected(null);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to load titles.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     void load();
-  }, [titleId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [titleId]);
 
-  if (!t) {
-    return error ? <Alert tone="danger">{error}</Alert> : <Spinner />;
+  const createTitle = async (dto: TitleInput) => {
+    return libraryApi.saveTitle(dto);
+  };
+
+  const updateTitle = async (dto: TitleInput) => {
+    if (!selected) return null;
+    return libraryApi.saveTitle(dto, selected.id);
+  };
+
+  if (loading) {
+    return <div className="p-6">Loading titles...</div>;
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title={t.title}
-        description={`${byLine(t.authors)}${t.edition ? `, ${t.edition}` : ''}${t.year ? `, ${t.year}` : ''}. ${[
-          t.publisher,
-          t.isbn ? `ISBN ${t.isbn}` : null,
-          t.callNumber,
-        ]
-          .filter(Boolean)
-          .join('. ')}`}
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setEditing(true)}
-          >
-            Edit title
-          </Button>
-        }
-      />
-
+    <div className="space-y-6">
       {notice && <Alert tone="success">{notice}</Alert>}
       {error && <Alert tone="danger">{error}</Alert>}
 
-      <Card>
-        <CardHeader
-          title={`Copies (${t.copies.length})`}
-          actions={
-            <Button size="sm" onClick={() => setAdding(true)}>
-              Add copies
-            </Button>
-          }
-        />
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Library Titles</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage books and other library titles.
+          </p>
+        </div>
 
-        <ul className="divide-y divide-border">
-          {t.copies.map((c) => (
-            <li
-              key={c.id}
-              className="flex flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            >
-              <span className="min-w-0 text-sm">
-                <span className="font-mono">{c.barcode}</span>{' '}
-                <span className="text-muted">{c.shelf}</span>
+        <Button
+          onClick={() => {
+            setSelected(null);
+            setEditing(true);
+          }}
+        >
+          Add title
+        </Button>
+      </div>
 
-                {c.loans[0] && (
-                  <span className="block text-xs text-muted">
-                    With {c.loans[0].borrower.firstName}{' '}
-                    {c.loans[0].borrower.lastName} (
-                    {c.loans[0].borrower.indexNumber ??
-                      c.loans[0].borrower.email}
-                    ), due {dueLabel(c.loans[0].dueAt)}
-                  </span>
+      <div className="grid gap-4">
+        {titles.map((t) => (
+          <Card key={t.id} className="p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold">{t.title}</h2>
+
+                {t.subtitle && (
+                  <p className="text-sm text-muted-foreground">
+                    {t.subtitle}
+                  </p>
                 )}
 
-                {c.notes && (
-                  <span className="block text-xs text-muted">
-                    {c.notes}
-                  </span>
+                {t.authors?.length > 0 && (
+                  <p className="mt-1 text-sm">
+                    {t.authors.join(', ')}
+                  </p>
                 )}
-              </span>
 
-              <span className="flex shrink-0 items-center gap-2">
-                {c.isReference && <Badge>Reference</Badge>}
+                {t.description && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t.description}
+                  </p>
+                )}
+              </div>
 
-                <Badge tone={COPY_STATUS[c.status].tone}>
-                  {COPY_STATUS[c.status].label}
-                </Badge>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCopy(c)}
-                >
-                  Edit
-                </Button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      {t.reservations.length > 0 && (
-        <Card>
-          <CardHeader title="Reservation queue" />
-
-          <ol className="divide-y divide-border">
-            {t.reservations.map((r, i) => (
-              <li
-                key={r.id}
-                className="flex items-center justify-between gap-3 px-4 py-2 text-sm sm:px-5"
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelected(t);
+                  setEditing(true);
+                }}
               >
-                <span>
-                  {i + 1}. {r.borrower.firstName} {r.borrower.lastName}{' '}
-                  <span className="text-xs text-muted">
-                    {r.borrower.indexNumber ?? r.borrower.email}, since{' '}
-                    {formatDateTime(r.createdAt)}
-                  </span>
-                </span>
+                Edit
+              </Button>
+            </div>
+          </Card>
+        ))}
 
-                <Badge
-                  tone={r.status === 'READY' ? 'success' : 'primary'}
-                >
-                  {r.status === 'READY'
-                    ? `Ready until ${
-                        r.expiresAt ? dueLabel(r.expiresAt) : ''
-                      }`
-                    : 'Waiting'}
-                </Badge>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
-
-      {t.description && (
-        <Card>
-          <CardBody>
-            <p className="text-sm">{t.description}</p>
-          </CardBody>
-        </Card>
-      )}
+        {!titles.length && (
+          <Card className="p-8 text-center text-muted-foreground">
+            No titles found.
+          </Card>
+        )}
+      </div>
 
       <TitleFormDialog
         open={editing}
-        initial={{
-          ...t,
-          subtitle: t.subtitle ?? undefined,
-          isbn: t.isbn ?? undefined,
-          publisher: t.publisher ?? undefined,
-          year: t.year ?? undefined,
-          edition: t.edition ?? undefined,
-          callNumber: t.callNumber ?? undefined,
-        }}
-        onCloseAction={() => setEditing(false)}
-        onSaveAction={(dto: TitleInput) =>
-          libraryApi.saveTitle(dto, titleId)
+        initial={
+          selected
+            ? {
+                ...selected,
+                subtitle: selected.subtitle ?? undefined,
+                isbn: selected.isbn ?? undefined,
+                publisher: selected.publisher ?? undefined,
+                year: selected.year ?? undefined,
+                edition: selected.edition ?? undefined,
+                callNumber: selected.callNumber ?? undefined,
+                description: selected.description ?? undefined,
+              }
+            : undefined
         }
+        onCloseAction={() => setEditing(false)}
+        onSaveAction={selected ? updateTitle : createTitle}
         onSavedAction={() => {
           setEditing(false);
           setNotice('Title saved.');
           void load();
         }}
       />
-
-      <AddCopiesDialog
-        open={adding}
-        titleId={titleId}
-        defaultShelf={t.copies[0]?.shelf ?? ''}
-        onCloseAction={() => setAdding(false)}
-        onDoneAction={(n) => {
-          setAdding(false);
-          setNotice(`${n} copies added.`);
-          void load();
-        }}
-      />
-
-      <CopyDialog
-        copy={copy}
-        onCloseAction={() => setCopy(null)}
-        onDoneAction={() => {
-          setCopy(null);
-          setNotice('Copy saved.');
-          void load();
-        }}
-      />
     </div>
-  );
-}
-
-type AddCopiesDialogProps = {
-  open: boolean;
-  titleId: string;
-  defaultShelf: string;
-  onCloseAction: () => void;
-  onDoneAction: (n: number) => void;
-};
-
-function AddCopiesDialog({
-  open,
-  titleId,
-  defaultShelf,
-  onCloseAction,
-  onDoneAction,
-}: AddCopiesDialogProps) {
-  const [codes, setCodes] = useState('');
-  const [shelf, setShelf] = useState('');
-  const [reference, setReference] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setCodes('');
-      setShelf(defaultShelf);
-      setReference(false);
-      setError(null);
-    }
-  }, [open, defaultShelf]);
-
-  const list = codes
-    .split(/[\s,;]+/)
-    .map((c) => c.trim().toUpperCase())
-    .filter(Boolean);
-
-  const save = async () => {
-    setBusy(true);
-    setError(null);
-
-    try {
-      const r = await libraryApi.addCopies(
-        titleId,
-        list,
-        shelf.trim() || undefined,
-        reference,
-      );
-
-      onDoneAction(r.added);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onCloseAction}
-      title="Add copies"
-      description="Scan each new barcode label; each scan adds a line."
-    >
-      <div className="flex flex-col gap-4">
-        {error && <Alert tone="danger">{error}</Alert>}
-
-        <Field
-          label="Barcodes"
-          htmlFor="c-codes"
-          hint={`${list.length} copies`}
-        >
-          <Textarea
-            id="c-codes"
-            className="min-h-32 font-mono uppercase"
-            value={codes}
-            onChange={(e) => setCodes(e.target.value)}
-          />
-        </Field>
-
-        <Field label="Shelf" htmlFor="c-shelf">
-          <Input
-            id="c-shelf"
-            value={shelf}
-            maxLength={80}
-            onChange={(e) => setShelf(e.target.value)}
-          />
-        </Field>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4"
-            checked={reference}
-            onChange={(e) => setReference(e.target.checked)}
-          />
-          Reference copies (cannot be borrowed)
-        </label>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onCloseAction}>
-            Cancel
-          </Button>
-
-          <Button
-            loading={busy}
-            disabled={!list.length}
-            onClick={save}
-          >
-            Add {list.length} copies
-          </Button>
-        </div>
-      </div>
-    </Dialog>
-  );
-}
-
-type CopyDialogProps = {
-  copy: TitleDetail['copies'][number] | null;
-  onCloseAction: () => void;
-  onDoneAction: () => void;
-};
-
-function CopyDialog({
-  copy,
-  onCloseAction,
-  onDoneAction,
-}: CopyDialogProps) {
-  const [shelf, setShelf] = useState('');
-  const [status, setStatus] = useState('');
-  const [reference, setReference] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!copy) return;
-
-    setShelf(copy.shelf ?? '');
-    setStatus(
-      ['AVAILABLE', 'DAMAGED', 'WITHDRAWN'].includes(copy.status)
-        ? copy.status
-        : '',
-    );
-    setReference(copy.isReference);
-    setNotes(copy.notes ?? '');
-    setError(null);
-  }, [copy]);
-
-  if (!copy) return null;
-
-  const inUse =
-    copy.status === 'ON_LOAN' || copy.status === 'ON_HOLD';
-
-  const save = async () => {
-    setBusy(true);
-    setError(null);
-
-    try {
-      await libraryApi.updateCopy(copy.id, {
-        shelf: shelf.trim() || undefined,
-        isReference: reference,
-        notes: notes.trim() || undefined,
-        ...(status && !inUse
-          ? { status: status as 'AVAILABLE' }
-          : {}),
-      });
-
-      onDoneAction();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open
-      onClose={onCloseAction}
-      title={`Copy ${copy.barcode}`}
-      description={COPY_STATUS[copy.status].label}
-    >
-      <div className="flex flex-col gap-4">
-        {error && <Alert tone="danger">{error}</Alert>}
-
-        <Field label="Shelf" htmlFor="cp-shelf">
-          <Input
-            id="cp-shelf"
-            value={shelf}
-            maxLength={80}
-            onChange={(e) => setShelf(e.target.value)}
-          />
-        </Field>
-
-        {!inUse && (
-          <Field
-            label="Condition"
-            htmlFor="cp-status"
-            hint="Lost copies found again: set them back to On the shelf."
-          >
-            <Select
-              id="cp-status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="" disabled>
-                Choose
-              </option>
-              <option value="AVAILABLE">On the shelf</option>
-              <option value="DAMAGED">Damaged (not lent)</option>
-              <option value="WITHDRAWN">
-                Withdrawn from stock
-              </option>
-            </Select>
-          </Field>
-        )}
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4"
-            checked={reference}
-            onChange={(e) => setReference(e.target.checked)}
-          />
-          Reference copy (cannot be borrowed)
-        </label>
-
-        <Field label="Notes" htmlFor="cp-notes">
-          <Input
-            id="cp-notes"
-            value={notes}
-            maxLength={300}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Field>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onCloseAction}>
-            Cancel
-          </Button>
-
-          <Button loading={busy} onClick={save}>
-            Save copy
-          </Button>
-        </div>
-      </div>
-    </Dialog>
   );
 }

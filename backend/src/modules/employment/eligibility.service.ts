@@ -30,7 +30,7 @@ export class EligibilityService {
       this.prisma.courseResult.findMany({ where: { studentId: { in: ids }, sheet: { status: 'PUBLISHED' } }, select: { studentId: true, credits: true, gradePoint: true, incomplete: true } }),
       semester ? this.prisma.courseRegistration.findMany({ where: { studentId: { in: ids }, semesterId: semester.id, status: 'APPROVED' }, select: { studentId: true } }) : [],
       semester ? this.prisma.examHold.findMany({ where: { studentId: { in: ids }, semesterId: semester.id, liftedAt: null }, select: { studentId: true, category: true } }) : [],
-      this.prisma.jobApplication.groupBy({ by: ['studentId'], where: { studentId: { in: ids }, status: 'HIRED' }, _count: true }),
+      this.prisma.jobApplication.groupBy({ by: ['studentId'], where: { studentId: { in: ids }, status: 'HIRED', job: { kind: { not: 'INTERNSHIP' } } }, _count: true }),
     ]);
     for (const id of ids) {
       const s = out.get(id)!;
@@ -42,9 +42,10 @@ export class EligibilityService {
     return out;
   }
 
-  async check(studentId: string, opts: { jobMinCgpa?: number | null; forJob?: boolean; ignoreJobs?: number } = {}): Promise<WorkEligibility & { cgpa: number | null }> {
+  async check(studentId: string, opts: { jobMinCgpa?: number | null; forJob?: boolean; ignoreJobs?: number; internship?: boolean } = {}): Promise<WorkEligibility & { cgpa: number | null }> {
     const [s, rules] = await Promise.all([this.standing([studentId]).then((m) => m.get(studentId)!), this.rules.get()]);
-    const result = checkEligibility({ ...s, currentJobs: Math.max(0, s.currentJobs - (opts.ignoreJobs ?? 0)) }, rules, opts);
+    // Internships have only their own CGPA minimum and do not count towards the campus job limit.
+    const result = checkEligibility({ ...s, currentJobs: Math.max(0, s.currentJobs - (opts.ignoreJobs ?? 0)) }, opts.internship ? { ...rules, minCgpa: 0 } : rules, opts.internship ? { jobMinCgpa: opts.jobMinCgpa } : opts);
     return { ...result, cgpa: s.cgpa };
   }
 }

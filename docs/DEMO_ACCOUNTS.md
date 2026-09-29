@@ -203,9 +203,10 @@ This semester's fees are issued from the Accounts office's fee items: GH₵ 3,80
 74. Sign in as **finance** and open **Student fees**: totals for the semester, and every student's balance. Open `ANU26400013` and **Record a payment**: bank deposit, GH₵ 1,300.00 (taking them from 40% to over 72%), any slip number. The student passes 70% and is **cleared for exams automatically**, and told by SMS. Try recording the same slip number again: it is refused.
 75. Still as finance, open `ANU25400019`: a 25% scholarship reduces the bill. Add an extra charge, or **Reverse** a bank payment (for a bounced cheque); if that takes a student below 70%, the automatic clearance is withdrawn. Clearances set by hand on **Fee clearance** are never changed by the rule.
 76. **Fee set-up**: two schedules this semester, the first-year one taking priority for level 100. Change the clearance percentage: this semester's bills are rechecked straight away.
-77. Sign in as `ANU25400005`, who is EHASSA president. **Association dues** shows EHASSA dues of GH₵ 50.00 with two paid, one online and one in cash. Open **Members and cash** and record cash from `ANU25400019`: a receipt number (EHASSA-000003) is issued and the student is sent it by SMS.
+77. Sign in as `ANU25400005`, who is EHASSA president. **Association dues** shows EHASSA dues of GH₵ 50.00 (set by the patron, Dr Agyeman) with two paid, one online and one in cash. Open **Members and cash** and record cash from `ANU25400019`: a receipt number (EHASSA-000003) is issued and the student is sent it by SMS. Officers collect and receipt dues but do not set them: the association's patron does (step 77a).
+77a. Sign in as **lecturer.cs** (Head of Computer Science, EHASSA's patron) and open **Departmental dues**: set new dues with an amount and due date. The EHASSA officers are told, and students see them. The patron can close or reopen collection.
 78. Sign in as `ANU25400019` and open **Departmental dues**: the receipt is there. As `ANU26400020` (not yet paid), pay EHASSA dues online.
-79. Sign in as **deanofstudents** and open **Departmental associations**. Open EHASSA's **Receipts** and cancel one with a reason: the student and the president are told. Record an elected president for BACA (for example `ANU25400002` if they are in a BACA department, or change BACA's departments first). When a term ends, the officer loses the dues screen automatically.
+79. Sign in as **deanofstudents** and open **Departmental associations**. Open EHASSA's **Receipts** and cancel one with a reason: the student and the president are told. Record an elected president for BACA (for example `ANU25400002` if they are in a BACA department, or change BACA's departments first). When a term ends, the officer loses the dues screen automatically. Use **Name patron** on BACA to name its patron: it must be a Head of Department of Accounting or Management.
 80. As **finance**, **Dues payouts** shows the online dues held for EHASSA. Record a payout to the association's mobile money number.
 
 **Registry: programmes, departments and index numbers**
@@ -258,7 +259,48 @@ This semester's fees are issued from the Accounts office's fee items: GH₵ 3,80
 112. As **chaplaincy**, open **Devotion exemptions** and exempt a student with a reason; their results are scaled from 95 like weekend students.
 113. As **advisor.cs**, open **Registration approvals**, the **Approved** tab, and **Reopen** a registration with a reason; the student can change it and submit again.
 
+**Library: clearance, e-books, inter-library loans, reading lists**
+
+114. As `ANU25400006` (owes a fine), open **Library**: **Library clearance** says what stops clearance. As **libdesk**, open **Library clearance**, paste `ANU25400001 ANU25400006` and check: issue a certificate for the clear student and download the PDF.
+115. As **librarian**, open a catalogue title and add an **E-book** link (or upload a PDF). Members see **Read e-book** in the catalogue.
+116. As a student, request an **inter-library loan** on the Library page. As **libdesk**, open **Inter-library loans**: Ordered, then Arrived (the student is told), then Issued with a due date.
+117. As **lecturer.cs**, open **Reading lists**, choose a course, add books from the catalogue (essential or recommended) and a web reference, and save. Students on the course see it with shelf availability; **librarian** sees essential books short of copies under **Reading lists**.
+
+**Food: ratings, schedules, meal plans, payouts, tracking**
+
+118. As `ANU25400002`, open a completed order under **My food orders** and rate the vendor (and the dispatcher, if one delivered). Vendor cards show the average; **vendor** sees them under **Ratings**.
+119. Order from a vendor while it is closed and choose a time under **When**: the vendor sees the scheduled time.
+120. As **vendor**, add a **Meal plan** covering some dishes. As a student, buy it on the vendor's menu (demo checkout), then choose it at checkout: one meal covers a dish.
+121. As **finance**, open **Vendor settlements** and press **Pay now** (asks for your authenticator code): in demo mode the transfer succeeds at once and the payout is recorded. The same button is on dues and hostel owner payouts.
+122. As the dispatcher `ANU26400006`, collect an order on a phone and allow location: the customer's order page shows when the location was last updated, with a map link.
+
+**Opportunities, timesheets and payroll**
+
+123. As **lecturer.cs**, open **Opportunities** and post a **Teaching assistant** for CSC 101 at GH₵ 12 an hour, 6 hours a week. As any staff member, post an **Internship** with an organisation. Both wait for Career Services.
+124. As **careers**, open **Jobs**: approve and open them. Students see them on the jobs board, marked by kind.
+125. As a student, apply for the assistantship. As **lecturer.cs**, open **Opportunities**, then **Applicants**, and take the student on.
+126. As that student, open **My work**: add a mobile money number, open this month's timesheet, log some hours (try more than 6 in a week to see the limit) and send it. As **lecturer.cs**, approve it under **Timesheets to approve**.
+127. As **finance**, open **Student payroll**: **Pay now** (demo transfer) or **Paid another way**. The student is told and downloads the payslip.
+
+**Importing from the previous system**
+
+128. As **registrar**, open **Import data**, choose **Students**, and download the blank template. Fill in a few rows (use an existing programme code such as BSC-CS and an index number like ANU19400001), save as CSV and choose the file. Check the column matches, **Check every row**, then **Import**. Run the same file again: the rows are updated, not duplicated.
+129. Import **Past results** for those students (course code, 2023/2024, semester 1, a score): their CGPA appears on their dashboard. Then **Send set-up emails** for the student import.
+
+**Roommates, complaints, instalments, bank statements**
+
+130. As two female students (for example `ANU25400002` and `ANU25400004`), apply for a hall naming each other as roommate: each sees "Matched". As **hostels**, run the allocation: they share a room.
+131. As a student, open **Accommodation**, **Report a problem** about a private hostel. As **hostels**, open **Hostel complaints**: look into it, then resolve it with a note. As **owner**, the complaint shows under **Complaints** without the student's name unless they allowed it.
+132. As **finance**, open **Fee setup**: add instalments (50% by one date, 100% by a later one). Students see what is due next. Turn on **Charge for late payment** to see the setting; it is off by default.
+133. As **finance**, open **Bank statement** and upload a CSV with a line whose narration includes `ANU25400001`: it is matched to that bill; record it and a receipt is issued.
+
+**Photos, PDFs, security and retention**
+
+134. As any account, open **Account and security** and add a **Profile photo**: it shows in the sidebar. Replace it: the old one is deleted from Cloudinary. (Needs the Cloudinary settings.)
+135. Download any receipt or statement PDF: amounts print with the cedi sign.
+136. As **superadmin**, open **Records retention**: see the defaults (the activity log is kept for good).
+
 **Oversight**
 
-114. As **superadmin** or **auditor**, open **All activity** to see every step above, grouped by user type.
-115. As superadmin, enable **Developer access** for Kofi Amponsah; as dev.candidate switch to Developer to see **System diagnostics**.
+137. As **superadmin** or **auditor**, open **All activity** to see every step above, grouped by user type.
+138. As superadmin, enable **Developer access** for Kofi Amponsah; as dev.candidate switch to Developer to see **System diagnostics**.

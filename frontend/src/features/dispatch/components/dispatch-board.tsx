@@ -10,7 +10,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
+import { api, errorMessage } from '@/lib/axios';
 import { clockTime } from '@/features/marketplace/api';
 import { dispatchApi, type DispatchState } from '@/features/employment/api';
 
@@ -18,6 +18,7 @@ type Mine = DispatchState['mine'][number];
 
 /** The dispatcher's live screen. Refreshes every 15 seconds, which also keeps them online. */
 export function DispatchBoard() {
+  const [sharing, setSharing] = useState<'off' | 'on' | 'denied'>('off');
   const [s, setS] = useState<DispatchState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -64,6 +65,8 @@ export function DispatchBoard() {
       {error && <Alert tone="danger">{error}</Alert>}
       {notice && <Alert tone="success">{notice}</Alert>}
 
+      <LocationSharer carrying={s.mine.some((d) => d.status === 'PICKED_UP')} onState={setSharing} />
+      {s.mine.some((d) => d.status === 'PICKED_UP') && <Alert tone={sharing === 'denied' ? 'warning' : 'info'}>{sharing === 'denied' ? 'Allow location for this site so customers can see you are on the way.' : 'While you carry an order, your location is shared with that customer only. It stops when you deliver.'}</Alert>}
       {s.mine.map((d) => (
         <Card key={d.id}>
           <CardHeader
@@ -170,4 +173,24 @@ function DeliveryDialog({ target, onClose, onDone }: { target: { d: Mine; kind: 
       </div>
     </Dialog>
   );
+}
+
+/** While carrying an order, sends the phone's position every 20 seconds (only then). */
+function LocationSharer({ carrying, onState }: { carrying: boolean; onState: (s: 'off' | 'on' | 'denied') => void }) {
+  useEffect(() => {
+    if (!carrying || !('geolocation' in navigator)) { onState('off'); return; }
+    let last = 0;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        onState('on');
+        if (Date.now() - last < 20_000) return;
+        last = Date.now();
+        void api.post('/dispatch/location', { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }).catch(() => undefined);
+      },
+      () => onState('denied'),
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 30_000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [carrying, onState]);
+  return null;
 }

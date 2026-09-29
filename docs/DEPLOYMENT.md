@@ -61,3 +61,10 @@ Migrations only move forward. To undo a bad release, deploy the previous build; 
 - **API will not start:** read the first lines of its log. Configuration problems are listed one per line with what to change.
 - **People cannot sign in:** check the database is reachable (health address), then the Failed messages screen for setup links and reset codes.
 - **Suspected breach:** a Super Admin revokes the affected sessions; ICT rotates `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` (this signs everyone out), and the Internal Auditor exports the activity log for the period. Do not rotate `MFA_ENCRYPTION_KEY` without a plan: it would require every staff authenticator to be set up again.
+
+
+## After the tenth round
+
+- Run `pnpm install` (the backend now uses `@pdf-lib/fontkit` to put the cedi sign in PDFs; the DejaVu Sans fonts and their licence are in `backend/assets/fonts`, and must be deployed with the backend).
+- `pnpm db:deploy` now also applies `prisma/sql/03_audit_retention.sql`.
+- Pages are rendered per request because of the content security policy nonce; allow for this when sizing the frontend server.

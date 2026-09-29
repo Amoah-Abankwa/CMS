@@ -6,8 +6,12 @@ const MAX_BYTES = 5 * 1024 * 1024;
  * Uploads one image straight from the browser to Cloudinary, using a signature from our API that fixes
  * the folder and the allowed formats. Returns the Cloudinary public id to save.
  */
-export async function uploadImage(purpose: 'menu' | 'hostel', targetId: string, file: File): Promise<string> {
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Choose a JPG, PNG or WebP photo.');
+export async function uploadImage(
+  purpose: 'menu' | 'hostel' | 'profile',
+  targetId: string,
+  file: File,
+): Promise<string> {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Choose a JPG, PNG or WebP photo.');
   if (file.size > MAX_BYTES) throw new Error('Photos can be at most 5 MB.');
   const s = (await api.post<{ cloudName: string; apiKey: string; timestamp: number; folder: string; allowedFormats: string; signature: string }>('/uploads/sign', { purpose, targetId })).data;
   const form = new FormData();

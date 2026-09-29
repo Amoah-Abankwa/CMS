@@ -120,3 +120,28 @@ describe('who pays the campus dispatcher', () => {
     expect(dispatchFeeSettlement('ON_DELIVERY', 'ON_PICKUP')).toBe('CUSTOMER');
   });
 });
+
+import { indexNumbersIn, instalmentPlanProblem, instalmentStatus } from '@anu/shared';
+
+describe('fee instalments', () => {
+  const plan = [{ dueDate: '2026-09-30', cumulativePercent: 50 }, { dueDate: '2026-10-31', cumulativePercent: 75 }, { dueDate: '2026-11-30', cumulativePercent: 100 }];
+  it('checks the plan', () => {
+    expect(instalmentPlanProblem(plan)).toBeNull();
+    expect(instalmentPlanProblem([{ dueDate: '2026-09-30', cumulativePercent: 60 }])).toMatch('100%');
+    expect(instalmentPlanProblem([{ dueDate: '2026-10-30', cumulativePercent: 50 }, { dueDate: '2026-09-30', cumulativePercent: 100 }])).toMatch('go up');
+  });
+  it('shows what is due next and which instalments were missed', () => {
+    const s = instalmentStatus(200000, 80000, plan, '2026-10-05');
+    expect(s.missed.map((m) => m.index)).toEqual([0]);
+    expect(s.next).toMatchObject({ index: 1, required: 150000, toPay: 70000 });
+    expect(instalmentStatus(200000, 200000, plan, '2026-12-01')).toEqual({ missed: [], next: null });
+  });
+});
+
+describe('bank statement matching', () => {
+  it('finds index numbers in narrations', () => {
+    expect(indexNumbersIn('FEES PYMT ANU25400001 AMA MENSAH')).toEqual(['ANU25400001']);
+    expect(indexNumbersIn('school fees anugs260004/ tuition')).toEqual(['ANUGS260004']);
+    expect(indexNumbersIn('Transfer from 0244123456')).toEqual([]);
+  });
+});

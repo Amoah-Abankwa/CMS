@@ -1,10 +1,20 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { loadEnv } from '../../core/config/env';
 import { AuditService } from '../audit/audit.service';
-import { DemoPaymentProvider, PaymentProvider, PaystackPaymentProvider } from './payment-providers';
+import {
+  DemoPaymentProvider,
+  PaymentProvider,
+  PaystackPaymentProvider,
+} from './payment-providers';
 
 type Handler = (payment: {
   id: string;
@@ -18,8 +28,8 @@ type Handler = (payment: {
 
 /**
  * Starts, confirms and refunds payments. Other modules register what should happen when a payment for
- * their purpose succeeds (for example, a food order is placed). Confirmation is idempotent, so the
- * browser return and the webhook arriving together do no harm.
+ * their purpose succeeds (for example, a food order is placed). Confirmation is idempotent, so
+ * the browser return and the webhook arriving together do no harm.
  */
 @Injectable()
 export class PaymentsService {
@@ -48,6 +58,23 @@ export class PaymentsService {
 
       this.provider = new DemoPaymentProvider(env.WEB_ORIGIN);
     }
+  }
+
+  /** Used by transfers (payouts), which share the provider. */
+  get paymentProvider() {
+    return this.provider;
+  }
+
+  private transferListener?: (
+    reference: string,
+    ok: boolean,
+    reason?: string,
+  ) => Promise<void>;
+
+  onTransferEvent(
+    fn: (reference: string, ok: boolean, reason?: string) => Promise<void>,
+  ) {
+    this.transferListener = fn;
   }
 
   get providerName() {
@@ -80,7 +107,9 @@ export class PaymentsService {
       });
     }
 
-    const reference = `ANU-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
+    const reference = `ANU-${Date.now()
+      .toString(36)
+      .toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -95,7 +124,9 @@ export class PaymentsService {
       },
     });
 
-    const callbackUrl = `${loadEnv().WEB_ORIGIN}${input.returnPath}${input.returnPath.includes('?') ? '&' : '?'}reference=${reference}`;
+    const callbackUrl = `${loadEnv().WEB_ORIGIN}${input.returnPath}${
+      input.returnPath.includes('?') ? '&' : '?'
+    }reference=${reference}`;
 
     try {
       const { authorizationUrl } = await this.provider.initialize({
@@ -159,9 +190,7 @@ export class PaymentsService {
       });
     }
 
-    if (payment.status !== 'PENDING') {
-      return payment;
-    }
+    if (payment.status !== 'PENDING') return payment;
 
     const result = await this.provider.verify(reference, {
       amount: payment.amount,
@@ -169,9 +198,7 @@ export class PaymentsService {
       providerData: payment.providerData,
     });
 
-    if (result.status === 'pending') {
-      return payment;
-    }
+    if (result.status === 'pending') return payment;
 
     if (
       result.status === 'success' &&
@@ -267,10 +294,7 @@ export class PaymentsService {
     return fresh;
   }
 
-  async webhook(
-    rawBody: Buffer | undefined,
-    signature: string | undefined,
-  ) {
+  async webhook(rawBody: Buffer | undefined, signature: string | undefined) {
     if (!rawBody || !this.provider.verifyWebhook(rawBody, signature)) {
       await this.audit.record({
         action: 'payments.webhook_rejected',
@@ -292,11 +316,22 @@ export class PaymentsService {
       };
     };
 
-    if (
-      event.event === 'charge.success' &&
-      event.data?.reference
-    ) {
+    if (event.event === 'charge.success' && event.data?.reference) {
       await this.confirm(event.data.reference);
+    }
+
+    if (
+      event.event.startsWith('transfer.') &&
+      event.data?.reference &&
+      this.transferListener
+    ) {
+      const ok = event.event === 'transfer.success';
+
+      await this.transferListener(
+        event.data.reference,
+        ok,
+        ok ? undefined : event.event,
+      );
     }
 
     if (event.event === 'refund.processed') {
@@ -360,9 +395,7 @@ export class PaymentsService {
       where: { id: paymentId },
     });
 
-    if (payment.status !== 'SUCCEEDED') {
-      return payment.status;
-    }
+    if (payment.status !== 'SUCCEEDED') return payment.status;
 
     try {
       const status = await this.provider.refund(

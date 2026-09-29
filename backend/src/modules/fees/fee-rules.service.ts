@@ -15,7 +15,7 @@ export class FeeRulesService {
   }
 
   /** Finance: online payment minimums. */
-  async setFinance(v: Pick<FeeRules, 'minOnlinePayment' | 'minOnlinePaymentUsd'>) {
+  async setFinance(v: Partial<Pick<FeeRules, 'minOnlinePayment' | 'minOnlinePaymentUsd' | 'lateFeeEnabled' | 'lateFee' | 'lateFeeUsd'>>) {
     return this.set({ ...(await this.get()), ...v });
   }
 

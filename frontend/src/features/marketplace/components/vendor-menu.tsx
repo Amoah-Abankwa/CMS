@@ -10,7 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input, Select, Textarea } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
 import { Spinner } from '@/components/ui/states';
 import { errorMessage } from '@/lib/axios';
@@ -43,7 +43,8 @@ export function VendorMenu({ vendorId }: { vendorId: string }) {
   return (
     <div className="flex flex-col gap-4 pb-20 lg:pb-0">
       <PageHeader title={menu.name} description={`${menu.location}. Today: ${todaysHours(menu)}. About ${menu.prepMinutes} minutes.`} />
-      {!menu.openNow && <Alert tone="warning">{menu.name} is not taking orders right now. You can look at the menu.</Alert>}
+      {!menu.openNow && <Alert tone="warning">{menu.name} is closed now. You can schedule an order for when it is open.</Alert>}
+      <MealPlansOffer vendorId={menu.id} />
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
         <div className="flex flex-col gap-4">
           {groups.map((g) => (
@@ -67,7 +68,7 @@ export function VendorMenu({ vendorId }: { vendorId: string }) {
                           <Button variant="secondary" size="sm" aria-label={`One more ${i.name}`} onClick={() => cart.change(i.id, 1)}><Plus className="size-4" aria-hidden /></Button>
                         </span>
                       ) : (
-                        <Button variant="secondary" size="sm" disabled={!menu.openNow} onClick={() => cart.add(vendorId, { id: i.id, name: i.name, price: i.price })}>Add</Button>
+                        <Button variant="secondary" size="sm" onClick={() => cart.add(vendorId, { id: i.id, name: i.name, price: i.price })}>Add</Button>
                       )}
                     </li>
                   );
@@ -84,7 +85,7 @@ export function VendorMenu({ vendorId }: { vendorId: string }) {
               <>
                 <ul className="flex flex-col gap-1 text-sm">{lines.map((l) => <li key={l.id} className="flex justify-between gap-2"><span>{l.quantity} x {l.name}</span><span className="tabular-nums">{formatCedis(l.price * l.quantity)}</span></li>)}</ul>
                 <p className="flex justify-between border-t border-border pt-2 text-sm font-medium"><span>Subtotal</span><span className="tabular-nums">{formatCedis(subtotal)}</span></p>
-                <Button onClick={() => setCheckout(true)} disabled={!menu.openNow}>Check out</Button>
+                <Button onClick={() => setCheckout(true)}>{menu.openNow ? 'Check out' : 'Schedule for later'}</Button>
               </>
             )}
           </CardBody>
@@ -93,7 +94,7 @@ export function VendorMenu({ vendorId }: { vendorId: string }) {
 
       {lines.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface px-4 py-3 lg:hidden" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
-          <Button className="w-full" onClick={() => setCheckout(true)} disabled={!menu.openNow}>Check out: {count} items, {formatCedis(subtotal)}</Button>
+          <Button className="w-full" onClick={() => setCheckout(true)}>Check out: {count} items, {formatCedis(subtotal)}</Button>
         </div>
       )}
       <CheckoutDialog open={checkout} menu={menu} onClose={() => setCheckout(false)} />
@@ -102,6 +103,10 @@ export function VendorMenu({ vendorId }: { vendorId: string }) {
 }
 
 function CheckoutDialog({ open, menu, onClose }: { open: boolean; menu: Menu; onClose: () => void }) {
+  const [when, setWhen] = useState('');
+  const [planId, setPlanId] = useState('');
+  const [plans, setPlans] = useState<Array<{ id: string; mealsLeft: number; plan: { name: string; eligibleItemIds: string[]; vendor: { id: string } } }>>([]);
+  useEffect(() => { if (open) foodApi.myPlans().then((p) => setPlans(p.filter((x) => x.status === 'ACTIVE' && x.plan.vendor.id === menu.id && x.mealsLeft > 0))).catch(() => undefined); }, [open, menu.id]);
   const router = useRouter();
   const cart = useCart();
   const [fulfilment, setFulfilment] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
@@ -131,7 +136,7 @@ function CheckoutDialog({ open, menu, onClose }: { open: boolean; menu: Menu; on
     try {
       const r = await foodApi.place({
         vendorId: menu.id, lines: cart.lines.map((l) => ({ menuItemId: l.id, quantity: l.quantity })), fulfilment, paymentOption: payment,
-        dispatchFeeMode: dispatched ? feeMode : undefined, deliveryAddress: fulfilment === 'DELIVERY' ? address.trim() : undefined, deliveryNote: deliveryNote.trim() || undefined, note: note.trim() || undefined,
+        dispatchFeeMode: dispatched ? feeMode : undefined, scheduledFor: when ? new Date(when).toISOString() : undefined, mealPlanPurchaseId: planId || undefined, deliveryAddress: fulfilment === 'DELIVERY' ? address.trim() : undefined, deliveryNote: deliveryNote.trim() || undefined, note: note.trim() || undefined,
       });
       cart.clear();
       if (r.paymentUrl) window.location.href = r.paymentUrl;
@@ -176,6 +181,18 @@ function CheckoutDialog({ open, menu, onClose }: { open: boolean; menu: Menu; on
             <button type="button" className={choice(payment === 'ON_PICKUP')} aria-pressed={payment === 'ON_PICKUP'} onClick={() => setPayment('ON_PICKUP')}>Pay the vendor<span className="block text-xs font-normal text-muted">Cash, or MoMo to {menu.payToNumber}</span></button>
           </fieldset>
         )}
+        <Field label="When" htmlFor="co-when" hint={menu.openNow ? undefined : 'The vendor is closed now: choose a time when they are open.'}>
+          <Input id="co-when" type="datetime-local" value={when} min={new Date(Date.now() + (menu.prepMinutes + 15) * 60_000 - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16)} onChange={(e) => setWhen(e.target.value)} />
+        </Field>
+        {when && <button type="button" className="-mt-2 w-fit text-xs text-primary hover:underline" onClick={() => setWhen('')}>As soon as possible instead</button>}
+        {plans.length > 0 && (
+          <Field label="Meal plan" htmlFor="co-plan" hint="One meal covers the dearest eligible dish in your order.">
+            <Select id="co-plan" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+              <option value="">Do not use a meal</option>
+              {plans.map((p) => <option key={p.id} value={p.id}>{p.plan.name}: {p.mealsLeft} meals left</option>)}
+            </Select>
+          </Field>
+        )}
         <Field label="Note for the vendor (optional)" htmlFor="co-note"><Textarea id="co-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="For example: no pepper" /></Field>
 
         <dl className="flex flex-col gap-1 border-t border-border pt-3 text-sm">
@@ -192,5 +209,27 @@ function CheckoutDialog({ open, menu, onClose }: { open: boolean; menu: Menu; on
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/** Meal plans the vendor sells, bought online and then used one meal per order. */
+function MealPlansOffer({ vendorId }: { vendorId: string }) {
+  const [plans, setPlans] = useState<Array<{ id: string; name: string; meals: number; price: number; validDays: number }>>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { foodApi.vendorPlans(vendorId).then(setPlans).catch(() => undefined); }, [vendorId]);
+  if (!plans.length) return null;
+  return (
+    <Card>
+      <CardHeader title="Meal plans" description="Pay once, then use one meal per order on the dishes the plan covers." />
+      <CardBody className="flex flex-col gap-2">
+        {error && <Alert tone="danger">{error}</Alert>}
+        {plans.map((p) => (
+          <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span><span className="font-medium">{p.name}</span>: {p.meals} meals for {formatCedis(p.price)}, valid {p.validDays} days.</span>
+            <Button size="sm" variant="secondary" onClick={() => foodApi.buyPlan(p.id).then((r) => { window.location.href = r.paymentUrl; }).catch((err) => setError(errorMessage(err)))}>Buy</Button>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
   );
 }

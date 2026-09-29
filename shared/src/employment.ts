@@ -125,3 +125,59 @@ export function deliveryArea(address: string | null) {
   if (!address) return 'Campus';
   return address.split(/[,(]/)[0].replace(/\broom\b.*$/i, '').trim() || 'Campus';
 }
+
+// ----- Opportunities -----
+
+export type JobKind = 'CAMPUS_JOB' | 'INTERNSHIP' | 'TEACHING_ASSISTANT' | 'RESEARCH_ASSISTANT';
+export const JOB_KIND_LABEL: Record<JobKind, string> = {
+  CAMPUS_JOB: 'Campus job',
+  INTERNSHIP: 'Internship',
+  TEACHING_ASSISTANT: 'Teaching assistant',
+  RESEARCH_ASSISTANT: 'Research assistant',
+};
+
+// ----- Timesheets -----
+
+/** Hours a student may work in a week across all campus jobs, so work does not crowd out study. */
+export const MAX_WORK_HOURS_PER_WEEK = 20;
+
+/** Monday of the week a date falls in (YYYY-MM-DD), for weekly limits. */
+export function weekOf(date: string | Date) {
+  const d = new Date(typeof date === 'string' ? `${date.slice(0, 10)}T00:00:00Z` : date);
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * What a timesheet pays: hours times the hourly rate, tasks times the task rate, or the monthly amount.
+ * Quantities are hours (to the quarter hour) or tasks.
+ */
+export function timesheetAmount(payUnit: JobPayUnit, rate: number, entries: Array<{ quantity: number }>) {
+  if (payUnit === 'MONTH') return rate;
+  const total = entries.reduce((t, e) => t + e.quantity, 0);
+  return Math.round(total * rate);
+}
+
+/**
+ * Problems with hours logged: more than the job's weekly hours in any week, or more than the campus
+ * weekly limit counting the student's other jobs. `otherHours` maps a week (Monday) to hours already
+ * logged on other jobs that week.
+ */
+export function hoursProblems(entries: Array<{ date: string; quantity: number }>, jobHoursPerWeek: number, otherHours: Record<string, number> = {}) {
+  const weeks = new Map<string, number>();
+  for (const e of entries) weeks.set(weekOf(e.date), (weeks.get(weekOf(e.date)) ?? 0) + e.quantity);
+  const problems: string[] = [];
+  for (const [week, hours] of weeks) {
+    if (hours > jobHoursPerWeek + 1e-9) problems.push(`Week of ${week}: ${hours} hours is more than this job's ${jobHoursPerWeek} hours a week.`);
+    const all = hours + (otherHours[week] ?? 0);
+    if (all > MAX_WORK_HOURS_PER_WEEK + 1e-9) problems.push(`Week of ${week}: ${all} hours across your jobs is more than the ${MAX_WORK_HOURS_PER_WEEK}-hour weekly limit.`);
+  }
+  for (const e of entries) {
+    if (!(e.quantity > 0) || e.quantity > 12 || Math.round(e.quantity * 4) !== e.quantity * 4) problems.push(`${e.date}: enter between 0.25 and 12 hours, in quarter hours.`);
+  }
+  return problems;
+}
+
+export type TimesheetStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'RETURNED' | 'PAID';
+export const TIMESHEET_STATUS_LABEL: Record<TimesheetStatus, string> = { DRAFT: 'Not sent', SUBMITTED: 'Waiting for approval', APPROVED: 'Approved, waiting for payment', RETURNED: 'Returned for changes', PAID: 'Paid' };

@@ -25,6 +25,17 @@ export interface PaymentProvider {
   refund(reference: string, amount: number): Promise<'REFUNDED' | 'REFUND_PENDING'>;
   /** True if the webhook body really came from the provider. */
   verifyWebhook(rawBody: Buffer, signature: string | undefined): boolean;
+  /** Sends money from the university's balance to a mobile money number. */
+  transfer(input: TransferInput): Promise<{ status: 'success' | 'pending' | 'failed'; transferCode?: string; message?: string }>;
+}
+
+export interface TransferInput {
+  amount: number;
+  bankCode: string;
+  number: string;
+  name: string;
+  reference: string;
+  reason: string;
 }
 
 /**
@@ -50,6 +61,11 @@ export class DemoPaymentProvider implements PaymentProvider {
 
   verifyWebhook() {
     return false;
+  }
+
+  /** Demo: every transfer succeeds at once; no money moves. */
+  async transfer() {
+    return { status: 'success' as const, transferCode: 'DEMO' };
   }
 }
 
@@ -114,5 +130,26 @@ export class PaystackPaymentProvider implements PaymentProvider {
     const a = Buffer.from(expected);
     const b = Buffer.from(signature);
     return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  /**
+   * Paystack Transfers (https://paystack.com/docs/transfers): create a mobile money recipient, then send
+   * from the balance. Paystack may hold a transfer for OTP approval if that is switched on for the
+   * account; it then completes by webhook (transfer.success / transfer.failed).
+   */
+  async transfer(input: TransferInput) {
+    try {
+      const recipient = await this.call<{ recipient_code: string }>('/transferrecipient', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'mobile_money', name: input.name, account_number: input.number, bank_code: input.bankCode, currency: 'GHS' }),
+      });
+      const t = await this.call<{ status: string; transfer_code: string }>('/transfer', {
+        method: 'POST',
+        body: JSON.stringify({ source: 'balance', amount: input.amount, recipient: recipient.recipient_code, reason: input.reason, reference: input.reference, currency: 'GHS' }),
+      });
+      return { status: t.status === 'success' ? ('success' as const) : t.status === 'failed' ? ('failed' as const) : ('pending' as const), transferCode: t.transfer_code };
+    } catch (err) {
+      return { status: 'failed' as const, message: (err as Error).message };
+    }
   }
 }

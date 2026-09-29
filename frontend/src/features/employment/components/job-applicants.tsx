@@ -10,7 +10,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
+import { api, errorMessage } from '@/lib/axios';
 import { formatDate } from '@/lib/format';
 import { APPLICATION_TONE, cgpaText, workApi, type Applicant, type JobDetail } from '../api';
 
@@ -18,11 +18,11 @@ type Decision = 'SHORTLISTED' | 'HIRED' | 'REJECTED' | 'ENDED';
 const VERB: Record<Decision, string> = { SHORTLISTED: 'Shortlist', HIRED: 'Hire', REJECTED: 'Turn down', ENDED: 'End job' };
 
 /** Applicants with their CGPA and whether they meet the rules today. */
-export function JobApplicants({ id }: { id: string }) {
+export function JobApplicants({ id, scope = 'careers' }: { id: string; scope?: 'careers' | 'owner' }) {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deciding, setDeciding] = useState<{ a: Applicant; status: Decision } | null>(null);
-  const load = useCallback(() => workApi.jobDetail(id).then(setJob).catch((err) => setError(errorMessage(err))), [id]);
+  const load = useCallback(() => (scope === 'owner' ? api.get<JobDetail>(`/opportunities/jobs/${id}`).then((r) => r.data) : workApi.jobDetail(id)).then(setJob).catch((err) => setError(errorMessage(err))), [id, scope]);
   useEffect(() => { void load(); }, [load]);
 
   if (!job) return error ? <Alert tone="danger">{error}</Alert> : <Spinner />;
@@ -73,12 +73,12 @@ export function JobApplicants({ id }: { id: string }) {
           </ul>
         )}
       </Card>
-      <DecisionDialog target={deciding} onClose={() => setDeciding(null)} onDone={() => { setDeciding(null); void load(); }} />
+      <DecisionDialog scope={scope} target={deciding} onClose={() => setDeciding(null)} onDone={() => { setDeciding(null); void load(); }} />
     </div>
   );
 }
 
-function DecisionDialog({ target, onClose, onDone }: { target: { a: Applicant; status: Decision } | null; onClose: () => void; onDone: () => void }) {
+function DecisionDialog({ scope, target, onClose, onDone }: { scope: 'careers' | 'owner'; target: { a: Applicant; status: Decision } | null; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState('');
   const [start, setStart] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +90,7 @@ function DecisionDialog({ target, onClose, onDone }: { target: { a: Applicant; s
   const submit = async () => {
     setBusy(true);
     try {
-      await workApi.decide(a.id, { status, note: note.trim() || undefined, startDate: status === 'HIRED' ? `${start}T08:00:00.000Z` : undefined });
+      await (scope === 'owner' ? (a: string, d: Parameters<typeof workApi.decide>[1]) => api.post(`/opportunities/applications/${a}/decision`, d) : workApi.decide)(a.id, { status, note: note.trim() || undefined, startDate: status === 'HIRED' ? `${start}T08:00:00.000Z` : undefined });
       onDone();
     } catch (err) {
       setError(errorMessage(err));

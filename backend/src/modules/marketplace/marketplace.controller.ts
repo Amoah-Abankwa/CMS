@@ -9,7 +9,7 @@ import { CustomerService } from './customer.service';
 import { OrdersService } from './orders.service';
 import { DispatchService } from './dispatch.service';
 import {
-  AvailabilityDto, MarkPaidDto, CategoryDto, CreateVendorDto, DeliveredDto, DispatcherPayoutDto, OnlineDto, ProblemDto, MarketplaceSettingsDto, MenuItemDto, OrdersQuery, PauseDto, PayoutDto, PlaceOrderDto, ReviewVendorDto, SettlementQuery, VendorActionDto, VendorProfileDto,
+  AvailabilityDto, MarkPaidDto, RatingDto, MealPlanDto, LocationDto, CategoryDto, CreateVendorDto, DeliveredDto, DispatcherPayoutDto, OnlineDto, ProblemDto, MarketplaceSettingsDto, MenuItemDto, OrdersQuery, PauseDto, PayoutDto, PlaceOrderDto, ReviewVendorDto, SettlementQuery, VendorActionDto, VendorProfileDto,
 } from './dto/marketplace.dto';
 
 @Controller('marketplace')
@@ -60,6 +60,9 @@ export class MarketplaceAdminController {
   settlements(@Query() q: SettlementQuery) {
     return this.admin.settlements(q.from, q.to);
   }
+
+  @Get('ratings') ratings() { return this.admin.ratings(); }
+  @Post('ratings/:id/hide') @HttpCode(200) hideRating(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PauseDto) { return this.admin.hideRating(u, id, dto.paused); }
 
   @Post('payouts')
   payout(@CurrentUser() u: AuthUser, @Body() dto: PayoutDto) {
@@ -122,6 +125,11 @@ export class VendorController {
     return this.vendor.deleteItem(u, id);
   }
 
+  @Get('ratings') myRatings(@CurrentUser() u: AuthUser) { return this.vendor.ratings(u); }
+  @Get('meal-plans') plans(@CurrentUser() u: AuthUser) { return this.vendor.plans(u); }
+  @Post('meal-plans') createPlan(@CurrentUser() u: AuthUser, @Body() dto: MealPlanDto) { return this.vendor.savePlan(u, dto); }
+  @Put('meal-plans/:id') updatePlan(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: MealPlanDto) { return this.vendor.savePlan(u, dto, id); }
+
   @Get('orders')
   board(@CurrentUser() u: AuthUser) {
     return this.vendor.board(u);
@@ -175,6 +183,11 @@ export class FoodController {
     return this.customer.cancel(u, id);
   }
 
+  @Post('orders/:id/rating') rate(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RatingDto) { return this.customer.rate(u, id, dto); }
+  @Get('vendors/:id/meal-plans') vendorPlans(@Param('id', ParseUUIDPipe) id: string) { return this.customer.plansFor(id); }
+  @Get('meal-plans') myPlans(@CurrentUser() u: AuthUser) { return this.customer.myPlans(u); }
+  @Post('meal-plans/:id/buy') @HttpCode(200) buyPlan(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) { return this.customer.buyPlan(u, id); }
+
   @Post('orders/:id/pay') @HttpCode(200)
   pay(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.orders.retryPayment(u, id);
@@ -221,6 +234,8 @@ export class DispatchController {
   problem(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ProblemDto) {
     return this.dispatch.problem(u, id, dto.note);
   }
+
+  @Post('location') @HttpCode(200) location(@CurrentUser() u: AuthUser, @Body() dto: LocationDto) { return this.dispatch.location(u, dto); }
 
   @Get('earnings')
   earnings(@CurrentUser() u: AuthUser, @Query() q: SettlementQuery) {

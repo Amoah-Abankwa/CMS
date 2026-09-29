@@ -20,13 +20,15 @@ export interface Bill extends BillFigures {
   clearancePercent?: number;
   cedisPerDollar?: number | null;
 }
-export interface MyBill extends Omit<Bill, 'student' | 'clearance'> { semesterLabel: string; cleared: boolean; statement: StatementEntry[] }
+export interface MyBill extends Omit<Bill, 'student' | 'clearance'> {
+  instalments?: { plan: Array<{ dueDate: string; cumulativePercent: number }>; missed: Array<{ index: number; dueDate: string }>; next: { index: number; dueDate: string; cumulativePercent: number; required: number; toPay: number } | null } | null; semesterLabel: string; cleared: boolean; statement: StatementEntry[] }
 export interface Schedule { id: string; name: string; programmeId: string | null; level: number | null; studentGroup: FeeStudentGroup; currency: Currency; programme: { name: string } | null; lines: Array<{ id: string; feeItemId: string | null; name: string; amount: number }>; _count: { bills: number } }
 export interface FeeItem { id: string; name: string; description: string | null; isActive: boolean; _count: { lines: number } }
 export interface FeeReceipt { originalAmount?: number | null; originalCurrency?: Currency | null; exchangeRate?: number | null; id: string; amount: number; method: FeePaymentMethod; reference: string; receiptNumber: string; paidOn: string; createdAt: string; reversedAt: string | null; reversalReason: string | null; currency: Currency; semester: string; student: { name: string; indexNumber: string | null; programme: string | null; level: number | null }; balanceAfter: number; balanceNow: number }
 export interface FeeOptions { semesters: Array<{ id: string; label: string; isCurrent: boolean }>; programmes: Array<{ id: string; name: string }> }
 
 export interface AdminAssociation {
+  patron?: { id: string; firstName: string; lastName: string; email: string | null } | null;
   id: string; code: string; name: string; description: string | null; isActive: boolean;
   payoutNetwork: string | null; payoutNumber: string | null; payoutName: string | null;
   departments: Array<{ id: string; name: string }>;
@@ -36,6 +38,7 @@ export interface AdminAssociation {
 }
 export interface Receipt { id: string; amount: number; method: 'ONLINE' | 'CASH'; receiptNumber: string; createdAt: string; voidedAt: string | null; voidReason: string | null; levy: { title: string }; student: { firstName: string; lastName: string; indexNumber: string | null } }
 export interface Office {
+  patron?: { firstName: string; lastName: string; email: string | null; staffProfile: { title: string | null } | null } | null;
   office: AssociationOffice; endsOn: string;
   association: { id: string; code: string; name: string };
   semester: { id: string; label: string } | null;
@@ -54,7 +57,15 @@ export interface MyDues {
 }
 export interface DuesSettlement { id: string; code: string; name: string; payoutNetwork: string | null; payoutNumber: string | null; payoutName: string | null; online: number; cash: number; paidOut: number; owed: number }
 
+export interface Patronage {
+  id: string; code: string; name: string; semester: string | null; departments: string[]; members: number;
+  officers: Array<{ office: string; student: { firstName: string; lastName: string; phone: string | null } }>;
+  levies: Array<{ id: string; title: string; amount: number; dueOn: string; isOpen: boolean; paidCount: number; online: number; cash: number }>;
+}
+
 export const feesApi = {
+  patronages: () => api.get<Patronage[]>('/dues-patron').then((r) => r.data),
+  setPatron: (associationId: string, email: string | null) => api.put(`/associations/${associationId}/patron`, { email }),
   mine: () => api.get<{ rules: FeeRules; provider: string; cedisPerDollar: number | null; bills: MyBill[] }>('/me/fees').then((r) => r.data),
   rates: () => api.get<ExchangeRate[]>('/fees/rates').then((r) => r.data),
   addRate: (dto: { cedisPerDollar: number; effectiveFrom: string; note?: string }) => api.post('/fees/rates', dto),
@@ -63,7 +74,9 @@ export const feesApi = {
 
   options: () => api.get<FeeOptions>('/fees/options').then((r) => r.data),
   rules: () => api.get<FeeRules>('/fees/rules').then((r) => r.data),
-  saveRules: (dto: Pick<FeeRules, 'minOnlinePayment' | 'minOnlinePaymentUsd'>) => api.put<FeeRules>('/fees/rules', dto).then((r) => r.data),
+  instalments: (semesterId: string) => api.get<{ semesterId: string; instalments: Array<{ dueDate: string; cumulativePercent: number }> }>(`/fees/instalments/${semesterId}`).then((r) => r.data),
+  saveInstalments: (semesterId: string, instalments: Array<{ dueDate: string; cumulativePercent: number }>) => api.put(`/fees/instalments/${semesterId}`, { instalments }),
+  saveRules: (dto: Partial<Pick<FeeRules, 'minOnlinePayment' | 'minOnlinePaymentUsd' | 'lateFeeEnabled' | 'lateFee' | 'lateFeeUsd'>>) => api.put<FeeRules>('/fees/rules', dto).then((r) => r.data),
   items: () => api.get<FeeItem[]>('/fees/items').then((r) => r.data),
   saveItem: (dto: { name: string; description?: string; isActive?: boolean }, id?: string) => (id ? api.put(`/fees/items/${id}`, dto) : api.post('/fees/items', dto)),
   clearanceRule: () => api.get<{ clearancePercent: number }>('/fees/clearance-rule').then((r) => r.data),
@@ -93,8 +106,8 @@ export const feesApi = {
   voidReceipt: (id: string, reason: string) => api.post(`/associations/receipts/${id}/void`, { reason }),
 
   offices: () => api.get<Office[]>('/association').then((r) => r.data),
-  createLevy: (associationId: string, dto: { title: string; amount: number; dueOn: string }) => api.post(`/association/${associationId}/levies`, dto),
-  setLevyOpen: (levyId: string, isOpen: boolean) => api.post(`/association/levies/${levyId}/open`, { isOpen }),
+  createLevy: (associationId: string, dto: { title: string; amount: number; dueOn: string }) => api.post(`/dues-patron/${associationId}/levies`, dto),
+  setLevyOpen: (levyId: string, isOpen: boolean) => api.post(`/dues-patron/levies/${levyId}/open`, { isOpen }),
   levyMembers: (levyId: string) => api.get<LevyMembers>(`/association/levies/${levyId}`).then((r) => r.data),
   recordCash: (levyId: string, indexNumber: string) => api.post<{ receiptNumber: string; amount: number; student: string }>(`/association/levies/${levyId}/cash`, { indexNumber }).then((r) => r.data),
 

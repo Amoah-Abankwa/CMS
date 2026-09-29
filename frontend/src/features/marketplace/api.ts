@@ -2,6 +2,8 @@ import type { OpeningHours, OrderStatus } from '@anu/shared';
 import { api } from '@/lib/axios';
 
 export interface VendorPublic {
+  rating?: number | null;
+  ratings?: number;
   id: string;
   name: string;
   description: string | null;
@@ -49,6 +51,9 @@ export interface Order {
   status: OrderStatus;
   fulfilment: 'PICKUP' | 'DELIVERY';
   viaDispatcher: boolean;
+  scheduledFor: string | null;
+  mealCredit: number;
+  rating: { vendorStars: number; dispatcherStars: number | null; vendorComment: string | null } | null;
   dispatchFeeMode: 'INCLUDED' | 'ON_DELIVERY' | null;
   paidVia: string | null;
   paidReference: string | null;
@@ -152,10 +157,20 @@ export interface DispatcherSettlement {
   owed: number;
 }
 
+export interface MealPlan { id: string; name: string; meals: number; price: number; validDays: number; eligibleItemIds: string[]; isActive?: boolean }
+export interface MyMealPlan { id: string; mealsTotal: number; mealsLeft: number; status: 'ACTIVE' | 'USED_UP' | 'EXPIRED'; expiresAt: string | null; plan: { id: string; name: string; eligibleItemIds: string[]; vendor: { id: string; name: string } } }
+
 export const foodApi = {
+  rate: (id: string, dto: { vendorStars: number; vendorComment?: string; dispatcherStars?: number }) => api.post(`/food/orders/${id}/rating`, dto),
+  vendorPlans: (vendorId: string) => api.get<MealPlan[]>(`/food/vendors/${vendorId}/meal-plans`).then((r) => r.data),
+  myPlans: () => api.get<MyMealPlan[]>('/food/meal-plans').then((r) => r.data),
+  buyPlan: (id: string) => api.post<{ paymentUrl: string }>(`/food/meal-plans/${id}/buy`).then((r) => r.data),
+  vendorRatings: () => api.get<{ average: number | null; count: number; rows: Array<{ vendorStars: number; vendorComment: string | null; createdAt: string; order: { number: number } }> }>('/vendor/ratings').then((r) => r.data),
+  ownPlans: () => api.get<Array<MealPlan & { _count: { purchases: number } }>>('/vendor/meal-plans').then((r) => r.data),
+  savePlan: (dto: Omit<MealPlan, 'id'>, id?: string) => (id ? api.put(`/vendor/meal-plans/${id}`, dto) : api.post('/vendor/meal-plans', dto)),
   vendors: () => api.get<Array<VendorPublic & { itemsAvailable: number }>>('/food/vendors').then((r) => r.data),
   menu: (id: string) => api.get<VendorMenu>(`/food/vendors/${id}`).then((r) => r.data),
-  place: (dto: { vendorId: string; lines: Array<{ menuItemId: string; quantity: number }>; fulfilment: 'PICKUP' | 'DELIVERY'; paymentOption: 'ONLINE' | 'ON_PICKUP'; dispatchFeeMode?: 'INCLUDED' | 'ON_DELIVERY'; deliveryAddress?: string; deliveryNote?: string; note?: string }) =>
+  place: (dto: { vendorId: string; lines: Array<{ menuItemId: string; quantity: number }>; fulfilment: 'PICKUP' | 'DELIVERY'; paymentOption: 'ONLINE' | 'ON_PICKUP'; dispatchFeeMode?: 'INCLUDED' | 'ON_DELIVERY'; scheduledFor?: string; mealPlanPurchaseId?: string; deliveryAddress?: string; deliveryNote?: string; note?: string }) =>
     api.post<{ orderId: string; number: number; paymentUrl?: string; provider?: string }>('/food/orders', dto).then((r) => r.data),
   orders: (page: number) => api.get<{ items: Order[]; total: number; page: number; pageSize: number }>('/food/orders', { params: { page, pageSize: 20 } }).then((r) => r.data),
   order: (id: string) => api.get<Order>(`/food/orders/${id}`).then((r) => r.data),

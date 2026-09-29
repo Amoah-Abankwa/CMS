@@ -32,3 +32,12 @@ describe('private document downloads', () => {
     expect(signature).toBe(signParams(signed, 's'));
   });
 });
+
+import { resourceUrl } from './cloudinary';
+
+describe('checking what was really uploaded', () => {
+  it('asks the Admin API about the exact file, private or public', () => {
+    expect(resourceUrl('anu', 'upload', 'anu/menu/v1/abc')).toBe('https://api.cloudinary.com/v1_1/anu/resources/image/upload/anu/menu/v1/abc');
+    expect(resourceUrl('anu', 'authenticated', 'anu/docs/excuses/u1/note 1')).toBe('https://api.cloudinary.com/v1_1/anu/resources/image/authenticated/anu/docs/excuses/u1/note%201');
+  });
+});

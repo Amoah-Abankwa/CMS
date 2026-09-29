@@ -1,3 +1,4 @@
+import { TransfersService } from '../payments/transfers.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { formatCedis, PERMISSIONS, ROLE_KEYS } from '@anu/shared';
@@ -39,9 +40,20 @@ export class HostelFeesService implements OnModuleInit {
     private readonly hallCharges: HallChargesService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly transfers: TransfersService,
   ) {}
 
   onModuleInit() {
+    this.transfers.register('HOSTEL_OWNER', {
+      recipient: async (hostelId) => {
+        const h = await this.prisma.hostel.findUniqueOrThrow({ where: { id: hostelId }, select: { name: true, payoutNetwork: true, payoutNumber: true, payoutName: true } });
+        const row = (await this.ownerSettlements()).find((x) => x.id === hostelId);
+        return { network: h.payoutNetwork, number: h.payoutNumber, name: h.payoutName, owed: row?.owed ?? 0, label: h.name };
+      },
+      record: async (actorId, hostelId, amount, reference) => {
+        await this.recordOwnerPayout({ id: actorId } as AuthUser, { hostelId, amount, reference });
+      },
+    });
     this.payments.onSucceeded('HOSTEL_FEE', async (p) => {
       if (!p.subjectId || (await this.prisma.hostelFeePayment.findUnique({ where: { reference: p.reference } }))) return;
       const pay = await this.prisma.hostelFeePayment.create({ data: { feeId: p.subjectId, amount: p.amount, method: 'ONLINE', reference: p.reference, receiptNumber: newReceipt(), paidOn: p.paidAt ?? new Date(), recordedById: p.userId } });
@@ -177,13 +189,22 @@ export class HostelFeesService implements OnModuleInit {
     return { filename: `hostel-receipt-${p.receiptNumber}.pdf`, buffer: await d.toBuffer(`Generated ${new Date().toISOString().slice(0, 10)} from the ANU platform.`) };
   }
 
+  /** Owners set where Finance sends their online fees. */
+  async setPayoutDetails(user: AuthUser, dto: { hostelId: string; network: string; number: string; name: string }) {
+    const h = await this.prisma.hostel.findUnique({ where: { id: dto.hostelId }, select: { ownerId: true } });
+    if (!h || h.ownerId !== user.id) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Hostel not found.' });
+    await this.prisma.hostel.update({ where: { id: dto.hostelId }, data: { payoutNetwork: dto.network, payoutNumber: dto.number, payoutName: dto.name } });
+    await this.audit.record({ action: 'accommodation.owner_payout_details', module: 'accommodation', targetType: 'Hostel', targetId: dto.hostelId });
+    return { ok: true };
+  }
+
   // ----- Finance: paying private hostel owners the fees collected online -----
 
   async ownerSettlements() {
     const hostels = await this.prisma.hostel.findMany({
       where: { kind: 'PRIVATE' },
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, owner: { select: { firstName: true, lastName: true, phone: true } }, hostelFees: { select: { payments: { where: { method: 'ONLINE', reversedAt: null }, select: { amount: true } } } }, ownerPayouts: { select: { amount: true } } },
+      select: { id: true, name: true, payoutNetwork: true, payoutNumber: true, payoutName: true, owner: { select: { firstName: true, lastName: true, phone: true } }, hostelFees: { select: { payments: { where: { method: 'ONLINE', reversedAt: null }, select: { amount: true } } } }, ownerPayouts: { select: { amount: true } } },
     });
     return hostels.map(({ hostelFees, ownerPayouts, ...h }) => {
       const online = hostelFees.flatMap((f) => f.payments).reduce((t, p) => t + p.amount, 0);

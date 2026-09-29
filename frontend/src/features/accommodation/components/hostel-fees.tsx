@@ -13,6 +13,7 @@ import { EmptyState, Spinner } from '@/components/ui/states';
 import { api, errorMessage } from '@/lib/axios';
 import { formatDate } from '@/lib/format';
 import { usePaymentReturn } from '@/features/fees/components/use-payment-return';
+import { PayNowButton } from '@/features/fees/components/pay-now';
 
 type Method = 'ONLINE' | 'CASH' | 'MOBILE_MONEY' | 'BANK';
 const METHOD: Record<Method, string> = { ONLINE: 'Online', CASH: 'Cash', MOBILE_MONEY: 'MoMo', BANK: 'Bank' };
@@ -88,6 +89,7 @@ export function HostelFeesDesk() {
     <div className="flex flex-col gap-4">
       {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
       <p className="text-sm text-muted">This semester: {formatCedis(data.totals.due)} due, {formatCedis(data.totals.paid)} paid. You receive a copy of every receipt.</p>
+      <OwnerPayoutDetails />
       <div className="flex flex-wrap gap-3">
         <Input aria-label="Search" className="w-64" placeholder="Index number or name" value={q.search} onChange={(e) => setQ({ ...q, search: e.target.value })} />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={q.unpaidOnly} onChange={(e) => setQ({ ...q, unpaidOnly: e.target.checked })} /> Only those who owe</label>
@@ -160,11 +162,43 @@ export function HostelOwnerPayouts() {
           {rows.map((h) => (
             <li key={h.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <span><span className="font-medium">{h.name}</span><span className="block text-xs text-muted">{h.owner ? `${h.owner.firstName} ${h.owner.lastName}, ${h.owner.phone ?? ''}. ` : ''}Online {formatCedis(h.online)}, paid out {formatCedis(h.paidOut)}.</span></span>
-              <span className="flex items-center gap-3"><span className="font-medium tabular-nums">{formatCedis(h.owed)} owed</span>{h.owed > 0 && <Button size="sm" variant="secondary" onClick={() => { const ref = window.prompt(`Transaction ID for the ${formatCedis(h.owed)} payout to ${h.name} (optional)`) ?? undefined; api.post('/fees/hostel-owners/payouts', { hostelId: h.id, amount: h.owed, reference: ref || undefined }).then(() => { setMsg({ tone: 'success', text: `Payout to ${h.name} recorded.` }); load(); }).catch((err) => setMsg({ tone: 'danger', text: errorMessage(err) })); }}>Record payout</Button>}</span>
+              <span className="flex items-center gap-3"><span className="font-medium tabular-nums">{formatCedis(h.owed)} owed</span>{h.owed > 0 && <PayNowButton purpose="HOSTEL_OWNER" subjectId={h.id} amount={h.owed} label={h.name} onDone={load} />}{h.owed > 0 && <Button size="sm" variant="secondary" onClick={() => { const ref = window.prompt(`Transaction ID for the ${formatCedis(h.owed)} payout to ${h.name} (optional)`) ?? undefined; api.post('/fees/hostel-owners/payouts', { hostelId: h.id, amount: h.owed, reference: ref || undefined }).then(() => { setMsg({ tone: 'success', text: `Payout to ${h.name} recorded.` }); load(); }).catch((err) => setMsg({ tone: 'danger', text: errorMessage(err) })); }}>Record payout</Button>}</span>
             </li>
           ))}
         </ul>
       )}
     </Card>
+  );
+}
+
+/** Private hostel owners: the mobile money number Finance sends online fees to. Hidden for the Hostel Manager. */
+function OwnerPayoutDetails() {
+  const [hostels, setHostels] = useState<Array<{ id: string; name: string; payoutNetwork?: string | null; payoutNumber?: string | null; payoutName?: string | null }> | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { api.get('/my-hostels').then((r) => setHostels(r.data)).catch(() => setHostels([])); }, []);
+  if (!hostels || !hostels.length) return null;
+  return (
+    <Card>
+      <CardHeader title="Where online fees are paid to you" description="Finance sends fees students pay online to this mobile money number." />
+      <CardBody className="flex flex-col gap-3">
+        {msg && <Alert tone="success">{msg}</Alert>}
+        {hostels.map((h) => <PayoutRow key={h.id} h={h} onSaved={() => setMsg(`Saved for ${h.name}.`)} />)}
+      </CardBody>
+    </Card>
+  );
+}
+
+function PayoutRow({ h, onSaved }: { h: { id: string; name: string; payoutNetwork?: string | null; payoutNumber?: string | null; payoutName?: string | null }; onSaved: () => void }) {
+  const [f, setF] = useState({ network: h.payoutNetwork ?? 'MTN', number: h.payoutNumber ?? '', name: h.payoutName ?? '' });
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
+      <span className="text-sm font-medium">{h.name}</span>
+      <Select aria-label="Network" value={f.network} onChange={(e) => setF({ ...f, network: e.target.value })}><option value="MTN">MTN MoMo</option><option value="Telecel">Telecel Cash</option><option value="AirtelTigo">AirtelTigo Money</option></Select>
+      <Input aria-label="Mobile money number" value={f.number} placeholder="0244000000" onChange={(e) => setF({ ...f, number: e.target.value })} />
+      <Input aria-label="Name on the account" value={f.name} placeholder="Name on the account" onChange={(e) => setF({ ...f, name: e.target.value })} />
+      <Button size="sm" variant="secondary" disabled={f.number.trim().length < 9 || f.name.trim().length < 3} onClick={() => api.post('/hostel-fees/payout-details', { hostelId: h.id, ...f }).then(onSaved).catch((err) => setError(errorMessage(err)))}>Save</Button>
+      {error && <span className="text-xs text-danger sm:col-span-5">{error}</span>}
+    </div>
   );
 }

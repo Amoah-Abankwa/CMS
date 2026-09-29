@@ -30,7 +30,7 @@ export function VendorList() {
           <Link href={`/food/${v.id}`} className="block rounded-lg border border-border bg-surface px-4 py-3 hover:border-primary">
             <span className="flex items-start justify-between gap-2">
               <span className="font-medium">{v.name}</span>
-              <Badge tone={v.openNow ? 'success' : 'neutral'}>{v.openNow ? 'Open' : v.paused ? 'Paused' : 'Closed'}</Badge>
+              <span className="flex items-center gap-2">{v.rating != null && <span className="text-xs text-muted" aria-label={`Rated ${v.rating} out of 5 by ${v.ratings} customers`}>{v.rating.toFixed(1)} / 5 ({v.ratings})</span>}<Badge tone={v.openNow ? 'success' : 'neutral'}>{v.openNow ? 'Open' : v.paused ? 'Paused' : 'Closed'}</Badge></span>
             </span>
             <span className="block text-sm text-muted">{v.location}</span>
             {v.description && <span className="mt-1 block text-sm">{v.description}</span>}

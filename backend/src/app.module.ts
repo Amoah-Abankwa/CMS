@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { PerPersonThrottlerGuard } from './common/guards/throttle.guard';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { JobsModule } from './core/jobs/jobs.module';
 import { RequestContextMiddleware } from './core/context/request-context.middleware';
@@ -27,6 +28,7 @@ import { SecurityModule } from './modules/security/security.module';
 import { FeesModule } from './modules/fees/fees.module';
 import { RegistryModule } from './modules/registry/registry.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { ImportsModule } from './modules/imports/imports.module';
 import { AccountSetupModule } from './modules/account-setup/account-setup.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { AcademicsModule } from './modules/academics/academics.module';
@@ -59,13 +61,15 @@ import { HealthModule } from './modules/health/health.module';
     FeesModule,
     RegistryModule,
     UploadsModule,
+    ImportsModule,
     AcademicsModule,
     PreferencesModule,
     HealthModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Sign-in is checked first so request limits can be counted per account (see PerPersonThrottlerGuard).
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: PerPersonThrottlerGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

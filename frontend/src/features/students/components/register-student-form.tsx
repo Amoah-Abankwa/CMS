@@ -18,23 +18,19 @@ import {
   type RegisterStudentValues,
 } from '../schemas';
 
-type RegisterStudentFormInput = Omit<RegisterStudentValues, 'gender'> & {
-  gender?: '' | 'Female' | 'Male';
-};
-
 export function RegisterStudentForm({
   onRegisteredAction,
 }: {
-  onRegisteredAction: (s: RegisteredStudent) => void;
+  onRegisteredAction: (student: RegisteredStudent) => void;
 }) {
   const [programmes, setProgrammes] = useState<ProgrammeOption[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState } = useForm<
-    RegisterStudentFormInput,
-    unknown,
-    RegisterStudentValues
-  >({
+  const {
+    register,
+    handleSubmit,
+    formState,
+  } = useForm<RegisterStudentValues>({
     resolver: zodResolver(registerStudentSchema),
     defaultValues: {
       admissionYear: new Date().getFullYear(),
@@ -52,19 +48,35 @@ export function RegisterStudentForm({
       .catch((err) => setError(errorMessage(err)));
   }, []);
 
-  const onSubmit = handleSubmit(async (values) => {
-    setError(null);
+  const onSubmit = handleSubmit(
+    async (values: RegisterStudentValues) => {
+      setError(null);
 
-    try {
-      const result = await studentsApi.register(values);
-      onRegisteredAction(result);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  });
+      try {
+        const payload = {
+          ...values,
+          phone: values.phone.replace(/\s/g, ''),
+          middleName: values.middleName || undefined,
+          dateOfBirth: values.dateOfBirth || undefined,
+          gender: values.gender || undefined,
+          nationality: values.nationality || undefined,
+        };
+
+        const student = await studentsApi.register(payload);
+
+        onRegisteredAction(student);
+      } catch (err) {
+        setError(errorMessage(err));
+      }
+    },
+  );
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      className="flex flex-col gap-6"
+    >
       {error && <Alert tone="danger">{error}</Alert>}
 
       <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -110,7 +122,11 @@ export function RegisterStudentForm({
           />
         </Field>
 
-        <Field label="Date of birth (optional)" htmlFor="dateOfBirth">
+        <Field
+          label="Date of birth (optional)"
+          htmlFor="dateOfBirth"
+          error={e.dateOfBirth?.message}
+        >
           <Input
             id="dateOfBirth"
             type="date"
@@ -118,7 +134,11 @@ export function RegisterStudentForm({
           />
         </Field>
 
-        <Field label="Gender (optional)" htmlFor="gender">
+        <Field
+          label="Gender (optional)"
+          htmlFor="gender"
+          error={e.gender?.message}
+        >
           <Select id="gender" {...register('gender')}>
             <option value="">Not stated</option>
             <option value="Female">Female</option>
@@ -126,13 +146,22 @@ export function RegisterStudentForm({
           </Select>
         </Field>
 
-        <Field label="Nationality (optional)" htmlFor="nationality">
-          <Input id="nationality" {...register('nationality')} />
+        <Field
+          label="Nationality (optional)"
+          htmlFor="nationality"
+          error={e.nationality?.message}
+        >
+          <Input
+            id="nationality"
+            {...register('nationality')}
+          />
         </Field>
       </fieldset>
 
       <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold">Contact</legend>
+        <legend className="mb-3 text-sm font-semibold">
+          Contact
+        </legend>
 
         <Field
           label="Email"
@@ -166,7 +195,9 @@ export function RegisterStudentForm({
       </fieldset>
 
       <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <legend className="mb-3 text-sm font-semibold">Admission</legend>
+        <legend className="mb-3 text-sm font-semibold">
+          Admission
+        </legend>
 
         <div className="sm:col-span-2">
           <Field
@@ -203,15 +234,17 @@ export function RegisterStudentForm({
             type="number"
             inputMode="numeric"
             aria-invalid={!!e.admissionYear}
-            {...register('admissionYear', { valueAsNumber: true })}
+            {...register('admissionYear', {
+              valueAsNumber: true,
+            })}
           />
         </Field>
       </fieldset>
 
       <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted">
-          The index number is assigned automatically. The student receives
-          sign-in details by email and SMS.
+          The index number is assigned automatically. The
+          student receives sign-in details by email and SMS.
         </p>
 
         <Button

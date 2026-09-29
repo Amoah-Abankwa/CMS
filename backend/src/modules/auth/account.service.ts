@@ -1,3 +1,4 @@
+import { UploadsService } from '../uploads/uploads.service';
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { generateNumericCode, sha256 } from '../../core/crypto/crypto.util';
@@ -23,6 +24,7 @@ export class AccountService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly setup: AccountSetupService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async me(auth: AuthUser) {
@@ -30,7 +32,7 @@ export class AccountService {
       where: { id: auth.id },
       select: {
         id: true, type: true, firstName: true, middleName: true, lastName: true, email: true, phone: true,
-        indexNumber: true, mustChangePassword: true, primaryRoleKey: true,
+        indexNumber: true, mustChangePassword: true, primaryRoleKey: true, photoId: true,
         preference: { select: { theme: true, sidebarCollapsed: true } },
         studentProfile: { select: { admissionYear: true, currentLevel: true, programme: { select: { code: true, name: true } } } },
         staffProfile: { select: { staffNumber: true, title: true, department: { select: { name: true } } } },
@@ -41,6 +43,7 @@ export class AccountService {
       this.resolver.permissionsFor(auth.id, auth.activeRoleKey),
     ]);
     return {
+      photoUrl: user.photoId ? this.uploads.url(user.photoId, 200) : null,
       ...user,
       activeRoleKey: auth.activeRoleKey,
       roles,
