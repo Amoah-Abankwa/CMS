@@ -13,7 +13,13 @@
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
-    "strictPropertyInitialization": false
+    "strictPropertyInitialization": false,
+    "types": [
+      "node",
+      "jest"
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }
