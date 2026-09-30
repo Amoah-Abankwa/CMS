@@ -31,7 +31,7 @@ export function CreateStaffForm({ onCreated }: { onCreated: (m: StaffMember) => 
     setRoleError(problem);
     if (problem) return;
     try {
-      onCreated(await staffApi.create({ ...details, ...selection }));
+      onCreated(await staffApi.create({ ...details, departmentId: details.departmentId || undefined, ...selection }));
     } catch (err) {
       setError(errorMessage(err));
     }
