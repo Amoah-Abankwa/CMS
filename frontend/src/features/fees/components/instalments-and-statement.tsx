@@ -26,7 +26,7 @@ export function InstalmentPlan() {
       <CardHeader title="Instalments" description="By each date, at least this share of the bill must be paid, ending at 100%. For example 50% by the start of term, 75% mid-term, 100% before exams." />
       <CardBody className="flex flex-col gap-3">
         {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
-        <SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} id="ip-sem" />
+        <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} id="ip-sem" />
         {semesterId && (
           <>
             {rows.map((r, i) => (

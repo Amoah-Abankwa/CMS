@@ -14,7 +14,7 @@ import { staffDetailsSchema, type StaffDetailsValues } from '../schemas';
 import { useRoleOptions } from '../use-role-options';
 import { RolePicker } from './role-picker';
 
-export function CreateStaffForm({ onCreated }: { onCreated: (m: StaffMember) => void }) {
+export function CreateStaffForm({ onCreatedAction }: { onCreatedAction: (m: StaffMember) => void }) {
   const { roles, schools, error: loadError } = useRoleOptions();
   const [selection, setSelection] = useState<RoleSelection>({ roles: [], primaryRoleKey: '' });
   const [roleError, setRoleError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function CreateStaffForm({ onCreated }: { onCreated: (m: StaffMember) => 
     setRoleError(problem);
     if (problem) return;
     try {
-      onCreated(await staffApi.create({ ...details, departmentId: details.departmentId || undefined, ...selection }));
+      onCreatedAction(await staffApi.create({ ...details, departmentId: details.departmentId || undefined, ...selection }));
     } catch (err) {
       setError(errorMessage(err));
     }

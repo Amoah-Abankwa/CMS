@@ -32,7 +32,7 @@ export function HostelsOverview() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {semesters && <div className="sm:w-80"><SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} /></div>}
+        {semesters && <div className="sm:w-80"><SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} /></div>}
         <Button size="sm" onClick={() => setAdding(true)}>Add a hostel</Button>
       </div>
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">

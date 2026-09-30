@@ -77,7 +77,7 @@ export function ScoresTable() {
 
   return (
     <div className="flex flex-col gap-4">
-      {semesters && <div className="max-w-sm"><SemesterSelect semesters={semesters} value={semesterId} onChange={(v) => { setSemesterId(v); setPage(1); }} /></div>}
+      {semesters && <div className="max-w-sm"><SemesterSelect semesters={semesters} value={semesterId} onChangeAction={(v) => { setSemesterId(v); setPage(1); }} /></div>}
       <dl className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border border-border bg-surface px-4 py-3"><dt className="text-xs text-muted">Students</dt><dd className="text-2xl font-semibold tabular-nums">{data.stats.students}</dd></div>
         <div className="rounded-lg border border-border bg-surface px-4 py-3"><dt className="text-xs text-muted">Average</dt><dd className="text-2xl font-semibold tabular-nums">{marks(data.stats.average)}</dd></div>

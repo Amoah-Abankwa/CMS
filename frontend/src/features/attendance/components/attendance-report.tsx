@@ -26,7 +26,7 @@ export function AttendanceReport() {
 
   return (
     <div className="flex flex-col gap-4">
-      {semesters && <div className="max-w-sm"><SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} /></div>}
+      {semesters && <div className="max-w-sm"><SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} /></div>}
       {error && <Alert tone="danger">{error}</Alert>}
       {!data && !error && <Spinner />}
       {data && data.items.length === 0 && <EmptyState title="No courses in your area this semester" />}

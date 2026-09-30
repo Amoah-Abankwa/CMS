@@ -49,7 +49,7 @@ export function ReviewList() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        {semesters && <SemesterSelect semesters={semesters} value={semesterId} onChange={(v) => { setSemesterId(v); setPage(1); }} />}
+        {semesters && <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={(v) => { setSemesterId(v); setPage(1); }} />}
         <div>
           <label htmlFor="rev-search" className="sr-only">
             Search students

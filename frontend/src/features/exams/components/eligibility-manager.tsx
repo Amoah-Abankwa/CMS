@@ -74,7 +74,7 @@ export function EligibilityManager() {
     <div className="flex flex-col gap-4">
       {semesters && (
         <div className="max-w-sm">
-          <SemesterSelect semesters={semesters} value={semesterId} onChange={(v) => { setSemesterId(v); setPage(1); }} />
+          <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={(v) => { setSemesterId(v); setPage(1); }} />
         </div>
       )}
 

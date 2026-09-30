@@ -76,7 +76,7 @@ export function ServicesManager() {
 
   return (
     <div className="flex flex-col gap-4">
-      {semesters && <div className="max-w-sm"><SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} /></div>}
+      {semesters && <div className="max-w-sm"><SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} /></div>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted">{data.semester.label}. {data.expected} students expected (those with approved courses). {data.items.filter((s) => !s.cancelledAt).length} services.</p>
         <div className="flex flex-wrap gap-2">

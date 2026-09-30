@@ -74,7 +74,7 @@ export function OfferingsManager() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        {semesters && <SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} />}
+        {semesters && <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} />}
         {departments.length > 1 && (
           <div>
             <label htmlFor="off-dept" className="sr-only">

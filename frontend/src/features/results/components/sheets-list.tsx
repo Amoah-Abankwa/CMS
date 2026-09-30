@@ -36,7 +36,7 @@ export function SheetsList() {
     <div className="flex flex-col gap-4">
       {semesters && (
         <div className="max-w-sm">
-          <SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} />
+          <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} />
         </div>
       )}
       <div role="tablist" aria-label="Results" className="flex gap-1 border-b border-border">

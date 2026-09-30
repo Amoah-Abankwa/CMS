@@ -70,7 +70,7 @@ export function TimetableManager() {
     <div className="flex flex-col gap-4">
       {semesters && (
         <div className="max-w-sm">
-          <SemesterSelect semesters={semesters} value={semesterId} onChange={setSemesterId} />
+          <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={setSemesterId} />
         </div>
       )}
 
