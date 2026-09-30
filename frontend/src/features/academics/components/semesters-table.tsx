@@ -43,8 +43,8 @@ export function SemestersTable() {
       </ul>
       <SemesterDialog
         semester={editing}
-        onClose={() => setEditing(null)}
-        onSaved={() => {
+        onCloseAction={() => setEditing(null)}
+        onSavedAction={() => {
           setEditing(null);
           void reload();
         }}
