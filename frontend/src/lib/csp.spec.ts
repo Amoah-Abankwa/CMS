@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+// Run by the QA test runner (scripts/qa/run-specs.ts); not part of the frontend build.
 import { contentSecurityPolicy } from './csp';
 
 describe('content security policy', () => {
