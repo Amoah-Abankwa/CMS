@@ -10,7 +10,7 @@ import { errorMessage } from '@/lib/axios';
 import { fromLocalInput, toLocalInput } from '@/lib/format';
 import { academicsApi, type Semester } from '../api';
 
-export function SemesterDialog({ semester, onClose, onSaved }: { semester: Semester | null; onClose: () => void; onSaved: (s: Semester) => void }) {
+export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { semester: Semester | null; onCloseAction: () => void; onSavedAction: (s: Semester) => void }) {
   const [opens, setOpens] = useState('');
   const [closes, setCloses] = useState('');
   const [min, setMin] = useState('');
@@ -36,7 +36,7 @@ export function SemesterDialog({ semester, onClose, onSaved }: { semester: Semes
     setBusy(true);
     setError(null);
     try {
-      onSaved(
+      onSavedAction(
         await academicsApi.updateSemester(semester.id, {
           registrationOpensAt: fromLocalInput(opens),
           registrationClosesAt: fromLocalInput(closes),
@@ -53,7 +53,7 @@ export function SemesterDialog({ semester, onClose, onSaved }: { semester: Semes
   };
 
   return (
-    <Dialog open onClose={onClose} title={semester.label} description="Students can choose and submit courses only between these times.">
+    <Dialog open onClose={onCloseAction} title={semester.label} description="Students can choose and submit courses only between these times.">
       <form onSubmit={save} className="flex flex-col gap-4">
         {error && <Alert tone="danger">{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -77,7 +77,7 @@ export function SemesterDialog({ semester, onClose, onSaved }: { semester: Semes
           </label>
         )}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onCloseAction}>
             Cancel
           </Button>
           <Button type="submit" loading={busy}>
