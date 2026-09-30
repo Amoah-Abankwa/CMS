@@ -18,7 +18,7 @@ export function ProfilePhoto() {
     setBusy(true);
     setError(null);
     try {
-      const publicId = file ? await uploadImage('profile', '', file) : null;
+      const publicId = file ? await uploadImage('profile', me.id, file) : null;
       const r = await api.put<{ photoUrl: string | null }>('/uploads/profile-photo', { publicId });
       setMe({ ...me, photoUrl: r.data.photoUrl });
     } catch (err) {
