@@ -27,3 +27,23 @@ describe('converting values', () => {
     expect(parseLevel('250')).toBeNull();
   });
 });
+
+import { academicYearProblem, semesterDatesProblem } from '@anu/shared';
+
+describe('academic calendar', () => {
+  it('checks a new academic year', () => {
+    expect(academicYearProblem('2026/2027', '2026-08-31', '2027-07-31')).toBeNull();
+    expect(academicYearProblem('2026-27', '2026-08-31', '2027-07-31')).toMatch('2026/2027');
+    expect(academicYearProblem('2026/2027', '2027-07-31', '2026-08-31')).toMatch('end after');
+    expect(academicYearProblem('2026/2027', '2025-09-01', '2027-07-31')).toMatch('start in 2026');
+  });
+  it('keeps semesters inside the year and apart from each other', () => {
+    const year = { startDate: '2026-08-31', endDate: '2027-07-31' };
+    const first = { number: 1, startDate: '2026-09-07', endDate: '2027-01-15' };
+    expect(semesterDatesProblem(year, first, [])).toBeNull();
+    expect(semesterDatesProblem(year, { number: 2, startDate: '2027-01-10', endDate: '2027-05-30' }, [first])).toMatch('overlaps Semester 1');
+    expect(semesterDatesProblem(year, { number: 2, startDate: '2027-01-25', endDate: '2027-08-30' }, [first])).toMatch('within');
+    expect(semesterDatesProblem(year, { number: 1, startDate: '2027-01-25', endDate: '2027-05-30' }, [first])).toMatch('already exists');
+    expect(semesterDatesProblem(year, { number: 2, startDate: '2027-01-25', endDate: '2027-05-30' }, [first])).toBeNull();
+  });
+});

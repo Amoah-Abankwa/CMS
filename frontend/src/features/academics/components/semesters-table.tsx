@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -11,8 +11,10 @@ import { useSemesters } from '../use-semesters';
 import { RegistrationWindow } from './registration-window';
 import { SemesterDialog } from './semester-dialog';
 
-export function SemestersTable() {
+export function SemestersTable({ reloadKey = 0, onChangedAction }: { reloadKey?: number; onChangedAction?: () => void } = {}) {
   const { semesters, error, reload } = useSemesters();
+  // Reload when a year or semester is added above.
+  useEffect(() => { if (reloadKey) reload(); }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState<Semester | null>(null);
 
   if (error) return <Alert tone="danger">{error}</Alert>;
@@ -46,7 +48,7 @@ export function SemestersTable() {
         onCloseAction={() => setEditing(null)}
         onSavedAction={() => {
           setEditing(null);
-          void reload();
+          void reload(); onChangedAction?.();
         }}
       />
     </>

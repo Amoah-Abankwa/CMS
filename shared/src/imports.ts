@@ -142,3 +142,31 @@ export function parseLevel(v: string): number | null {
   const level = n < 10 ? n * 100 : n;
   return level >= 100 && level <= 900 && level % 100 === 0 ? level : null;
 }
+
+// ----- Academic calendar (used by the Registrar's screen as well as imports) -----
+
+const day = (d: string | Date) => (typeof d === 'string' ? d.slice(0, 10) : d.toISOString().slice(0, 10));
+
+/** Problems with a new academic year: label like 2026/2027, dates in order, starting in the label's first year. */
+export function academicYearProblem(label: string, startDate: string, endDate: string): string | null {
+  const l = parseAcademicYear(label);
+  if (!l || l !== label.trim()) return 'Write the year as 2026/2027.';
+  if (!(day(endDate) > day(startDate))) return 'The year must end after it starts.';
+  if (Number(day(startDate).slice(0, 4)) !== Number(l.slice(0, 4))) return `${l} should start in ${l.slice(0, 4)}.`;
+  return null;
+}
+
+/** Problems with a semester's dates: inside its academic year, in order, and not overlapping its other semesters. */
+export function semesterDatesProblem(
+  year: { startDate: string | Date; endDate: string | Date },
+  s: { number: number; startDate: string; endDate: string },
+  others: Array<{ number: number; startDate: string | Date; endDate: string | Date }>,
+): string | null {
+  if (!Number.isInteger(s.number) || s.number < 1 || s.number > 3) return 'The semester number must be 1, 2 or 3.';
+  if (others.some((o) => o.number === s.number)) return `Semester ${s.number} already exists in this year.`;
+  if (!(day(s.endDate) > day(s.startDate))) return 'The semester must end after it starts.';
+  if (day(s.startDate) < day(year.startDate) || day(s.endDate) > day(year.endDate)) return 'The semester must fall within its academic year.';
+  const clash = others.find((o) => day(s.startDate) <= day(o.endDate) && day(o.startDate) <= day(s.endDate));
+  if (clash) return `It overlaps Semester ${clash.number}.`;
+  return null;
+}
