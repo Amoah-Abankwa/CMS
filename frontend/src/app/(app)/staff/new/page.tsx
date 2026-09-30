@@ -49,7 +49,7 @@ export default function NewStaffPage() {
               </div>
             </div>
           ) : (
-            <CreateStaffForm key={formKey} onCreated={setCreated} />
+            <CreateStaffForm key={formKey} onCreatedAction={setCreated} />
           )}
         </CardBody>
       </Card>
