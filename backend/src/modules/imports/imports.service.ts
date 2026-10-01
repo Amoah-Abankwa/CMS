@@ -119,7 +119,7 @@ export class ImportsService implements OnModuleInit {
 
   private async context(type: ImportType) {
     const [levels, scale, roles] = await Promise.all([
-      this.prisma.programmeLevel.findMany({ select: { code: true, semesters: true, indexFormat: true } }),
+      this.prisma.programmeLevel.findMany({ select: { code: true, semesters: true, indexFormat: true, mode: true } }),
       type === 'RESULTS' ? this.prisma.gradingScale.findFirst({ where: { isActive: true }, include: { bands: true } }) : null,
       type === 'STAFF' ? this.prisma.role.findMany({ select: { id: true, key: true, name: true } }) : [],
     ]);
@@ -173,8 +173,10 @@ export class ImportsService implements OnModuleInit {
         const dept = (await this.dept(ctx, clean(r.departmentCode))) ?? fail(`Department "${clean(r.departmentCode)}" does not exist. Import departments first.`);
         const level = r.level ? parseLevel(r.level) ?? fail(`Level "${r.level}" should be 100, 200, ...`) : 100;
         const sem = r.semester ? Number(clean(r.semester)) : 1;
-        if (sem !== 1 && sem !== 2) fail('Semester should be 1 or 2.');
         const prog = clean(r.programmeCode) ? (await this.programme(ctx, clean(r.programmeCode))) ?? fail(`Programme "${clean(r.programmeCode)}" does not exist.`) : null;
+        // Weekend programmes have three terms a year (Fall, Spring, Summer); regular ones two.
+        const weekend = !!prog && ctx.levels.find((l) => l.code === prog.levelCode)?.mode === 'WEEKEND';
+        if (!(sem === 1 || sem === 2 || (sem === 3 && weekend))) fail(weekend ? 'Semester should be 1 (Fall), 2 (Spring) or 3 (Summer).' : 'Semester should be 1 (Fall) or 2 (Spring).');
         const existing = await this.course(ctx, code);
         if (!commit) return existing ? 'update' : 'create';
         const c = existing

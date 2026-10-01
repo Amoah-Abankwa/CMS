@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { amendedResult, PERMISSIONS } from '@anu/shared';
+import { amendedResult, PERMISSIONS, termName } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -141,7 +141,7 @@ export class AmendmentsService {
       eventKey: EVENT_KEYS.RESULT_AMENDED,
       recipients: [{ userId: a.result.studentId }],
       channels: ['IN_APP', 'EMAIL', 'SMS'],
-      sharedVars: { course, semester: `${a.result.sheet.offering.semester.academicYear.label}, Semester ${a.result.sheet.offering.semester.number}`, before: show(before), after: show(after), reason: a.reason },
+      sharedVars: { course, semester: `${a.result.sheet.offering.semester.academicYear.label} ${termName(a.result.sheet.offering.semester.number)}`, before: show(before), after: show(after), reason: a.reason },
       link: '/results',
     });
     return { status: 'APPLIED', after };

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { academicYearProblem, semesterDatesProblem } from '@anu/shared';
+import { academicYearProblem, semesterDatesProblem, termName } from '@anu/shared';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -14,12 +14,12 @@ export function registrationOpen(s: SemesterWindow, now = new Date()) {
 }
 
 export function semesterLabel(s: { number: number; academicYear: { label: string } }) {
-  return `${s.academicYear.label}, Semester ${s.number}`;
+  return `${s.academicYear.label} ${termName(s.number)}`;
 }
 
 const SELECT = {
   id: true, number: true, startDate: true, endDate: true, isCurrent: true,
-  registrationOpensAt: true, registrationClosesAt: true, minCredits: true, maxCredits: true,
+  registrationOpensAt: true, registrationClosesAt: true, minCredits: true, maxCredits: true, summerKind: true,
   academicYear: { select: { id: true, label: true } },
 } as const;
 
@@ -49,7 +49,7 @@ export class SemestersService {
 
   async update(
     id: string,
-    dto: { registrationOpensAt?: string | null; registrationClosesAt?: string | null; minCredits?: number; maxCredits?: number; isCurrent?: boolean },
+    dto: { registrationOpensAt?: string | null; registrationClosesAt?: string | null; minCredits?: number; maxCredits?: number; isCurrent?: boolean; summerKind?: 'PROMOTIONAL' | 'UPGRADE' | null },
   ) {
     const before = await this.prisma.semester.findUnique({ where: { id }, select: SELECT });
     if (!before) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Semester not found.' });
@@ -61,6 +61,7 @@ export class SemestersService {
     const min = dto.minCredits ?? before.minCredits;
     const max = dto.maxCredits ?? before.maxCredits;
     if (min > max) throw new BadRequestException({ code: 'CREDIT_LIMITS', message: 'Minimum credits cannot be more than the maximum.' });
+    if (dto.summerKind && before.number !== 3) throw new BadRequestException({ code: 'NOT_SUMMER', message: 'Only a summer is promotional or upgrade.' });
 
     const after = await this.prisma.$transaction(async (tx) => {
       if (dto.isCurrent) {
@@ -71,7 +72,7 @@ export class SemestersService {
       }
       return tx.semester.update({
         where: { id },
-        data: { registrationOpensAt: opens, registrationClosesAt: closes, minCredits: min, maxCredits: max, ...(dto.isCurrent !== undefined ? { isCurrent: dto.isCurrent } : {}) },
+        data: { registrationOpensAt: opens, registrationClosesAt: closes, minCredits: min, maxCredits: max, ...(dto.isCurrent !== undefined ? { isCurrent: dto.isCurrent } : {}), ...(dto.summerKind !== undefined ? { summerKind: dto.summerKind } : {}) },
         select: SELECT,
       });
     });
@@ -84,7 +85,7 @@ export class SemestersService {
   async years() {
     return this.prisma.academicYear.findMany({
       orderBy: { startDate: 'desc' },
-      select: { id: true, label: true, startDate: true, endDate: true, isCurrent: true, semesters: { orderBy: { number: 'asc' }, select: { id: true, number: true, startDate: true, endDate: true, isCurrent: true } } },
+      select: { id: true, label: true, startDate: true, endDate: true, isCurrent: true, semesters: { orderBy: { number: 'asc' }, select: { id: true, number: true, startDate: true, endDate: true, isCurrent: true, summerKind: true } } },
     });
   }
 
@@ -117,7 +118,7 @@ export class SemestersService {
     if (!y) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Academic year not found.' });
     const problem = semesterDatesProblem(y, dto, y.semesters);
     if (problem) throw new BadRequestException({ code: 'SEMESTER', message: problem });
-    const min = dto.minCredits ?? 12;
+    const min = dto.minCredits ?? (dto.number === 3 ? 0 : 12);
     const max = dto.maxCredits ?? 24;
     if (min > max) throw new BadRequestException({ code: 'CREDIT_LIMITS', message: 'Minimum credits cannot be more than the maximum.' });
     const s = await this.prisma.semester.create({

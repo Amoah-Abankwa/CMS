@@ -19,14 +19,20 @@ class ReopenDto {
 export class MyRegistrationController {
   constructor(private readonly service: StudentRegistrationService) {}
 
+  /** Every course the student has registered for, with its result. */
+  @Get('courses')
+  courses(@CurrentUser() user: AuthUser) {
+    return this.service.myCourses(user);
+  }
+
   @Get()
   overview(@CurrentUser() user: AuthUser, @Query() q: SemesterQuery) {
-    return this.service.overview(user, q.semesterId);
+    return this.service.overview(user, q.semesterId, q.mainStage);
   }
 
   @Put()
   save(@CurrentUser() user: AuthUser, @Body() dto: SaveRegistrationDto) {
-    return this.service.save(user, dto.offeringIds);
+    return this.service.save(user, dto.offeringIds, dto.mainStage);
   }
 
   @Post('submit') @HttpCode(200)

@@ -69,6 +69,8 @@ model Semester {
   registrationClosesAt DateTime?
   minCredits     Int          @default(12)
   maxCredits     Int          @default(24)
+  /// Summer only (semester 3): what regular students may take. Weekend students register as usual.
+  summerKind     SummerKind?
   offerings      CourseOffering[]
   registrations  CourseRegistration[]
   examTimetable  ExamTimetable?
@@ -101,4 +103,11 @@ model Course {
   offerings    CourseOffering[]
   curriculum   ProgrammeCourse[]
   readingList    ReadingList?
+}
+
+enum SummerKind {
+  /// Courses failed or not yet taken.
+  PROMOTIONAL
+  /// Any course, to improve the grade.
+  UPGRADE
 }

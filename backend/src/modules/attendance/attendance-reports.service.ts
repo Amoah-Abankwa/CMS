@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { belowMinimum } from '@anu/shared';
+import { belowMinimum, termName } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
 import { ScopeService } from '../rbac/scope.service';
@@ -67,7 +67,7 @@ export class AttendanceReportsService {
     await this.scope.assertDepartment(user, offering.course.departmentId);
     const [roster, summaries, policy] = await Promise.all([this.offerings.roster(offeringId), this.summary.summaries({ offeringIds: [offeringId] }), this.policy.get()]);
     return {
-      offering: { id: offering.id, course: offering.course, semesterLabel: `${offering.semester.academicYear.label}, Semester ${offering.semester.number}` },
+      offering: { id: offering.id, course: offering.course, semesterLabel: `${offering.semester.academicYear.label} ${termName(offering.semester.number)}` },
       policy,
       students: roster.map((s) => {
         const sum = summaries.get(AttendanceSummaryService.key(s.id, offeringId)) ?? null;

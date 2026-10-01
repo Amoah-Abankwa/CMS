@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { PERMISSIONS } from '@anu/shared';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -12,6 +12,8 @@ class UpdateSemesterDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(40) minCredits?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(40) maxCredits?: number;
   @IsOptional() @IsBoolean() isCurrent?: boolean;
+  /** Summer only: promotional (failed or not yet taken) or upgrade (any course, to improve the grade). */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsIn(['PROMOTIONAL', 'UPGRADE']) summerKind?: 'PROMOTIONAL' | 'UPGRADE' | null;
 }
 
 class YearDto {

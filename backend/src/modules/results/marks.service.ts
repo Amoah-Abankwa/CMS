@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ROLE_KEYS, scopeValue, courseTotalWithDevotion, DEVOTION_SHARE } from '@anu/shared';
+import { ROLE_KEYS, scopeValue, courseTotalWithDevotion, DEVOTION_SHARE, termName } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
@@ -56,7 +56,7 @@ export class MarksService {
       offering: {
         id: offering.id,
         course: offering.course,
-        semesterLabel: `${offering.semester.academicYear.label}, Semester ${offering.semester.number}`,
+        semesterLabel: `${offering.semester.academicYear.label} ${termName(offering.semester.number)}`,
       },
       isLead,
       canEdit: EDITABLE.includes(status),
@@ -280,7 +280,7 @@ export class MarksService {
       sharedVars: {
         courseCode: offering.course.code,
         courseTitle: offering.course.title,
-        semesterLabel: `${offering.semester.academicYear.label}, Semester ${offering.semester.number}`,
+        semesterLabel: `${offering.semester.academicYear.label} ${termName(offering.semester.number)}`,
         stage,
       },
       link: '/academics/results',

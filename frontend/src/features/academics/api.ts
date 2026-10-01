@@ -25,7 +25,7 @@ export interface SemesterUpdate {
 
 export interface AcademicYearRow {
   id: string; label: string; startDate: string; endDate: string; isCurrent: boolean;
-  semesters: Array<{ id: string; number: number; startDate: string; endDate: string; isCurrent: boolean }>;
+  semesters: Array<{ id: string; number: number; startDate: string; endDate: string; isCurrent: boolean; summerKind: 'PROMOTIONAL' | 'UPGRADE' | null }>;
 }
 
 export const academicsApi = {
@@ -36,5 +36,6 @@ export const academicsApi = {
   deleteYear: (id: string) => api.delete(`/academics/years/${id}`),
   createSemester: (yearId: string, dto: { number: number; startDate: string; endDate: string }) => api.post(`/academics/years/${yearId}/semesters`, dto),
   deleteSemester: (id: string) => api.delete(`/academics/semesters/${id}`),
+  setSummerKind: (id: string, summerKind: 'PROMOTIONAL' | 'UPGRADE') => api.patch(`/academics/semesters/${id}`, { summerKind }),
   updateSemester: (id: string, dto: SemesterUpdate) => api.patch<Semester>(`/academics/semesters/${id}`, dto).then((r) => r.data),
 };

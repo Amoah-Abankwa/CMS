@@ -5,6 +5,10 @@ import type { Offering } from '@/features/offerings/api';
 export type RegistrationStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export interface AvailableOffering extends Offering {
+  stage: number;
+  isMain: boolean;
+  isElective: boolean;
+  passed: boolean;
   seatsTaken: number;
   /** Failed at the latest attempt; must be taken again. */
   carryOver?: boolean;
@@ -14,7 +18,13 @@ export interface MyRegistration {
   semester: Semester;
   profile: { level: number; programme: { code: string; name: string } };
   available: AvailableOffering[];
+  mode: 'REGULAR' | 'PROMOTIONAL' | 'UPGRADE' | 'SUMMER_NOT_SET';
+  mainStage: number | null;
+  suggestedStage: number;
+  totalStages: number;
+  weekend: boolean;
   registration: {
+    mainStage?: number | null;
     id: string;
     status: RegistrationStatus;
     submittedAt: string | null;
@@ -54,8 +64,9 @@ export interface ReviewPage {
 }
 
 export const registrationApi = {
-  mine: () => api.get<MyRegistration>('/me/registration').then((r) => r.data),
-  save: (offeringIds: string[]) => api.put<MyRegistration>('/me/registration', { offeringIds }).then((r) => r.data),
+  mine: (mainStage?: number) => api.get<MyRegistration>('/me/registration', { params: mainStage ? { mainStage } : {} }).then((r) => r.data),
+  save: (offeringIds: string[], mainStage?: number | null) => api.put<MyRegistration>('/me/registration', { offeringIds, mainStage: mainStage ?? undefined }).then((r) => r.data),
+  courses: () => api.get<MyCourse[]>('/me/registration/courses').then((r) => r.data),
   submit: () => api.post<MyRegistration>('/me/registration/submit').then((r) => r.data),
   withdraw: () => api.post<MyRegistration>('/me/registration/withdraw').then((r) => r.data),
 
@@ -65,3 +76,13 @@ export const registrationApi = {
   reopen: (id: string, reason: string) => api.post(`/registrations/${id}/reopen`, { reason }),
   reject: (id: string, note: string) => api.post<ReviewItem>(`/registrations/${id}/reject`, { note }).then((r) => r.data),
 };
+
+export interface MyCourse {
+  offeringId: string;
+  course: { id: string; code: string; title: string; creditHours: number };
+  term: string;
+  startDate: string;
+  status: 'PASSED' | 'FAILED' | 'INCOMPLETE' | 'IN_PROGRESS' | 'AWAITING_APPROVAL';
+  grade: string | null;
+  total: number | null;
+}

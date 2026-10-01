@@ -70,6 +70,8 @@ model CourseRegistration {
   reviewedBy   User?                    @relation("RegistrationReviewer", fields: [reviewedById], references: [id])
   reviewNote   String?
   /// An approved registration reopened for changes: by whom, when and why.
+  /// The curriculum stage the student registered as their main semester (for example 5).
+  mainStage    Int?
   reopenedAt   DateTime?
   reopenedById String?  @db.Uuid
   reopenReason String?

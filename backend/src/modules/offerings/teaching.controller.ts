@@ -1,6 +1,6 @@
 import { Controller, ForbiddenException, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { IsOptional, IsUUID } from 'class-validator';
-import { PERMISSIONS } from '@anu/shared';
+import { PERMISSIONS, termName } from '@anu/shared';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -46,7 +46,7 @@ export class TeachingController {
     const { semester, ...rest } = offering;
     return {
       offering: presentOffering(rest),
-      semesterLabel: `${semester.academicYear.label}, Semester ${semester.number}`,
+      semesterLabel: `${semester.academicYear.label} ${termName(semester.number)}`,
       students,
     };
   }

@@ -1,3 +1,4 @@
+import { termName } from '@anu/shared';
 import type { AssociationOffice, Currency, FeePaymentMethod, FeeRules, FeeStudentGroup, StatementEntry } from '@anu/shared';
 import { api } from '@/lib/axios';
 
@@ -115,4 +116,4 @@ export const feesApi = {
   payDues: (levyId: string) => api.post<{ paymentUrl: string }>(`/me/dues/levies/${levyId}/pay`).then((r) => r.data),
 };
 
-export const semesterText = (s: { number: number; academicYear: { label: string } }) => `${s.academicYear.label}, Semester ${s.number}`;
+export const semesterText = (s: { number: number; academicYear: { label: string } }) => `${s.academicYear.label} ${termName(s.number)}`;

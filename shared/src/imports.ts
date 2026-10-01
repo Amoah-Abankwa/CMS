@@ -53,7 +53,7 @@ export const IMPORT_FIELDS: Record<ImportType, ImportField[]> = {
     { key: 'departmentCode', label: 'Department code', required: true, aliases: ['dept code', 'dept', 'department'] },
     { key: 'programmeCode', label: 'Programme code (curriculum)', aliases: ['program code', 'programme'] },
     { key: 'level', label: 'Level (100, 200...)', aliases: ['year', 'level'] },
-    { key: 'semester', label: 'Semester (1 or 2)', aliases: ['sem', 'semester no'] },
+    { key: 'semester', label: 'Semester in the year (1 Fall, 2 Spring, 3 Summer for weekend)', aliases: ['sem', 'semester no'] },
     { key: 'elective', label: 'Elective (yes/no)', aliases: ['elective', 'optional'] },
   ],
   STAFF: [

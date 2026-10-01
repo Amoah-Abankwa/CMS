@@ -1,3 +1,4 @@
+import { termName } from '@anu/shared';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -39,7 +40,7 @@ export class StudentResultsService {
     const bySemester = new Map<string, { id: string; label: string; start: Date; courses: Course[] }>();
     for (const r of rows) {
       const s = r.sheet.offering.semester;
-      if (!bySemester.has(s.id)) bySemester.set(s.id, { id: s.id, label: `${s.academicYear.label}, Semester ${s.number}`, start: s.startDate, courses: [] });
+      if (!bySemester.has(s.id)) bySemester.set(s.id, { id: s.id, label: `${s.academicYear.label} ${termName(s.number)}`, start: s.startDate, courses: [] });
       bySemester.get(s.id)!.courses.push({
         code: r.sheet.offering.course.code, title: r.sheet.offering.course.title, credits: r.credits, total: r.total,
         grade: r.grade, gradePoint: r.gradePoint, isPass: r.isPass, incomplete: r.incomplete, publishedAt: r.sheet.publishedAt,

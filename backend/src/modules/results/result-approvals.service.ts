@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PERMISSIONS, ROLE_KEYS, scopeValue } from '@anu/shared';
+import { PERMISSIONS, ROLE_KEYS, scopeValue, termName } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -121,7 +121,7 @@ export class ResultApprovalsService {
         eventKey: EVENT_KEYS.RESULTS_PUBLISHED,
         recipients: students.map((s) => ({ userId: s.studentId })),
         channels: ['IN_APP', 'EMAIL', 'SMS'],
-        sharedVars: { courseCode: o.course.code, semesterLabel: `${o.semester.academicYear.label}, Semester ${o.semester.number}` },
+        sharedVars: { courseCode: o.course.code, semesterLabel: `${o.semester.academicYear.label} ${termName(o.semester.number)}` },
         link: '/results',
       });
     }
@@ -148,7 +148,7 @@ export class ResultApprovalsService {
       eventKey: EVENT_KEYS.RESULTS_RETURNED,
       recipients: o.lecturers.map((l) => ({ userId: l.user.id })),
       channels: ['IN_APP', 'EMAIL'],
-      sharedVars: { courseCode: o.course.code, semesterLabel: `${o.semester.academicYear.label}, Semester ${o.semester.number}`, note, actor: user.label },
+      sharedVars: { courseCode: o.course.code, semesterLabel: `${o.semester.academicYear.label} ${termName(o.semester.number)}`, note, actor: user.label },
       link: `/teaching/${o.id}`,
     });
     return this.get(user, id);
@@ -162,7 +162,7 @@ export class ResultApprovalsService {
       offering: {
         id: offering.id,
         course: offering.course,
-        semesterLabel: `${offering.semester.academicYear.label}, Semester ${offering.semester.number}`,
+        semesterLabel: `${offering.semester.academicYear.label} ${termName(offering.semester.number)}`,
         lecturers: offering.lecturers.map((l) => ({ name: `${l.user.firstName} ${l.user.lastName}`, isLead: l.isLead })),
       },
       summary: summarise(results),

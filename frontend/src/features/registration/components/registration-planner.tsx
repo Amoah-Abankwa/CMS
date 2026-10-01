@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
+import { Field } from '@/components/ui/field';
+import { Select } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
 import { useAuthStore } from '@/stores/auth.store';
 import { errorMessage } from '@/lib/axios';
@@ -22,17 +24,34 @@ export function RegistrationPlanner() {
   const [busy, setBusy] = useState<'save' | 'submit' | 'withdraw' | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
 
+  const [mainStage, setMainStage] = useState<number | null>(null);
   const apply = (d: MyRegistration) => {
     setData(d);
-    setSelected(new Set(d.registration?.offeringIds ?? []));
+    setMainStage(d.mainStage);
+    // A new registration starts with the main semester's courses ticked (electives are left to choose).
+    const preset = d.registration?.offeringIds ?? (d.mode === 'REGULAR' ? d.available.filter((o) => o.isMain && !o.isElective).map((o) => o.id) : []);
+    setSelected(new Set(preset));
   };
 
   useEffect(() => {
     registrationApi.mine().then(apply).catch((err) => setError(errorMessage(err)));
   }, []);
 
+  /** Choosing another main semester shows its courses and ticks them; other ticks that still apply stay. */
+  const chooseStage = async (stage: number) => {
+    setError(null);
+    try {
+      const d = await registrationApi.mine(stage);
+      setData(d);
+      setMainStage(stage);
+      setSelected((prev) => new Set([...[...prev].filter((id) => d.available.some((o) => o.id === id)), ...d.available.filter((o) => o.isMain && !o.isElective).map((o) => o.id)]));
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
   const saved = useMemo(() => new Set(data?.registration?.offeringIds ?? []), [data]);
-  const dirty = selected.size !== saved.size || [...selected].some((id) => !saved.has(id));
+  const dirty = selected.size !== saved.size || [...selected].some((id) => !saved.has(id)) || (data?.mode === 'REGULAR' && mainStage !== (data?.registration?.mainStage ?? null));
   const credits = useMemo(
     () => (data ? data.available.filter((o) => selected.has(o.id)).reduce((s, o) => s + o.course.creditHours, 0) : 0),
     [data, selected],
@@ -55,7 +74,7 @@ export function RegistrationPlanner() {
       if (kind === 'withdraw') apply(await registrationApi.withdraw());
       else {
         let next = data;
-        if (dirty || status === 'REJECTED' || !data.registration) next = await registrationApi.save([...selected]);
+        if (dirty || status === 'REJECTED' || !data.registration) next = await registrationApi.save([...selected], data.mode === 'REGULAR' ? mainStage : null);
         if (kind === 'submit') next = await registrationApi.submit();
         apply(next);
         if (kind === 'save') setSavedNotice(true);
@@ -105,13 +124,28 @@ export function RegistrationPlanner() {
       <div className="print:hidden">
         <RegistrationStatus data={data} />
       </div>
+      {data.mode === 'REGULAR' && (
+        <Card className="print:hidden">
+          <CardBody className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <Field label="Your main semester" htmlFor="rg-stage" hint={`Its courses are ticked for you. You can add any course from the semesters below it, within ${maxCredits} credits.`}>
+              <Select id="rg-stage" className="w-56" disabled={!editable} value={mainStage ?? data.suggestedStage} onChange={(e) => void chooseStage(Number(e.target.value))}>
+                {Array.from({ length: data.totalStages }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Semester {n}{n === data.suggestedStage ? ' (suggested)' : ''}</option>)}
+              </Select>
+            </Field>
+            <p className="text-xs text-muted">{data.weekend ? 'Weekend programme: three semesters a year (Fall, Spring and Summer).' : 'Two semesters a year (Fall and Spring).'} {data.totalStages} semesters in all.</p>
+          </CardBody>
+        </Card>
+      )}
+      {data.mode === 'PROMOTIONAL' && <Alert tone="info">Promotional summer: you can take courses you failed or have not taken yet, up to your current level, within {maxCredits} credits.</Alert>}
+      {data.mode === 'UPGRADE' && <Alert tone="info">Upgrade summer: you can retake any course up to your current level to improve your grade, within {maxCredits} credits.</Alert>}
+      {data.mode === 'SUMMER_NOT_SET' && <Alert tone="warning">The academic office has not yet said whether this summer is promotional or upgrade. Registration opens once it has.</Alert>}
       {error && <Alert tone="danger">{error}</Alert>}
       {savedNotice && <Alert tone="success">Saved. Submit when you are ready.</Alert>}
 
       <Card>
         <CardHeader title={editable ? 'Courses you can take' : 'Your courses'} />
         {data.available.length === 0 ? (
-          <EmptyState title="No courses offered for your level yet" description="Your department has not published this semester's courses. Check back soon." />
+          <EmptyState title="No courses to show" description={data.mode === 'SUMMER_NOT_SET' ? 'Wait for the academic office to set this summer.' : "Your programme's curriculum has no courses for these semesters yet. Contact your department."} />
         ) : (
           <ul className="divide-y divide-border">
             {(editable ? data.available : chosen).map((o) => {
@@ -127,11 +161,14 @@ export function RegistrationPlanner() {
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <span className="text-sm font-medium">
-                          <span className="font-mono">{o.course.code}</span> {o.course.title}{o.carryOver && <span className="ml-2 rounded-sm bg-warning-soft px-1.5 py-0.5 text-xs font-medium">Carry-over</span>}
+                          <span className="font-mono">{o.course.code}</span> {o.course.title}
+                          {o.passed ? <Badge tone="success" className="ml-2">Passed</Badge> : o.carryOver ? <Badge tone="danger" className="ml-2">Failed</Badge> : null}
+                          {o.isElective && <span className="ml-2 text-xs text-muted">elective</span>}
                         </span>
                         <span className="text-sm tabular-nums text-muted">{o.course.creditHours} credits</span>
                       </span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                        <span>Semester {o.stage}{o.isMain ? ' (main)' : ''}</span>
                         {lead ? lead.name : 'Lecturer to be announced'}
                         {o.capacity !== null && <span>{Math.max(0, o.capacity - o.seatsTaken)} seats left</span>}
                         {full && <Badge tone="danger">Full</Badge>}

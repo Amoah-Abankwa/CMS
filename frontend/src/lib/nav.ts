@@ -24,6 +24,7 @@ export const NAV: NavSection[] = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/registration', label: 'Course registration', icon: ListChecks, audience: 'STUDENT' },
+      { href: '/courses', label: 'My courses', icon: BookMarked, audience: 'STUDENT' },
       { href: '/results', label: 'Results', icon: Award, audience: 'STUDENT' },
       { href: '/attendance', label: 'Attendance', icon: UserCheck, audience: 'STUDENT' },
       { href: '/exams', label: 'Exams', icon: CalendarClock, audience: 'STUDENT' },
