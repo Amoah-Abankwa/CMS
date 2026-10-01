@@ -162,7 +162,7 @@ export function RegistrationPlanner() {
                       <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <span className="text-sm font-medium">
                           <span className="font-mono">{o.course.code}</span> {o.course.title}
-                          {o.passed ? <Badge tone="success" className="ml-2">Passed</Badge> : o.carryOver ? <Badge tone="danger" className="ml-2">Failed</Badge> : null}
+                          {o.passed ? <span className="ml-2"><Badge tone="success">Passed</Badge></span> : o.carryOver ? <span className="ml-2"><Badge tone="danger">Failed</Badge></span> : null}
                           {o.isElective && <span className="ml-2 text-xs text-muted">elective</span>}
                         </span>
                         <span className="text-sm tabular-nums text-muted">{o.course.creditHours} credits</span>

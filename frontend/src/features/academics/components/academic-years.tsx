@@ -17,13 +17,13 @@ import { academicsApi, type AcademicYearRow } from '../api';
  * The Registrar's academic calendar: academic years and their semesters. Registration dates, credit
  * limits and which semester is current are then set on each semester in the list below.
  */
-export function AcademicYears({ onChanged }: { onChanged: () => void }) {
+export function AcademicYears({ onChangedAction }: { onChangedAction: () => void }) {
   const [years, setYears] = useState<AcademicYearRow[] | null>(null);
   const [f, setF] = useState({ label: '', startDate: '', endDate: '' });
   const [msg, setMsg] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
   const load = useCallback(() => { academicsApi.years().then(setYears).catch((err) => setMsg({ tone: 'danger', text: errorMessage(err) })); }, []);
   useEffect(() => { load(); }, [load]);
-  const done = (text: string) => { setMsg({ tone: 'success', text }); load(); onChanged(); };
+  const done = (text: string) => { setMsg({ tone: 'success', text }); load(); onChangedAction(); };
   const fail = (err: unknown) => setMsg({ tone: 'danger', text: errorMessage(err) });
   const suggest = (label: string) => {
     const m = /^(\d{4})\/(\d{4})$/.exec(label.trim());
@@ -99,7 +99,7 @@ function YearRow({ y, onDone, onFail }: { y: AcademicYearRow; onDone: (t: string
           <Field label="Term" htmlFor={`sn-${y.id}`}><Select id={`sn-${y.id}`} value={s.number} onChange={(e) => setS(blank(Number(e.target.value)))}>{[1, 2, 3].map((n) => <option key={n} value={n} disabled={y.semesters.some((x) => x.number === n)}>{termName(n)}</option>)}</Select></Field>
           <Field label="Starts" htmlFor={`ss-${y.id}`}><Input id={`ss-${y.id}`} type="date" min={y.startDate.slice(0, 10)} max={y.endDate.slice(0, 10)} value={s.startDate} onChange={(e) => setS({ ...s, startDate: e.target.value })} /></Field>
           <Field label="Ends" htmlFor={`se-${y.id}`}><Input id={`se-${y.id}`} type="date" min={y.startDate.slice(0, 10)} max={y.endDate.slice(0, 10)} value={s.endDate} onChange={(e) => setS({ ...s, endDate: e.target.value })} /></Field>
-          <Button size="sm" disabled={!s.startDate || !s.endDate} onClick={() => academicsApi.createSemester(y.id, { number: Number(s.number), startDate: s.startDate, endDate: s.endDate }).then(() => { setAdding(false); onDone(`${y.label}, ${termName(s.number)} added. Set its registration dates below, and make it current when it starts.`); }).catch(onFail)}>Add</Button>
+          <Button size="sm" disabled={!s.startDate || !s.endDate} onClick={() => academicsApi.createSemester(y.id, { number: Number(s.number), startDate: s.startDate, endDate: s.endDate }).then(() => { setAdding(false); onDone(`${y.label}, ${termName(Number(s.number))} added. Set its registration dates below, and make it current when it starts.`); }).catch(onFail)}>Add</Button>
         </div>
       )}
     </li>
