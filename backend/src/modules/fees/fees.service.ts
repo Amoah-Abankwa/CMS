@@ -46,8 +46,7 @@ export class FeesService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.jobs.work( QUEUES.FEES_LATE_CHARGES, async () => { await this.applyLateCharges();},);
-    await this.jobs.schedule(QUEUES.FEES_LATE_CHARGES, '30 6 * * *');
+    await this.jobs.work(QUEUES.FEES_LATE_CHARGES, async () => { await this.applyLateCharges(); });    await this.jobs.schedule(QUEUES.FEES_LATE_CHARGES, '30 6 * * *');
     this.payments.onSucceeded('FEES', async (p) => {
       if (!p.subjectId) return;
       // The unique (method, reference) makes this safe to run twice.
@@ -385,29 +384,20 @@ export class FeesService implements OnModuleInit {
   async receipt(paymentId: string, user?: AuthUser) {
     const p = await this.prisma.feePayment.findUnique({
       where: { id: paymentId },
-      select: { id: true, amount: true, method: true, reference: true, receiptNumber: true, paidOn: true, createdAt: true, reversedAt: true, reversalReason: true, billId: true, originalAmount: true, originalCurrency: true, exchangeRate: true,},
-    });
+      select: { id: true, amount: true, method: true, reference: true, receiptNumber: true, paidOn: true, createdAt: true, reversedAt: true, reversalReason: true, billId: true, originalAmount: true, originalCurrency: true, exchangeRate: true },    });
     if (!p) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Receipt not found.' });
     const b = await this.bill(p.billId);
     if (user && b.student.id !== user.id) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Receipt not found.' });
     // Balance straight after this payment, as a receipt would have shown it.
     const statement = feeStatement({ ...b, lines: b.lines as Array<{ name: string; amount: number }> });
     const at = statement.findIndex((e) => e.receipt === p.receiptNumber && e.credit > 0);
-    return { 
+    return {
       ...p,
-      originalAmount: p.originalAmount,
-      originalCurrency: p.originalCurrency,
-      exchangeRate: p.exchangeRate,
-      currency: b.currency, 
-      semester: semesterLabel(b.semester), 
-      student: { 
-        name: `${b.student.firstName} ${b.student.lastName}`, 
-        indexNumber: b.student.indexNumber, 
-        programme: b.student.studentProfile?.programme.name ?? null, 
-        level: b.student.studentProfile?.currentLevel ?? null, 
-      }, 
-      balanceAfter: at >= 0 ? statement[at].balance : b.balance, 
-      balanceNow: b.balance, 
+      currency: b.currency,
+      semester: semesterLabel(b.semester),
+      student: { name: `${b.student.firstName} ${b.student.lastName}`, indexNumber: b.student.indexNumber, programme: b.student.studentProfile?.programme.name ?? null, level: b.student.studentProfile?.currentLevel ?? null },
+      balanceAfter: at >= 0 ? statement[at].balance : b.balance,
+      balanceNow: b.balance,
     };
   }
 
@@ -422,7 +412,7 @@ export class FeesService implements OnModuleInit {
       ['Programme', `${r.student.programme ?? ''}${r.student.level ? `, level ${r.student.level}` : ''}`],
       ['Fees for', r.semester],
       ['Amount received', formatMoney(r.amount, r.currency)],
-      ...(r.originalAmount && r.originalCurrency ? [ [ 'Paid as', `${formatMoney(r.originalAmount, r.originalCurrency)} at ${r.exchangeRate} cedis per dollar`, ] as [string, string], ] : []),
+      ...(r.originalAmount && r.originalCurrency ? [['Paid as', `${formatMoney(r.originalAmount, r.originalCurrency)} at ${r.exchangeRate} cedis per dollar`] as [string, string]] : []),
       ['Paid by', FEE_METHOD_LABEL[r.method]],
       ['Reference', r.reference],
       ['Date paid', new Date(r.paidOn).toISOString().slice(0, 10)],

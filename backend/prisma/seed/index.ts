@@ -45,10 +45,28 @@ async function seedAcademics() {
         create: { code: d.code, name: d.name, schoolId: school.id, isDemo: true },
         update: { name: d.name },
       });
-      for (const p of d.programmes) {
+            for (const p of d.programmes) {
+        // A demo index code (e.g. DCE) may already belong to a programme created on the Registry screens;
+        // that programme keeps it and the demo programme is created without one.
+        let indexCode = (p as { indexCode?: string }).indexCode ?? null;
+        if (indexCode) {
+          const holder = await prisma.programme.findUnique({ where: { indexCode }, select: { code: true } });
+          if (holder && holder.code !== p.code) {
+            console.warn(`Index code ${indexCode} already belongs to programme ${holder.code}; demo programme ${p.code} is created without one.`);
+            indexCode = null;
+          }
+        }
         await prisma.programme.upsert({
           where: { code: p.code },
-          create: { code: p.code, name: p.name, departmentId: dept.id, indexCode: (p as { indexCode?: string }).indexCode ?? null, levelCode: (p as { level?: string }).level ?? '4', durationYears: Math.ceil((LEVELS.find((l) => l.code === ((p as { level?: string }).level ?? '4'))?.semesters ?? 8) / 2), isDemo: true },
+          create: {
+            code: p.code,
+            name: p.name,
+            departmentId: dept.id,
+            indexCode,
+            levelCode: (p as { level?: string }).level ?? '4',
+            durationYears: Math.ceil((LEVELS.find((l) => l.code === ((p as { level?: string }).level ?? '4'))?.semesters ?? 8) / 2),
+            isDemo: true,
+          },
           update: { name: p.name },
         });
       }
@@ -733,6 +751,8 @@ async function seedFees() {
   // Associations and dues.
   const dept = async (code: string) => (await prisma.department.findUniqueOrThrow({ where: { code } })).id;
   const ehassa = await prisma.association.create({ data: { code: 'EHASSA', name: 'Engineering and Health and Allied Science Students Association', description: 'Engineering (including Oil and Gas), computing and health departments.', payoutNetwork: 'MTN', payoutNumber: '233244000901', payoutName: 'EHASSA Executive Account', receiptSeq: 2, departments: { create: [{ departmentId: await dept('CSC') }, { departmentId: await dept('EEE') }, { departmentId: await dept('BME') }, { departmentId: await dept('OGE') }, { departmentId: await dept('NUR') }] } } });
+  // The Head of Computer Science serves as EHASSA's patron and sets its dues.
+  await prisma.association.update({ where: { id: ehassa.id }, data: { patronId: (await prisma.user.findUniqueOrThrow({ where: { email: 'lecturer.cs@demo.anu.edu.gh' } })).id } });
   await prisma.association.create({ data: { code: 'BACA', name: 'Business and Accounting Students Association', description: 'Business and accounting departments.', departments: { create: [{ departmentId: await dept('ACC') }, { departmentId: await dept('MGT') }] } } });
   const dean = await prisma.user.findUniqueOrThrow({ where: { email: 'deanofstudents@demo.anu.edu.gh' } });
   const role = await prisma.role.findUniqueOrThrow({ where: { key: ROLE_KEYS.ASSOCIATION_OFFICER } });

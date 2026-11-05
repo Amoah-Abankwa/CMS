@@ -1,11 +1,13 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
+import { Transform } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UploadsService } from './uploads.service';
 
 class SignDto {
   @IsIn(['menu', 'hostel', 'profile']) purpose: 'menu' | 'hostel' | 'profile';
-  @IsOptional() @IsUUID() targetId?: string;
+  /** The dish or hostel; not used for profile photos (an empty value counts as none). */
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value)) @IsOptional() @IsUUID() targetId?: string;
 }
 class PhotoDto {
   @IsOptional() @IsString() @MaxLength(200) publicId?: string | null;

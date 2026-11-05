@@ -31,6 +31,8 @@ model CourseOffering {
   examHolds     ExamHold[]
   eligibilities ExamEligibility[]
   classSessions ClassSession[]
+  dropRequests   CourseDropRequest[]
+  malpractice    MalpracticeCase[]
 
   @@unique([courseId, semesterId])
   @@index([semesterId])
@@ -104,4 +106,32 @@ model AdvisorAssignment {
   createdAt    DateTime @default(now())
 
   @@index([advisorId])
+}
+
+enum DropStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+/// A student's request to drop a course from an approved registration. Approving it removes the course
+/// from the registration; the request stays as the record of the dropped course.
+model CourseDropRequest {
+  id             String     @id @default(uuid()) @db.Uuid
+  registrationId String     @db.Uuid
+  studentId      String     @db.Uuid
+  student        User       @relation("CourseDropStudent", fields: [studentId], references: [id])
+  offeringId     String     @db.Uuid
+  offering       CourseOffering @relation(fields: [offeringId], references: [id])
+  semesterId     String     @db.Uuid
+  reason         String
+  status         DropStatus @default(REQUESTED)
+  decisionNote   String?
+  decidedById    String?    @db.Uuid
+  decidedAt      DateTime?
+  createdAt      DateTime   @default(now())
+
+  @@index([semesterId, status])
+  @@index([studentId])
 }

@@ -181,3 +181,22 @@ model ExamAttendance {
 
   @@id([sessionId, studentId])
 }
+
+/// An exam malpractice case recorded by the Exams Office.
+model MalpracticeCase {
+  id           String          @id @default(uuid()) @db.Uuid
+  studentId    String          @db.Uuid
+  student      User            @relation("MalpracticeStudent", fields: [studentId], references: [id])
+  offeringId   String?         @db.Uuid
+  offering     CourseOffering? @relation(fields: [offeringId], references: [id])
+  semesterId   String          @db.Uuid
+  occurredOn   DateTime        @db.Date
+  offence      String
+  sanction     String?
+  recordedById String          @db.Uuid
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([semesterId])
+  @@index([studentId])
+}

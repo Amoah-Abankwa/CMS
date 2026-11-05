@@ -31,6 +31,7 @@ export class UploadsService {
   /** The folder a person may upload into for a purpose, after checking they own the thing. */
   private async folder(user: AuthUser, purpose: 'menu' | 'hostel' | 'profile', targetId: string) {
     if (purpose === 'profile') return `anu/profiles/${user.id}`;
+    if (!targetId) throw new BadRequestException({ code: 'TARGET', message: purpose === 'menu' ? 'Save the dish first, then add its photo.' : 'Choose the hostel first.' });
     if (purpose === 'menu') {
       const item = await this.prisma.menuItem.findUnique({ where: { id: targetId }, select: { vendor: { select: { id: true, ownerId: true } } } });
       if (!item) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Dish not found.' });

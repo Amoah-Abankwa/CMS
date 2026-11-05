@@ -32,3 +32,38 @@ describe('terms and curriculum stages', () => {
     expect(courseOpen('SUMMER_NOT_SET', 1, 5, false)).toBe(false);
   });
 });
+
+import { missingPrerequisites, placeOfStage, prerequisiteLoop } from '@anu/shared';
+
+describe('curriculum placement and prerequisites', () => {
+  it('places a stage back in its level and semester', () => {
+    expect(placeOfStage(5, false)).toEqual({ level: 300, semesterNo: 1 });
+    expect(placeOfStage(8, false)).toEqual({ level: 400, semesterNo: 2 });
+    expect(placeOfStage(6, true)).toEqual({ level: 200, semesterNo: 3 });
+  });
+  it('needs prerequisites taken before, with any grade', () => {
+    const pre = [{ id: 'csc101', code: 'CSC 101' }, { id: 'mth101', code: 'MTH 101' }];
+    expect(missingPrerequisites(pre, new Set(['csc101']))).toEqual(['MTH 101']);
+    expect(missingPrerequisites(pre, new Set(['csc101', 'mth101']))).toEqual([]);
+  });
+  it('refuses prerequisite loops', () => {
+    const edges = [{ courseId: 'b', prerequisiteId: 'a' }, { courseId: 'c', prerequisiteId: 'b' }];
+    expect(prerequisiteLoop('a', 'c', edges)).toBe(true);
+    expect(prerequisiteLoop('c', 'a', edges)).toBe(false);
+    expect(prerequisiteLoop('a', 'a', [])).toBe(true);
+  });
+});
+
+import { dropProblem } from '@anu/shared';
+
+describe('dropping a course', () => {
+  const now = new Date('2026-10-01T10:00:00Z');
+  it('is allowed before the deadline, above the minimum credits', () => {
+    expect(dropProblem({ deadline: '2026-10-15T23:59:00Z', now, creditsNow: 21, courseCredits: 3, minCredits: 12 })).toBeNull();
+  });
+  it('is refused after the deadline, without one, or below the minimum', () => {
+    expect(dropProblem({ deadline: '2026-09-30T23:59:00Z', now, creditsNow: 21, courseCredits: 3, minCredits: 12 })).toMatch('passed');
+    expect(dropProblem({ deadline: null, now, creditsNow: 21, courseCredits: 3, minCredits: 12 })).toMatch('not been opened');
+    expect(dropProblem({ deadline: '2026-10-15T23:59:00Z', now, creditsNow: 14, courseCredits: 3, minCredits: 12 })).toMatch('below the minimum of 12');
+  });
+});

@@ -1,3 +1,4 @@
+import type { AttendanceStatus } from '../../generated/prisma/client';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import QRCode from 'qrcode';
@@ -12,7 +13,6 @@ import { AttendancePolicyService } from './attendance-policy.service';
 import { AttendanceSummaryService } from './attendance-summary.service';
 import { codeAt, currentStep, secondsLeft } from './check-in-code';
 import { CreateSessionDto, RegisterEntryDto, UpdateSessionDto } from './dto/attendance.dto';
-import type { AttendanceStatus } from '../../generated/prisma/client';
 
 const MAX_REPEATS = 20;
 const EARLY_MINUTES = 15;
@@ -149,16 +149,7 @@ export class ClassSessionsService implements OnModuleInit {
     await this.prisma.$transaction(
       entries.map((e) => {
         // An absence covered by an excuse is recorded as excused, so it never counts against the student.
-        const status: AttendanceStatus =
-  e.status === 'ABSENT' && excused.has(e.studentId)
-    ? 'EXCUSED'
-    : e.status;
-
-const data = {
-  status,
-  source: status === 'EXCUSED' ? ('EXCUSE' as const) : ('LECTURER' as const),
-  markedById: user.id,
-};
+        const status: AttendanceStatus = e.status === 'ABSENT' && excused.has(e.studentId) ? 'EXCUSED' : (e.status as AttendanceStatus);        const data = { status, source: status === 'EXCUSED' ? ('EXCUSE' as const) : ('LECTURER' as const), markedById: user.id };
         return this.prisma.attendanceRecord.upsert({
           where: { sessionId_studentId: { sessionId, studentId: e.studentId } },
           create: { sessionId, studentId: e.studentId, ...data },

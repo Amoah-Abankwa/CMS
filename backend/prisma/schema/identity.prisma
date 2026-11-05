@@ -100,6 +100,10 @@ model User {
   interLibraryLoans   InterLibraryLoan[]   @relation("IllRequester")
   hostelComplaints    HostelComplaint[]    @relation("HostelComplaintStudent")
   patronOf            Association[]        @relation("AssociationPatron")
+  courseApprovals     CourseApproval[]     @relation("CourseApprovalStudent")
+  courseDrops         CourseDropRequest[]  @relation("CourseDropStudent")
+  mfaEmailCodes       MfaEmailCode[]
+  malpracticeCases    MalpracticeCase[]    @relation("MalpracticeStudent")
 
   @@index([type, status])
 }
@@ -247,4 +251,19 @@ model AccountSetupToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+/// A one-time code emailed to a staff member who cannot use their authenticator. Using it removes the
+/// old authenticator and sends them to set up a new one before they are signed in.
+model MfaEmailCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

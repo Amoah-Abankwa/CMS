@@ -71,6 +71,8 @@ model Semester {
   maxCredits     Int          @default(24)
   /// Summer only (semester 3): what regular students may take. Weekend students register as usual.
   summerKind     SummerKind?
+  /// Students may ask to drop a registered course until this moment (set by the Registrar).
+  dropDeadline   DateTime?
   offerings      CourseOffering[]
   registrations  CourseRegistration[]
   examTimetable  ExamTimetable?
@@ -103,6 +105,10 @@ model Course {
   offerings    CourseOffering[]
   curriculum   ProgrammeCourse[]
   readingList    ReadingList?
+  description    String?
+  prerequisites  CoursePrerequisite[] @relation("CourseNeeds")
+  requiredFor    CoursePrerequisite[] @relation("CourseRequiredFor")
+  approvals      CourseApproval[]
 }
 
 enum SummerKind {
@@ -110,4 +116,30 @@ enum SummerKind {
   PROMOTIONAL
   /// Any course, to improve the grade.
   UPGRADE
+}
+
+/// A course that must have been taken (any grade) before another can be registered.
+model CoursePrerequisite {
+  courseId       String @db.Uuid
+  course         Course @relation("CourseNeeds", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisiteId String @db.Uuid
+  prerequisite   Course @relation("CourseRequiredFor", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, prerequisiteId])
+}
+
+/// A course outside a student's programme, approved for that student for one term (by their advisor,
+/// Head of Department or the Registry).
+model CourseApproval {
+  id           String   @id @default(uuid()) @db.Uuid
+  studentId    String   @db.Uuid
+  student      User     @relation("CourseApprovalStudent", fields: [studentId], references: [id])
+  courseId     String   @db.Uuid
+  course       Course   @relation(fields: [courseId], references: [id])
+  semesterId   String   @db.Uuid
+  reason       String
+  approvedById String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  @@unique([studentId, courseId, semesterId])
 }

@@ -54,6 +54,15 @@ export class StaffController {
     return { ok: true };
   }
 
+  /** Removes the staff member's authenticator; they set it up again at their next sign-in. */
+  @Post(':id/mfa/reset')
+  @HttpCode(200)
+  @RequirePermission(PERMISSIONS.USERS_MANAGE)
+  @RequireRecentMfa()
+  resetMfa(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.staff.resetMfa(actor, id);
+  }
+
   @Post(':id/status')
   @HttpCode(200)
   @RequirePermission(PERMISSIONS.USERS_MANAGE)

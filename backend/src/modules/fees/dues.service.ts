@@ -59,8 +59,10 @@ export class DuesService implements OnModuleInit {
       const receipt = await this.record(levy.id, p.userId, p.amount, 'ONLINE', p.userId, p.reference);
       await this.sendReceipt(receipt.id);
     });
-     await this.jobs.work( QUEUES.ASSOCIATION_TERMS, async () => { await this.endExpiredTerms(); },);    
-     await this.jobs.schedule(QUEUES.ASSOCIATION_TERMS, '15 0 * * *'); }
+    await this.jobs.work(QUEUES.ASSOCIATION_TERMS, async () => { await this.endExpiredTerms(); });    await this.jobs.schedule(QUEUES.ASSOCIATION_TERMS, '15 0 * * *');
+  }
+
+  // ----- Shared helpers -----
 
   /** Creates a payment with the association's next receipt number, refusing a second payment for the same dues. */
   private async record(levyId: string, studentId: string, amount: number, method: 'ONLINE' | 'CASH', recordedById: string, reference?: string) {

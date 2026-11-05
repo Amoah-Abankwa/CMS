@@ -29,6 +29,7 @@ import { FeesModule } from './modules/fees/fees.module';
 import { RegistryModule } from './modules/registry/registry.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ImportsModule } from './modules/imports/imports.module';
+import { CurriculumModule } from './modules/curriculum/curriculum.module';
 import { AccountSetupModule } from './modules/account-setup/account-setup.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { AcademicsModule } from './modules/academics/academics.module';
@@ -62,6 +63,7 @@ import { HealthModule } from './modules/health/health.module';
     RegistryModule,
     UploadsModule,
     ImportsModule,
+    CurriculumModule,
     AcademicsModule,
     PreferencesModule,
     HealthModule,

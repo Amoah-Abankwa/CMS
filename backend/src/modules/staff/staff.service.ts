@@ -1,3 +1,4 @@
+import { resetAuthenticator } from '../auth/mfa-reset';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ROLE_KEYS } from '@anu/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -184,6 +185,17 @@ export class StaffService {
    * Suspending or deactivating ends every session at once; the sign-in check refuses the account
    * from its next request. Nobody can lock themselves out, and the last Super Admin cannot be locked out.
    */
+  /** A Super Admin resets a staff member's authenticator (lost phone, or unreadable after a key change). */
+  async resetMfa(actor: AuthUser, id: string) {
+    const u = await this.prisma.user.findUnique({ where: { id }, select: { id: true, type: true, email: true, mfaFactor: { select: { userId: true } } } });
+    if (!u || u.type !== 'STAFF') throw new NotFoundException({ code: 'NOT_FOUND', message: 'Staff member not found.' });
+    if (u.id === actor.id) throw new BadRequestException({ code: 'SELF', message: 'Another Super Admin must reset your own authenticator (or use the server command).' });
+    if (!u.mfaFactor) throw new BadRequestException({ code: 'NONE', message: 'This person has not set up an authenticator yet.' });
+    const r = await resetAuthenticator(this.prisma, id);
+    await this.audit.record({ action: 'auth.mfa.reset', module: 'auth', targetType: 'User', targetId: id, metadata: { sessionsEnded: r.sessionsEnded } });
+    return { ok: true };
+  }
+
   async setStatus(actor: AuthUser, id: string, status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED', reason: string) {
     if (actor.id === id) throw new ForbiddenException({ code: 'SELF', message: 'Another administrator must change your own account.' });
     const user = await this.prisma.user.findFirst({ where: { id, type: { in: ['STAFF', 'PARTNER'] } }, select: { id: true, status: true, firstName: true, lastName: true, roles: { select: { role: { select: { key: true } } } } } });

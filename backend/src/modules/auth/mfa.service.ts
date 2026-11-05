@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -16,6 +16,7 @@ function formatRecovery(raw: string) {
 
 @Injectable()
 export class MfaService {
+  private readonly logger = new Logger(MfaService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async startEnrolment(userId: string, accountLabel: string) {
@@ -36,7 +37,7 @@ export class MfaService {
   async confirmEnrolment(userId: string, code: string): Promise<string[]> {
     const factor = await this.prisma.mfaFactor.findUnique({ where: { userId } });
     if (!factor || factor.confirmedAt) throw new BadRequestException({ code: 'MFA_NOT_STARTED', message: 'Start setup again.' });
-    const step = this.check(decrypt(factor.secretEncrypted), code, factor.lastUsedStep);
+    const step = this.check(this.secret(factor.secretEncrypted), code, factor.lastUsedStep);
     if (step === null) throw new BadRequestException({ code: 'MFA_CODE_INVALID', message: 'That code is not valid. Check your authenticator app and try again.' });
 
     const codes = Array.from({ length: RECOVERY_CODE_COUNT }, () => formatRecovery(randomToken(12)));
@@ -48,13 +49,27 @@ export class MfaService {
     return codes;
   }
 
+    /**
+   * The authenticator secret, decrypted with ENCRYPTION_KEY. If the key has changed since the
+   * authenticator was set up, it cannot be read: say so plainly instead of failing with a server error.
+   * Recovery codes are stored as hashes, so they still work.
+   */
+  private secret(encrypted: string) {
+    try {
+      return decrypt(encrypted);
+    } catch {
+      this.logger.error('An authenticator secret could not be decrypted: ENCRYPTION_KEY differs from the key it was saved with.');
+      throw new UnauthorizedException({ code: 'MFA_UNREADABLE', message: 'Your authenticator cannot be checked right now. Sign in with one of your recovery codes, or ask an administrator to reset your authenticator.' });
+    }
+  }
+
   /** Accepts a TOTP code or an unused recovery code. Returns the method used, or null. */
   async verify(userId: string, code: string): Promise<'totp' | 'recovery' | null> {
     const factor = await this.prisma.mfaFactor.findUnique({ where: { userId } });
     if (!factor?.confirmedAt) return null;
 
     if (/^\d{6}$/.test(code)) {
-      const step = this.check(decrypt(factor.secretEncrypted), code, factor.lastUsedStep);
+      const step = this.check(this.secret(factor.secretEncrypted), code, factor.lastUsedStep);
       if (step === null) return null;
       await this.prisma.mfaFactor.update({ where: { userId }, data: { lastUsedStep: BigInt(step) } });
       return 'totp';

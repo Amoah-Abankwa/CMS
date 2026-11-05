@@ -1,14 +1,15 @@
+import type { Response } from 'express';
 import { MaxLength } from 'class-validator';
 import { MinLength } from 'class-validator';
 import { IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Res, Delete } from '@nestjs/common';
 import { PERMISSIONS } from '@anu/shared';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { StudentRegistrationService } from './student-registration.service';
 import { RegistrationReviewService } from './registration-review.service';
-import { ApproveDto, ListRegistrationsDto, RejectDto, SaveRegistrationDto, SemesterQuery } from './dto/registration.dto';
+import { ApproveDto, ListRegistrationsDto, RejectDto, SaveRegistrationDto, SemesterQuery, CourseApprovalDto } from './dto/registration.dto';
 
 /** The signed-in student's own registration. */
 class ReopenDto {
@@ -18,6 +19,16 @@ class ReopenDto {
 @Controller('me/registration')
 export class MyRegistrationController {
   constructor(private readonly service: StudentRegistrationService) {}
+
+  /** The registration slip as a PDF. */
+  @Get('slip.pdf')
+  async slip(@CurrentUser() user: AuthUser, @Query() q: SemesterQuery, @Res() res: Response) {
+    const f = await this.service.slipPdf(user, q.semesterId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${f.filename.replace(/[^\w.-]/g, '-')}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(f.buffer);
+  }
 
   /** Every course the student has registered for, with its result. */
   @Get('courses')
@@ -50,6 +61,26 @@ export class MyRegistrationController {
 @RequirePermission(PERMISSIONS.REGISTRATIONS_REVIEW)
 export class RegistrationReviewController {
   constructor(private readonly review: RegistrationReviewService) {}
+
+  @Get('export')
+  exportRows(@CurrentUser() user: AuthUser, @Query() q: ListRegistrationsDto) {
+    return this.review.exportRows(user, q);
+  }
+
+  @Get('course-approvals')
+  approvals(@CurrentUser() user: AuthUser, @Query() q: SemesterQuery) {
+    return this.review.approvals(user, q.semesterId);
+  }
+
+  @Post('course-approvals')
+  grant(@CurrentUser() user: AuthUser, @Body() dto: CourseApprovalDto) {
+    return this.review.grantApproval(user, dto);
+  }
+
+  @Delete('course-approvals/:id')
+  revoke(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.review.revokeApproval(user, id);
+  }
 
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() q: ListRegistrationsDto) {

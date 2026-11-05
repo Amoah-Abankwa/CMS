@@ -48,6 +48,20 @@ export class AuthController {
     return { status: 'signed_in', mustChangePassword: result.mustChangePassword, usedRecoveryCode: result.usedRecoveryCode };
   }
 
+  /** Can't use the authenticator: email a one-time code (after the password step). */
+  @Public() @Throttle(STRICT) @HttpCode(200)
+  @Post('mfa/email/send')
+  sendMfaEmail(@Body() dto: MfaChallengeDto) {
+    return this.login.sendMfaEmailCode(dto.challengeToken);
+  }
+
+  /** The emailed code replaces the authenticator code; the person then sets up a new authenticator. */
+  @Public() @Throttle(STRICT) @HttpCode(200)
+  @Post('mfa/email/verify')
+  verifyMfaEmail(@Body() dto: MfaCodeDto) {
+    return this.login.verifyMfaEmailCode(dto.challengeToken, dto.code);
+  }
+
   @Public() @Throttle(STRICT) @HttpCode(200)
   @Post('mfa/enrol/start')
   startEnrolment(@Body() dto: MfaChallengeDto) {

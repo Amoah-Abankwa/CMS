@@ -1,3 +1,5 @@
+import { CourseDropsController, MalpracticeController, MyDropsController, RegistrationRecordsController } from './course-drops.controller';
+import { CourseDropsService } from './course-drops.service';
 import { AdvisorsController } from './advisors.controller';
 import { AdvisorsService } from './advisors.service';
 import { Module } from '@nestjs/common';
@@ -6,7 +8,7 @@ import { StudentRegistrationService } from './student-registration.service';
 import { RegistrationReviewService } from './registration-review.service';
 
 @Module({
-  controllers: [AdvisorsController, MyRegistrationController, RegistrationReviewController],
-  providers: [AdvisorsService, StudentRegistrationService, RegistrationReviewService],
+  controllers: [MyDropsController, CourseDropsController, RegistrationRecordsController, MalpracticeController, AdvisorsController, MyRegistrationController, RegistrationReviewController],
+  providers: [CourseDropsService, AdvisorsService, StudentRegistrationService, RegistrationReviewService],
 })
 export class RegistrationsModule {}

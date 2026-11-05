@@ -116,8 +116,7 @@ export class VendorService {
 
   async markPaid(user: AuthUser, orderId: string, via: 'CASH' | 'MOMO', reference?: string) {
     const v = await this.mine(user);
-    const o = await this.orders.markPaid(orderId, v.id, via, reference);
-    return { ...o, pickupCode: undefined };
+    const o = await this.orders.markPaidByVendor(orderId, v.id, via, reference);    return { ...o, pickupCode: undefined };
   }
 
   async act(user: AuthUser, orderId: string, dto: VendorActionDto) {

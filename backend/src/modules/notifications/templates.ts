@@ -61,6 +61,8 @@ export const EVENT_KEYS = {
   EXAM_ELIGIBILITY_PUBLISHED: 'exam_eligibility.published',
   ACCOUNT_LOCKED: 'security.account_locked',
   PASSWORD_RESET_CODE: 'security.password_reset_code',
+  MFA_EMAIL_CODE: 'security.mfa_email_code',
+  MFA_RESET_BY_EMAIL: 'security.mfa_reset_by_email',
   PASSWORD_CHANGED: 'security.password_changed',
   DEVELOPER_ACCESS_CHANGED: 'security.developer_access_changed',
 } as const;
@@ -459,6 +461,22 @@ export const DEFAULT_TEMPLATES: TemplateDefinition[] = [
     smsBody: 'ANU: Your password reset code is {{code}}. It expires in 10 minutes.',
     inAppTitle: 'Password reset requested',
     inAppBody: 'A password reset code was sent.',
+  },
+  {
+    eventKey: EVENT_KEYS.MFA_EMAIL_CODE,
+    emailSubject: 'Your sign-in code',
+    emailBody: 'Your one-time sign-in code is {{code}}. It expires in 10 minutes. Using it removes your current authenticator, and you will set up a new one straight away. If you did not ask for this, someone may know your password: change it and contact ICT support.',
+    smsBody: 'ANU: Your sign-in code is {{code}}. It expires in 10 minutes.',
+    inAppTitle: 'Sign-in code requested',
+    inAppBody: 'A one-time sign-in code was emailed to you.',
+  },
+  {
+    eventKey: EVENT_KEYS.MFA_RESET_BY_EMAIL,
+    emailSubject: 'Your authenticator was replaced',
+    emailBody: 'At {{time}} you signed in with an emailed code instead of your authenticator, so your old authenticator and recovery codes were removed and a new authenticator was set up. If this was not you, contact ICT support immediately.',
+    smsBody: 'ANU: Your authenticator was replaced at {{time}} after signing in with an emailed code. Not you? Contact ICT support.',
+    inAppTitle: 'Authenticator replaced',
+    inAppBody: 'You signed in with an emailed code and set up a new authenticator.',
   },
   {
     eventKey: EVENT_KEYS.PASSWORD_CHANGED,

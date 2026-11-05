@@ -28,7 +28,7 @@ const MARGIN = 50;
 
 /** Text the standard fonts can draw: the cedi sign becomes GHS, anything else unsupported becomes '?'. */
 export function pdfSafe(text: string) {
-  return text.replace(/GH₵/g, 'GHS').replace(/₵/g, 'GHS').replace(/US\$/g, 'USD').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-').replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+  return text.replace(/GH₵/g, 'GHS').replace(/₵/g, 'GHS').replace(/US\$/g, 'USD').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–-]/g, '-').replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 }
 
 export class PdfDoc {

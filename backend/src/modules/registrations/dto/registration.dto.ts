@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength, IsInt, Max, Min } from 'class-validator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
@@ -25,4 +25,11 @@ export class ApproveDto {
 
 export class RejectDto {
   @IsString() @MinLength(5, { message: 'Tell the student what to change (at least 5 characters).' }) @MaxLength(500) note: string;
+}
+
+export class CourseApprovalDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value)) @IsString() @MinLength(6) @MaxLength(20) indexNumber: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value)) @IsString() @MinLength(5) @MaxLength(12) courseCode: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value)) @IsString() @MinLength(5) @MaxLength(300) reason: string;
+  @IsOptional() @IsUUID() semesterId?: string;
 }

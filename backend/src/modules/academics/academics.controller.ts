@@ -12,8 +12,10 @@ class UpdateSemesterDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(40) minCredits?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(40) maxCredits?: number;
   @IsOptional() @IsBoolean() isCurrent?: boolean;
-  /** Summer only: promotional (failed or not yet taken) or upgrade (any course, to improve the grade). */
+  /** Summer only: promotional (registered like Fall and Spring) or upgrade (any course, to improve the grade). */
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsIn(['PROMOTIONAL', 'UPGRADE']) summerKind?: 'PROMOTIONAL' | 'UPGRADE' | null;
+  /** Students may ask to drop courses until then; empty closes dropping. */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsDateString() dropDeadline?: string | null;
 }
 
 class YearDto {

@@ -24,7 +24,12 @@ type Handler<T> = (data: T) => Promise<void>;
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobsService.name);
-  private readonly boss = new PgBoss({ connectionString: loadEnv().DIRECT_URL, schema: 'pgboss' });
+  private readonly boss = new PgBoss({
+  connectionString: loadEnv().DIRECT_URL,
+  schema: 'pgboss',
+  max: 3,
+  application_name: 'anu-pgboss',
+});
   private readonly pending: Array<() => Promise<unknown>> = [];
   private started = false;
 

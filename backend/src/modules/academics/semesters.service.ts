@@ -19,7 +19,7 @@ export function semesterLabel(s: { number: number; academicYear: { label: string
 
 const SELECT = {
   id: true, number: true, startDate: true, endDate: true, isCurrent: true,
-  registrationOpensAt: true, registrationClosesAt: true, minCredits: true, maxCredits: true, summerKind: true,
+  registrationOpensAt: true, registrationClosesAt: true, minCredits: true, maxCredits: true, summerKind: true, dropDeadline: true,
   academicYear: { select: { id: true, label: true } },
 } as const;
 
@@ -49,7 +49,7 @@ export class SemestersService {
 
   async update(
     id: string,
-    dto: { registrationOpensAt?: string | null; registrationClosesAt?: string | null; minCredits?: number; maxCredits?: number; isCurrent?: boolean; summerKind?: 'PROMOTIONAL' | 'UPGRADE' | null },
+    dto: { registrationOpensAt?: string | null; registrationClosesAt?: string | null; minCredits?: number; maxCredits?: number; isCurrent?: boolean; summerKind?: 'PROMOTIONAL' | 'UPGRADE' | null; dropDeadline?: string | null },
   ) {
     const before = await this.prisma.semester.findUnique({ where: { id }, select: SELECT });
     if (!before) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Semester not found.' });
@@ -72,7 +72,7 @@ export class SemestersService {
       }
       return tx.semester.update({
         where: { id },
-        data: { registrationOpensAt: opens, registrationClosesAt: closes, minCredits: min, maxCredits: max, ...(dto.isCurrent !== undefined ? { isCurrent: dto.isCurrent } : {}), ...(dto.summerKind !== undefined ? { summerKind: dto.summerKind } : {}) },
+        data: { registrationOpensAt: opens, registrationClosesAt: closes, minCredits: min, maxCredits: max, ...(dto.isCurrent !== undefined ? { isCurrent: dto.isCurrent } : {}), ...(dto.summerKind !== undefined ? { summerKind: dto.summerKind } : {}), ...(dto.dropDeadline !== undefined ? { dropDeadline: dto.dropDeadline ? new Date(dto.dropDeadline) : null } : {}) },
         select: SELECT,
       });
     });

@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { sha256 } from '../../core/crypto/crypto.util';
+import { randomInt } from 'node:crypto';
+import { resetAuthenticator } from './mfa-reset';
+import { maskEmail } from './mask-email';
+import { ForbiddenException, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -83,6 +87,52 @@ export class LoginService {
     await this.recordSuccess(user, { mfaMethod: method });
     const tokens = await this.sessions.create(user.id, user.primaryRoleKey, true);
     return { mustChangePassword: user.mustChangePassword, usedRecoveryCode: method === 'recovery', tokens };
+  }
+
+  // ----- Signing in with an emailed code when the authenticator cannot be used -----
+
+  /** Emails a one-time code, after the password step. At most three an hour; a new code replaces the last. */
+  async sendMfaEmailCode(challengeToken: string) {
+    const user = await this.verifyStepUser(challengeToken);
+    if (!user.email) throw new BadRequestException({ code: 'NO_EMAIL', message: 'Your account has no email address. Ask ICT support to reset your authenticator.' });
+    const lastHour = await this.prisma.mfaEmailCode.count({ where: { userId: user.id, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
+    if (lastHour >= 3) throw new BadRequestException({ code: 'TOO_MANY_CODES', message: 'Three codes have been sent in the last hour. Use the latest one, or try again later.' });
+    await this.prisma.mfaEmailCode.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await this.prisma.mfaEmailCode.create({ data: { userId: user.id, codeHash: sha256(`${user.id}:${code}`), expiresAt: new Date(Date.now() + 10 * 60_000) } });
+    await this.notifications.notify({ eventKey: EVENT_KEYS.MFA_EMAIL_CODE, recipients: [{ userId: user.id }], channels: ['EMAIL'], sharedVars: { code }, sensitive: true });
+    await this.audit.record({ action: 'auth.mfa.email_code_sent', module: 'auth', targetType: 'User', targetId: user.id, actor: this.actor(user) });
+    return { sentTo: maskEmail(user.email) };
+  }
+
+  /**
+   * Accepts the emailed code instead of an authenticator code. The old authenticator and recovery
+   * codes are removed, and the person must set up a new authenticator before they are signed in.
+   */
+  async verifyMfaEmailCode(challengeToken: string, code: string) {
+    const user = await this.verifyStepUser(challengeToken);
+    const row = await this.prisma.mfaEmailCode.findFirst({ where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' } });
+    if (!row) throw new UnauthorizedException({ code: 'CODE_EXPIRED', message: 'That code has expired or been used. Send a new one.' });
+    if (row.codeHash !== sha256(`${user.id}:${code.trim()}`)) {
+      const attempts = row.attempts + 1;
+      await this.prisma.mfaEmailCode.update({ where: { id: row.id }, data: { attempts, ...(attempts >= 5 ? { usedAt: new Date() } : {}) } });
+      await this.registerFailure(user, 'auth.mfa.email_code_failed');
+      throw new UnauthorizedException({ code: 'CODE_INVALID', message: attempts >= 5 ? 'Too many wrong tries. Send a new code.' : 'That code is not right. Check the latest email.' });
+    }
+    await this.prisma.mfaEmailCode.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+    await resetAuthenticator(this.prisma, user.id);
+    await this.audit.record({ action: 'auth.mfa.email_fallback', module: 'auth', targetType: 'User', targetId: user.id, actor: this.actor(user) });
+    await this.notifications.notify({ eventKey: EVENT_KEYS.MFA_RESET_BY_EMAIL, recipients: [{ userId: user.id }], channels: ['EMAIL', 'IN_APP'], sharedVars: { time: new Date().toLocaleString('en-GB', { timeZone: 'Africa/Accra' }) } });
+    return { status: 'mfa_enrolment_required' as const, challengeToken: await this.tokens.signChallenge(user.id, 'enrol') };
+  }
+
+  /** The person who passed the password step (a 'verify' challenge), if not locked. */
+  private async verifyStepUser(challengeToken: string) {
+    const challenge = await this.tokens.verifyChallenge(challengeToken);
+    if (!challenge || challenge.purpose !== 'verify') throw new UnauthorizedException({ code: 'CHALLENGE_EXPIRED', message: 'Your sign-in attempt expired. Start again.' });
+    const user = (await this.prisma.user.findUnique({ where: { id: challenge.sub }, select: SELECT })) as LoginUser;
+    this.assertNotLocked(user);
+    return user;
   }
 
   async startEnrolment(challengeToken: string) {

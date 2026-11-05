@@ -1,4 +1,5 @@
-import { carryOverCourses, courseOpen, termName, registrationMode, stageOf, suggestedStage, type RegistrationMode, type SummerKind } from '@anu/shared';
+import { PdfDoc } from '../../core/pdf/pdf';
+import { carryOverCourses, courseOpen, levelOfStage, missingPrerequisites, termName, registrationMode, stageOf, suggestedStage, type RegistrationMode, type SummerKind } from '@anu/shared';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -7,7 +8,7 @@ import { SemestersService } from '../academics/semesters.service';
 import { OFFERING_SELECT, presentOffering } from '../offerings/offerings.service';
 
 type Semester = Awaited<ReturnType<SemestersService['resolve']>>;
-type Profile = { userId: string; programmeId: string; currentLevel: number; programme: { code: string; name: string; level: { mode: string; semesters: number } } };
+type Profile = { userId: string; programmeId: string; currentLevel: number; programme: { code: string; name: string; department: { name: string }; level: { mode: string; semesters: number } } };
 
 /**
  * Course registration from the student's side. A student picks their main semester (curriculum stage)
@@ -26,11 +27,11 @@ export class StudentRegistrationService {
   async overview(user: AuthUser, semesterId?: string, mainStage?: number) {
     const { profile, semester } = await this.context(user, semesterId);
     const registration = await this.current(user.id, semester.id);
-    const plan = this.plan(profile, semester, mainStage ?? registration?.mainStage ?? undefined);
+    const plan = this.plan(profile, semester, mainStage ?? registration?.mainStage ?? undefined, await this.lastMainStage(user.id, semester.id));
     const available = await this.available(profile, semester, plan);
     return {
       semester,
-      profile: { level: profile.currentLevel, programme: profile.programme },
+      profile: { level: profile.currentLevel, programme: profile.programme, department: profile.programme.department.name },
       mode: plan.mode,
       mainStage: plan.mode === 'REGULAR' ? plan.limitStage : null,
       suggestedStage: plan.suggested,
@@ -41,12 +42,18 @@ export class StudentRegistrationService {
     };
   }
 
+  /** The main semester of the student's latest approved registration in another term. */
+  private async lastMainStage(studentId: string, semesterId: string) {
+    const r = await this.prisma.courseRegistration.findFirst({ where: { studentId, status: 'APPROVED', semesterId: { not: semesterId }, mainStage: { not: null } }, orderBy: { semester: { startDate: 'desc' } }, select: { mainStage: true } });
+    return r?.mainStage ?? null;
+  }
+
   /** How this student registers this term, and up to which curriculum stage. */
-  private plan(profile: Profile, semester: Semester, mainStage?: number) {
+  private plan(profile: Profile, semester: Semester, mainStage?: number, lastApproved?: number | null) {
     const weekend = profile.programme.level.mode === 'WEEKEND';
     const totalStages = profile.programme.level.semesters;
     const mode: RegistrationMode = registrationMode(semester.number, weekend, (semester.summerKind ?? null) as SummerKind | null);
-    const suggested = suggestedStage(profile.currentLevel, semester.number, weekend, totalStages);
+    const suggested = suggestedStage(profile.currentLevel, semester.number, weekend, totalStages, lastApproved);
     // Regular registration: the chosen main semester. Summer: the stage reached (end of the current level).
     const reached = Math.min(totalStages, Math.floor(profile.currentLevel / 100) * (weekend ? 3 : 2));
     const limitStage = mode === 'REGULAR' ? Math.max(1, Math.min(totalStages, mainStage ?? suggested)) : reached;
@@ -55,7 +62,7 @@ export class StudentRegistrationService {
 
   async save(user: AuthUser, offeringIds: string[], mainStage?: number) {
     const { profile, semester } = await this.context(user);
-    const plan = this.plan(profile, semester, mainStage);
+    const plan = this.plan(profile, semester, mainStage, await this.lastMainStage(user.id, semester.id));
     if (plan.mode === 'SUMMER_NOT_SET') throw new BadRequestException({ code: 'SUMMER_NOT_SET', message: 'The academic office has not yet said whether this summer is promotional or upgrade.' });
     if (plan.mode === 'REGULAR' && (!mainStage || mainStage > plan.totalStages)) throw new BadRequestException({ code: 'MAIN_STAGE', message: 'Choose your main semester.' });
     this.assertWindow(semester);
@@ -70,6 +77,8 @@ export class StudentRegistrationService {
     const unique = [...new Set(offeringIds)];
     const available = await this.available(profile, semester, plan);
     const byId = new Map(available.map((o) => [o.id, o]));
+    const blocked = offeringIds.map((id) => byId.get(id)).filter((o): o is NonNullable<typeof o> => !!o && o.missingPrerequisites.length > 0);
+    if (blocked.length) throw new BadRequestException({ code: 'PREREQUISITES', message: blocked.map((o) => `${o.course.code} needs ${o.missingPrerequisites.join(' and ')} taken first.`).join(' ') });
     const unknown = unique.filter((id) => !byId.has(id));
     if (unknown.length) throw new BadRequestException({ code: 'COURSE_NOT_AVAILABLE', message: 'One or more courses are not open to you this semester. Refresh the page.' });
 
@@ -144,7 +153,7 @@ export class StudentRegistrationService {
     if (user.type !== 'STUDENT') throw new ForbiddenException({ code: 'STUDENTS_ONLY', message: 'Course registration is for students.' });
     const profile = await this.prisma.studentProfile.findUnique({
       where: { userId: user.id },
-      select: { userId: true, programmeId: true, currentLevel: true, programme: { select: { code: true, name: true, level: { select: { mode: true, semesters: true } } } } },
+      select: { userId: true, programmeId: true, currentLevel: true, programme: { select: { code: true, name: true, department: { select: { name: true } }, level: { select: { mode: true, semesters: true } } } } },
     });
     if (!profile) throw new ForbiddenException({ code: 'NO_PROFILE', message: 'Your student record is incomplete. Contact the Registry.' });
     return { profile, semester: await this.semesters.resolve(semesterId) };
@@ -162,16 +171,27 @@ export class StudentRegistrationService {
    */
   private async available(profile: Profile, semester: Semester, plan: ReturnType<StudentRegistrationService['plan']>) {
     if (plan.mode === 'SUMMER_NOT_SET') return [];
-    const [curriculum, attempts] = await Promise.all([
+    const [curriculum, attempts, approvals, earlier] = await Promise.all([
       this.prisma.programmeCourse.findMany({ where: { programmeId: profile.programmeId, course: { isActive: true } }, select: { courseId: true, level: true, semesterNo: true, isElective: true } }),
       this.prisma.courseResult.findMany({ where: { studentId: profile.userId, sheet: { status: 'PUBLISHED' } }, select: { isPass: true, incomplete: true, sheet: { select: { publishedAt: true, offering: { select: { courseId: true } } } } } }),
+      // Courses outside the programme approved for this student this term.
+      this.prisma.courseApproval.findMany({ where: { studentId: profile.userId, semesterId: semester.id, course: { isActive: true } }, select: { courseId: true } }),
+      // Taken before: approved registrations in other terms (results may not be out yet).
+      this.prisma.courseRegistrationItem.findMany({ where: { registration: { studentId: profile.userId, status: 'APPROVED', semesterId: { not: semester.id } } }, select: { offering: { select: { courseId: true } } } }),
     ]);
+    // A prerequisite counts once taken before, with any grade.
+    const taken = new Set([...attempts.map((a) => a.sheet.offering.courseId), ...earlier.map((e) => e.offering.courseId)]);
     const carry = carryOverCourses(attempts.map((a) => ({ courseId: a.sheet.offering.courseId, isPass: a.isPass, incomplete: a.incomplete, publishedAt: a.sheet.publishedAt ?? new Date(0) })));
     const passed = new Set(attempts.filter((a) => a.isPass).map((a) => a.sheet.offering.courseId));
-    const open = curriculum
-      .map((c) => ({ ...c, stage: stageOf(c.level, c.semesterNo, plan.weekend) }))
-      .filter((c) => courseOpen(plan.mode, c.stage, plan.limitStage, passed.has(c.courseId)));
+    const inCurriculum = new Set(curriculum.map((c) => c.courseId));
+    const open = [
+      ...curriculum
+        .map((c) => ({ ...c, stage: stageOf(c.level, c.semesterNo, plan.weekend), approved: false }))
+        .filter((c) => courseOpen(plan.mode, c.stage, plan.limitStage, passed.has(c.courseId))),
+      ...approvals.filter((a) => !inCurriculum.has(a.courseId)).map((a) => ({ courseId: a.courseId, level: 0, semesterNo: 0, isElective: true, stage: 0, approved: true })),
+    ];
     if (!open.length) return [];
+    const prereqs = await this.prisma.coursePrerequisite.findMany({ where: { courseId: { in: open.map((c) => c.courseId) } }, select: { courseId: true, prerequisite: { select: { id: true, code: true } } } });
     await this.prisma.courseOffering.createMany({ data: open.map((c) => ({ courseId: c.courseId, semesterId: semester.id })), skipDuplicates: true });
     const rows = await this.prisma.courseOffering.findMany({
       where: { semesterId: semester.id, courseId: { in: open.map((c) => c.courseId) } },
@@ -183,7 +203,8 @@ export class StudentRegistrationService {
     return rows
       .map((o) => {
         const c = info.get(o.courseId)!;
-        return { ...presentOffering(o), seatsTaken: held.get(o.id) ?? 0, stage: c.stage, isMain: plan.mode === 'REGULAR' && c.stage === plan.limitStage, isElective: c.isElective, passed: passed.has(o.courseId), carryOver: carry.includes(o.courseId) };
+        const needs = prereqs.filter((p) => p.courseId === o.courseId).map((p) => p.prerequisite);
+        return { ...presentOffering(o), seatsTaken: held.get(o.id) ?? 0, stage: c.stage, isMain: plan.mode === 'REGULAR' && c.stage === plan.limitStage, isElective: c.isElective, approvedForYou: c.approved, passed: passed.has(o.courseId), carryOver: carry.includes(o.courseId), prerequisites: needs.map((n) => n.code), missingPrerequisites: missingPrerequisites(needs, taken) };
       })
       .sort((a, b) => b.stage - a.stage || a.course.code.localeCompare(b.course.code));
   }
@@ -204,45 +225,99 @@ export class StudentRegistrationService {
     const reg = await this.prisma.courseRegistration.findUnique({
       where: { studentId_semesterId: { studentId, semesterId } },
       select: {
-        id: true, status: true, submittedAt: true, reviewedAt: true, reviewNote: true, mainStage: true,
+        id: true, status: true, submittedAt: true, reviewedAt: true, reviewNote: true, mainStage: true, createdAt: true,
         reviewedBy: { select: { firstName: true, lastName: true, staffProfile: { select: { title: true } } } },
         items: { select: { offeringId: true } },
+        semester: { select: { number: true, academicYear: { select: { label: true } } } },
       },
     });
     if (!reg) return null;
-    const { reviewedBy, items, ...rest } = reg;
+    const { reviewedBy, items, semester, ...rest } = reg;
     return {
       ...rest,
+      reference: registrationReference(reg.id, semester),
       offeringIds: items.map((i) => i.offeringId),
       reviewedBy: reviewedBy ? [reviewedBy.staffProfile?.title, reviewedBy.firstName, reviewedBy.lastName].filter(Boolean).join(' ') : null,
     };
   }
 
   /**
-   * Every course the student has registered for, with where it stands: passed, failed or incomplete
-   * (published results), in progress (approved), or waiting for approval.
+   * The student's registered courses (approved registrations only; ones waiting for approval stay on the
+   * registration page), with where each stands, and their trailing courses: failed at the latest
+   * attempt and not passed since.
    */
   async myCourses(user: AuthUser) {
     if (user.type !== 'STUDENT') throw new ForbiddenException({ code: 'STUDENTS_ONLY', message: 'This is for students.' });
-    const items = await this.prisma.courseRegistrationItem.findMany({
-      where: { registration: { studentId: user.id, status: { in: ['SUBMITTED', 'APPROVED'] } } },
-      select: {
-        offeringId: true,
-        registration: { select: { status: true } },
-        offering: { select: { course: { select: { id: true, code: true, title: true, creditHours: true } }, semester: { select: { number: true, startDate: true, academicYear: { select: { label: true } } } } } },
-      },
-    });
-    const results = await this.prisma.courseResult.findMany({
-      where: { studentId: user.id, sheet: { status: 'PUBLISHED', offeringId: { in: items.map((i) => i.offeringId) } } },
-      select: { grade: true, total: true, isPass: true, incomplete: true, sheet: { select: { offeringId: true } } },
-    });
+    const [items, results] = await Promise.all([
+      this.prisma.courseRegistrationItem.findMany({
+        where: { registration: { studentId: user.id, status: 'APPROVED' } },
+        select: {
+          offeringId: true,
+          offering: { select: { course: { select: { id: true, code: true, title: true, creditHours: true } }, semester: { select: { number: true, startDate: true, isCurrent: true, academicYear: { select: { label: true } } } } } },
+        },
+      }),
+      this.prisma.courseResult.findMany({
+        where: { studentId: user.id, sheet: { status: 'PUBLISHED' } },
+        select: { grade: true, total: true, isPass: true, incomplete: true, sheet: { select: { offeringId: true, publishedAt: true, offering: { select: { course: { select: { id: true, code: true, title: true, creditHours: true } }, semester: { select: { number: true, academicYear: { select: { label: true } } } } } } } } },
+      }),
+    ]);
     const byOffering = new Map(results.map((r) => [r.sheet.offeringId, r]));
-    return items
+    const courses = items
       .map((i) => {
         const r = byOffering.get(i.offeringId);
-        const status = r ? (r.incomplete ? 'INCOMPLETE' : r.isPass ? 'PASSED' : 'FAILED') : i.registration.status === 'APPROVED' ? 'IN_PROGRESS' : 'AWAITING_APPROVAL';
-        return { offeringId: i.offeringId, course: i.offering.course, term: `${i.offering.semester.academicYear.label} ${termName(i.offering.semester.number)}`, startDate: i.offering.semester.startDate, status, grade: r?.grade ?? null, total: r?.total ?? null };
+        const status = r ? (r.incomplete ? 'INCOMPLETE' : r.isPass ? 'PASSED' : 'FAILED') : 'IN_PROGRESS';
+        return { offeringId: i.offeringId, course: i.offering.course, term: `${i.offering.semester.academicYear.label} ${termName(i.offering.semester.number)}`, startDate: i.offering.semester.startDate, current: i.offering.semester.isCurrent, status, grade: r?.grade ?? null, total: r?.total ?? null };
       })
       .sort((a, b) => b.startDate.getTime() - a.startDate.getTime() || a.course.code.localeCompare(b.course.code));
+    // Trailing: the latest attempt was a fail (incomplete results are not trailing).
+    const trailingIds = new Set(carryOverCourses(results.map((r) => ({ courseId: r.sheet.offering.course.id, isPass: r.isPass, incomplete: r.incomplete, publishedAt: r.sheet.publishedAt ?? new Date(0) }))));
+    const latest = new Map<string, (typeof results)[number]>();
+    for (const r of results) {
+      const id = r.sheet.offering.course.id;
+      if (!trailingIds.has(id)) continue;
+      const cur = latest.get(id);
+      if (!cur || (r.sheet.publishedAt ?? new Date(0)) > (cur.sheet.publishedAt ?? new Date(0))) latest.set(id, r);
+    }
+    const retaking = new Set(courses.filter((c) => c.current).map((c) => c.course.id));
+    const trailing = [...latest.values()]
+      .map((r) => ({ course: r.sheet.offering.course, term: `${r.sheet.offering.semester.academicYear.label} ${termName(r.sheet.offering.semester.number)}`, grade: r.grade, total: r.total, registeredThisTerm: retaking.has(r.sheet.offering.course.id) }))
+      .sort((a, b) => a.course.code.localeCompare(b.course.code));
+    return { courses, trailing };
   }
+
+  /** The registration slip as a PDF: student, term, courses, credits and the reference number. */
+  async slipPdf(user: AuthUser, semesterId?: string) {
+    const { profile, semester } = await this.context(user, semesterId);
+    const reg = await this.prisma.courseRegistration.findUnique({
+      where: { studentId_semesterId: { studentId: user.id, semesterId: semester.id } },
+      select: { id: true, status: true, submittedAt: true, mainStage: true, student: { select: { firstName: true, middleName: true, lastName: true, indexNumber: true, studentProfile: { select: { programme: { select: { department: { select: { name: true } } } } } } } }, items: { select: { offering: { select: { course: { select: { code: true, title: true, creditHours: true } } } } } } },
+    });
+    if (!reg || reg.status === 'DRAFT') throw new BadRequestException({ code: 'NOT_SUBMITTED', message: 'Submit your registration first; the slip is for a submitted registration.' });
+    const courses = reg.items.map((i) => i.offering.course).sort((a, b) => a.code.localeCompare(b.code));
+    const credits = courses.reduce((t, c) => t + c.creditHours, 0);
+    const ref = registrationReference(reg.id, semester);
+    const s = reg.student;
+    const d = await PdfDoc.create('Course registration slip', `${semester.academicYear.label} ${termName(semester.number)}. ${reg.status === 'APPROVED' ? 'Approved' : reg.status === 'SUBMITTED' ? 'Submitted, waiting for approval' : reg.status}`);
+    d.rows([
+      ['Student', [s.firstName, s.middleName, s.lastName].filter(Boolean).join(' ')],
+      ['Index number', s.indexNumber ?? ''],
+      ['Programme', profile.programme.name],
+      ['Department', s.studentProfile?.programme.department.name ?? ''],
+      ['Level', String(reg.mainStage ? levelOfStage(reg.mainStage, profile.programme.level.mode === 'WEEKEND') : profile.currentLevel)],
+      ['Academic year', semester.academicYear.label],
+      ['Semester', `${termName(semester.number)}${reg.mainStage ? ` (programme semester ${reg.mainStage})` : ''}`],
+      ['Registration date', reg.submittedAt ? reg.submittedAt.toISOString().slice(0, 10) : ''],
+      ['Reference', ref],
+    ]);
+    d.gap();
+    d.table(['Code', 'Title', 'Credits'], courses.map((c) => [c.code, c.title, String(c.creditHours)]), [0.18, 0.67, 0.15], [2]);
+    d.gap(6);
+    d.text(`Total credit hours: ${credits}`, { bold: true });
+    return { filename: `registration-${s.indexNumber ?? 'slip'}-${semester.academicYear.label.replace('/', '-')}-${termName(semester.number)}.pdf`, buffer: await d.toBuffer('All Nations University. Check a registration with the Registry by its reference.') };
+  }
+}
+
+/** A short, stable reference for a registration, e.g. REG-2026F-3F9A2C1B. */
+export function registrationReference(id: string, semester: { number: number; academicYear: { label: string } }) {
+  return `REG-${semester.academicYear.label.slice(0, 4)}${'FSU'[semester.number - 1] ?? 'X'}-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
