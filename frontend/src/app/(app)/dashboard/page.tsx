@@ -7,6 +7,7 @@ import { RecentNotifications } from '@/features/dashboard/components/recent-noti
 import { RecentActivity } from '@/features/dashboard/components/recent-activity';
 import { RegistrationCard } from '@/features/dashboard/components/registration-card';
 import { StudentStanding } from '@/features/dashboard/components/student-standing';
+import { StudentDetails } from '@/features/dashboard/components/student-details';
 
 function greeting() {
   const hour = Number(new Date().toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Africa/Accra' }));
@@ -20,6 +21,7 @@ export default function DashboardPage() {
       <PageHeader title={`${greeting()}, ${me?.firstName}`} />
       <div className="flex flex-col gap-4">
         <ProfileSummary />
+        {me?.type === 'STUDENT' && <StudentDetails />}
         {me?.type === 'STUDENT' && <StudentStanding />}
         {me?.type === 'STUDENT' && <RegistrationCard />}
         <div className="grid gap-4 lg:grid-cols-2">

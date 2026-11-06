@@ -64,3 +64,9 @@ Super Admins manage accounts and settings but cannot approve or publish results.
 
 
 Head of Department: may also be named **patron** of a departmental association (by the Dean of Students office) and then sets that association's dues each semester. Association officers collect dues; they do not set them.
+
+
+Curriculum Officer (`curriculum_officer`): adds and edits courses and their prerequisites, and sets each programme's curriculum (`curriculum.manage`). Can be given to any staff member; the Registrar also has this permission.
+
+
+Registration Officer (`registration_officer`): decides course drop requests (`course_drops.approve`) and sees registration records and the malpractice list (`registration_records.read`). Can be given to any staff member. The Registrar has both permissions; Heads of Department and the Exam Coordinator can see the records.

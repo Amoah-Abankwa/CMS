@@ -40,6 +40,7 @@ GET /me/accommodation/private
 GET /me/accommodation/roommate
 GET /me/attendance
 GET /me/devotion
+GET /me/drops
 GET /me/dues
 GET /me/dues/receipts/:id/pdf
 GET /me/exams
@@ -56,6 +57,7 @@ GET /me/library/reading-lists
 GET /me/preferences
 GET /me/registration
 GET /me/registration/courses
+GET /me/registration/slip.pdf
 GET /me/results
 GET /me/timesheets
 GET /me/work/dispatcher
@@ -125,6 +127,8 @@ POST /me/accommodation/offer/accept
 POST /me/accommodation/offer/decline
 POST /me/attendance/check-in
 POST /me/devotion/check-in
+POST /me/drops
+POST /me/drops/:id/withdraw
 POST /me/dues/levies/:id/pay
 POST /me/excuse-requests
 POST /me/excuse-requests/:id/withdraw

@@ -14,6 +14,10 @@ export const ROLE_KEYS = {
   TEACHING_ASSISTANT: 'teaching_assistant',
   // Registry, admissions and examinations
   REGISTRAR: 'registrar',
+  /** Adds and edits courses, and sets each programme's curriculum (any staff member can be given it). */
+  CURRICULUM_OFFICER: 'curriculum_officer',
+  /** Decides course drop requests and sees registration records (any staff member can be given it). */
+  REGISTRATION_OFFICER: 'registration_officer',
   ADMISSIONS_OFFICER: 'admissions_officer',
   EXAM_COORDINATOR: 'exam_coordinator',
   QA_OFFICER: 'qa_officer',
@@ -102,6 +106,8 @@ export const STAFF_ROLE_CATEGORY: Partial<Record<RoleKey, RoleCategory>> = {
   [ROLE_KEYS.LECTURER]: 'academic',
   [ROLE_KEYS.TEACHING_ASSISTANT]: 'academic',
   [ROLE_KEYS.REGISTRAR]: 'registry',
+  [ROLE_KEYS.CURRICULUM_OFFICER]: 'registry',
+  [ROLE_KEYS.REGISTRATION_OFFICER]: 'registry',
   [ROLE_KEYS.ADMISSIONS_OFFICER]: 'registry',
   [ROLE_KEYS.EXAM_COORDINATOR]: 'registry',
   [ROLE_KEYS.QA_OFFICER]: 'registry',

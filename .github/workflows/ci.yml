@@ -1,0 +1,113 @@
+# Runs on every push and pull request. The first run is also the platform's first real install:
+# it type-checks, tests and builds everything, then starts the API against a real PostgreSQL
+# database with the demo data and runs the end-to-end smoke test (docs/QA.md).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks, type check, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # After the first successful install, commit pnpm-lock.yaml, then add "cache: pnpm" here and
+          # change the install step to plain "pnpm install" (which then uses the exact locked versions).
+      - name: Static checks (schema, wiring, design rules, open routes)
+        run: |
+          python3 scripts/qa/check-schema.py
+          python3 scripts/qa/check-wiring.py
+          python3 scripts/qa/check-requirements.py
+          python3 scripts/qa/list-open-routes.py
+      - run: pnpm install --frozen-lockfile=false
+      - name: Business-rule tests
+        run: pnpm qa:rules
+      - name: Generate the Prisma client
+        run: pnpm db:generate
+        env:
+          DIRECT_URL: postgresql://unused:unused@localhost:5432/unused
+      - name: Type check
+        run: pnpm typecheck
+      - name: Tests (Jest)
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+        env:
+          API_URL: http://localhost:4000
+      - name: Known vulnerabilities in production dependencies
+        run: pnpm audit --prod --audit-level high
+        continue-on-error: true
+
+  end-to-end:
+    name: End-to-end smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: anu
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anu
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/anu
+      WEB_ORIGIN: http://localhost:3000
+      PORT: '4000'
+      DEMO_MODE: 'true'
+      PAYMENTS_PROVIDER: demo
+      SMS_PROVIDER: log
+      # Demo runs in Africa/Accra time, like the university.
+      TZ: Africa/Accra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # After the first successful install, commit pnpm-lock.yaml, then add "cache: pnpm" here and
+          # change the install step to plain "pnpm install" (which then uses the exact locked versions).
+      - name: Throwaway secrets for this run
+        run: |
+          echo "JWT_ACCESS_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+          echo "JWT_REFRESH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+          echo "MFA_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm db:generate
+      - name: Create the database schema
+        working-directory: backend
+        run: |
+          if [ -d prisma/migrations ]; then npx prisma migrate deploy; else npx prisma db push; fi
+      - name: Harden the database (append-only activity log, row-level security)
+        run: pnpm db:harden
+      - name: Load the demo data
+        run: pnpm db:seed
+      - name: Build and start the API
+        run: |
+          pnpm --filter @anu/shared build
+          pnpm --filter @anu/backend build
+          node backend/dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4000/api/v1/health && exit 0
+            sleep 2
+          done
+          echo "The API did not start"; cat api.log; exit 1
+      - name: Smoke test
+        run: pnpm qa:smoke
+      - name: API log
+        if: always()
+        run: cat api.log || true

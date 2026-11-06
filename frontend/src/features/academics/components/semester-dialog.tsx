@@ -10,9 +10,10 @@ import { errorMessage } from '@/lib/axios';
 import { fromLocalInput, toLocalInput } from '@/lib/format';
 import { academicsApi, type Semester } from '../api';
 
-export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { semester: Semester | null; onCloseAction: () => void; onSavedAction: (s: Semester) => void }) {
+export function SemesterDialog({ semester, onClose, onSaved }: { semester: Semester | null; onClose: () => void; onSaved: (s: Semester) => void }) {
   const [opens, setOpens] = useState('');
   const [closes, setCloses] = useState('');
+  const [dropBy, setDropBy] = useState('');
   const [min, setMin] = useState('');
   const [max, setMax] = useState('');
   const [makeCurrent, setMakeCurrent] = useState(false);
@@ -23,6 +24,7 @@ export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { sem
     if (!semester) return;
     setOpens(toLocalInput(semester.registrationOpensAt));
     setCloses(toLocalInput(semester.registrationClosesAt));
+    setDropBy(toLocalInput(semester.dropDeadline ?? null));
     setMin(String(semester.minCredits));
     setMax(String(semester.maxCredits));
     setMakeCurrent(false);
@@ -36,10 +38,11 @@ export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { sem
     setBusy(true);
     setError(null);
     try {
-      onSavedAction(
+      onSaved(
         await academicsApi.updateSemester(semester.id, {
           registrationOpensAt: fromLocalInput(opens),
           registrationClosesAt: fromLocalInput(closes),
+          dropDeadline: fromLocalInput(dropBy),
           minCredits: Number(min),
           maxCredits: Number(max),
           ...(makeCurrent ? { isCurrent: true } : {}),
@@ -53,7 +56,7 @@ export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { sem
   };
 
   return (
-    <Dialog open onClose={onCloseAction} title={semester.label} description="Students can choose and submit courses only between these times.">
+    <Dialog open onClose={onClose} title={semester.label} description="Students can choose and submit courses only between these times.">
       <form onSubmit={save} className="flex flex-col gap-4">
         {error && <Alert tone="danger">{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -62,6 +65,9 @@ export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { sem
           </Field>
           <Field label="Registration closes" htmlFor="sem-closes">
             <Input id="sem-closes" type="datetime-local" value={closes} onChange={(e) => setCloses(e.target.value)} />
+          </Field>
+          <Field label="Students can ask to drop courses until" htmlFor="sem-drop" hint="Leave empty to keep dropping closed.">
+            <Input id="sem-drop" type="datetime-local" value={dropBy} onChange={(e) => setDropBy(e.target.value)} />
           </Field>
           <Field label="Minimum credits" htmlFor="sem-min">
             <Input id="sem-min" type="number" inputMode="numeric" min={0} max={40} value={min} onChange={(e) => setMin(e.target.value)} />
@@ -77,7 +83,7 @@ export function SemesterDialog({ semester, onCloseAction, onSavedAction }: { sem
           </label>
         )}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onCloseAction}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" loading={busy}>

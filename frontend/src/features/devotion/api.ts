@@ -102,4 +102,4 @@ export const DEVOTION_TONE: Record<DevotionStatus, 'success' | 'warning' | 'dang
 const TZ = 'Africa/Accra';
 export const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
 export const serviceDay = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
-export const marks = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toFixed(2));
+export const marks = (n: number | null | undefined) => (n === null || n === undefined ? '-' : n.toFixed(2));

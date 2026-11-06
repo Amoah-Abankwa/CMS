@@ -79,3 +79,13 @@ Set by the Super Admin under **Records retention**, as ANU decides (for example 
 ## Independent penetration test
 
 To be done by an independent firm before or soon after launch. Suggested scope: sign-in (index number, staff email with authenticator codes, password reset and set-up links, lock-outs); access between roles and scopes (Heads of Department and advisors within their departments, owners and vendors only their own records, students only their own); payments and payouts (Paystack webhooks, amounts, transfers needing authenticator codes); uploads and private documents (signed uploads, five-minute download links); the content security policy; the data import; and the API's rate limits. Give the testers a copy of the platform with demo data, not live student records.
+
+
+## Request limits and visitors' addresses
+
+Request limits (120 a minute; 10 a minute on sign-in, password reset and set-up) are counted per signed-in account, and on public pages per address and the account being tried. Counting by address alone would make everyone behind the campus's shared public address share one allowance. Account lockouts after repeated wrong passwords are unchanged. The visitor's address comes from `X-Forwarded-For` through the number of trusted proxies set in `TRUST_PROXY` (see `docs/DEPLOYMENT.md`); addresses in other positions are ignored, so a visitor cannot choose the address that is recorded.
+
+
+## When a staff member cannot use their authenticator
+
+At the authenticator step a staff member can choose **Email me a code**. A one-time 6-digit code goes to their account's email address; entering it removes their authenticator and recovery codes, and they must set up a new authenticator before they are signed in. Safeguards: the code can only be asked for after the correct password in the same sign-in attempt; it expires after 10 minutes and works once; five wrong tries end it and count towards the account lockout; at most three codes an hour; the codes are stored only as hashes; and afterwards the person is emailed that their authenticator was replaced, so an attempt by someone else is noticed. This makes the staff member's email account part of their sign-in security: if both their password and their email were taken, someone could replace their authenticator. Super Admins can also reset an authenticator on the Staff screens, and `npm run admin:reset-mfa` does it from the server.

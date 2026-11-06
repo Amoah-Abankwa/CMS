@@ -300,6 +300,30 @@ This semester's fees are issued from the Accounts office's fee items: GH₵ 3,80
 135. Download any receipt or statement PDF: amounts print with the cedi sign.
 136. As **superadmin**, open **Records retention**: see the defaults (the activity log is kept for good).
 
+**Academic calendar**
+
+139. As **registrar**, open **Academic calendar**: create **2027/2028** (dates filled in for you), add Semester 1 and Semester 2 inside it. In the list below, set Semester 1's registration dates; mark it current only when you want to move the whole platform to it (keep the demo's current semester for the other steps).
+
+**Terms and registration by semester**
+
+140. As **registrar**, open **Academic calendar**: years have Fall, Spring and Summer; add a Summer and choose **Promotional** or **Upgrade**.
+141. As a level 300 student, open **Course registration**: choose **Semester 5** as the main semester; its courses are ticked, and courses from semesters 1 to 4 (passed ones marked) can be added within the credit limit. Open **My courses**: passed courses in green, failed in red, with filters.
+
+**Courses and curriculum**
+
+142. As **registrar**, open **Courses and curriculum**. Under **Courses**, add a course and give it a prerequisite. Under **Programme curriculum**, choose BSc Computer Science and place the course in a semester as core or elective. To let someone else do this, give a staff member the **Curriculum Officer** role on the Staff screens.
+143. As a student, open **Course registration**: courses show **Core** or **Elective**; a course whose prerequisite you have not taken cannot be ticked. After submitting, **Download slip (PDF)** shows the reference number. As **advisor.cs**, **Registration approvals** can export to CSV and approve a course from another programme for one student.
+
+**Trailing courses**
+
+144. As a 2025 Computer Science student with a failed course in last year's results, open **My courses**: **Trailing courses** lists it with its grade; the **Trailing** filter shows only those. On **Course registration** it is marked **Trailing**. Courses from a registration still waiting for approval do not appear in My courses until it is approved.
+
+**Dropping courses, records and malpractice**
+
+145. As **registrar**, open **Academic calendar**, edit the current semester and set **Students can ask to drop courses until**.
+146. As a student with an approved registration, open **My courses** and **Ask to drop** a course with a reason. As **registrar**, open **Course drop requests** and approve or reject it; the student is told.
+147. As **exams**, open **Exam malpractice** and record a case. As **registrar** or **lecturer.cs** (Head of Department), open **Registration records**: dropped courses, rejected registrations, rejected drop requests and malpractice, each with **Export to CSV**.
+
 **Oversight**
 
 137. As **superadmin** or **auditor**, open **All activity** to see every step above, grouped by user type.

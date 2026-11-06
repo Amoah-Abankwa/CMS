@@ -80,6 +80,12 @@ export const PERMISSIONS = {
   PAYROLL_MANAGE: 'payroll.manage',
   /** Import records from the previous system (each kind also needs its own permission). */
   DATA_IMPORT: 'data.import',
+  /** Add and edit courses, their prerequisites, and each programme's curriculum. */
+  CURRICULUM_MANAGE: 'curriculum.manage',
+  /** Approve or reject students' requests to drop a registered course. */
+  COURSE_DROPS_APPROVE: 'course_drops.approve',
+  /** See dropped courses, rejected registrations, rejected drop requests and the malpractice list (own department if scoped). */
+  REGISTRATION_RECORDS_READ: 'registration_records.read',
   // Audit
   AUDIT_READ_ALL: 'audit.read_all',
   AUDIT_EXPORT: 'audit.export',
@@ -99,6 +105,8 @@ export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
  * platform, not results, exams or fees, so these are never part of the Super Admin role.
  */
 export const ACADEMIC_DECISION_PERMISSIONS: PermissionKey[] = [
+  PERMISSIONS.CURRICULUM_MANAGE,
+  PERMISSIONS.COURSE_DROPS_APPROVE,
   PERMISSIONS.RESULTS_APPROVE_DEPARTMENT,
   PERMISSIONS.RESULTS_APPROVE_SCHOOL,
   PERMISSIONS.RESULTS_PUBLISH,

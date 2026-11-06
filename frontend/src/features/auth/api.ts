@@ -43,6 +43,11 @@ export const authApi = {
     api.post<SignedIn>('/auth/student/login', { indexNumber, password }).then((r) => r.data),
   staffLogin: (email: string, password: string) =>
     api.post<StaffPasswordResult>('/auth/staff/login', { email, password }).then((r) => r.data),
+  /** Can't use the authenticator: email a one-time code. */
+  sendMfaEmail: (challengeToken: string) => api.post<{ sentTo: string }>('/auth/mfa/email/send', { challengeToken }).then((r) => r.data),
+  /** The emailed code; the person then sets up a new authenticator. */
+  verifyMfaEmail: (challengeToken: string, code: string) =>
+    api.post<{ status: 'mfa_enrolment_required'; challengeToken: string }>('/auth/mfa/email/verify', { challengeToken, code }).then((r) => r.data),
   verifyMfa: (challengeToken: string, code: string) =>
     api.post<SignedIn>('/auth/mfa/verify', { challengeToken, code }).then((r) => r.data),
   startEnrolment: (challengeToken: string) =>

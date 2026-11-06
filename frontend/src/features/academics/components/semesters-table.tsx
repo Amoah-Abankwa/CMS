@@ -11,7 +11,7 @@ import { useSemesters } from '../use-semesters';
 import { RegistrationWindow } from './registration-window';
 import { SemesterDialog } from './semester-dialog';
 
-export function SemestersTable({ reloadKey = 0, onChangedAction }: { reloadKey?: number; onChangedAction?: () => void } = {}) {
+export function SemestersTable({ reloadKey = 0, onChanged }: { reloadKey?: number; onChanged?: () => void } = {}) {
   const { semesters, error, reload } = useSemesters();
   // Reload when a year or semester is added above.
   useEffect(() => { if (reloadKey) reload(); }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -45,10 +45,10 @@ export function SemestersTable({ reloadKey = 0, onChangedAction }: { reloadKey?:
       </ul>
       <SemesterDialog
         semester={editing}
-        onCloseAction={() => setEditing(null)}
-        onSavedAction={() => {
+        onClose={() => setEditing(null)}
+        onSaved={() => {
           setEditing(null);
-          void reload(); onChangedAction?.();
+          void reload(); onChanged?.();
         }}
       />
     </>

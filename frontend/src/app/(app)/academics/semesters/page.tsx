@@ -14,8 +14,8 @@ export default function SemestersPage() {
     <RequirePermission permission={PERMISSIONS.ACADEMICS_MANAGE}>
       <PageHeader title="Academic calendar" description="Academic years and semesters: their dates, when course registration opens and closes, credit limits, and which semester is current." />
       <div className="flex flex-col gap-4">
-        <AcademicYears key={yearsKey} onChangedAction={() => setSemestersKey((k) => k + 1)} />
-        <SemestersTable reloadKey={semestersKey} onChangedAction={() => setYearsKey((k) => k + 1)} />
+        <AcademicYears key={yearsKey} onChanged={() => setSemestersKey((k) => k + 1)} />
+        <SemestersTable reloadKey={semestersKey} onChanged={() => setYearsKey((k) => k + 1)} />
       </div>
     </RequirePermission>
   );

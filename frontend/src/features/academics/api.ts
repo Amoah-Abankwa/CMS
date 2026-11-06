@@ -9,6 +9,7 @@ export interface Semester {
   isCurrent: boolean;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
+  dropDeadline?: string | null;
   registrationOpen: boolean;
   minCredits: number;
   maxCredits: number;
@@ -18,6 +19,7 @@ export interface Semester {
 export interface SemesterUpdate {
   registrationOpensAt?: string | null;
   registrationClosesAt?: string | null;
+  dropDeadline?: string | null;
   minCredits?: number;
   maxCredits?: number;
   isCurrent?: boolean;

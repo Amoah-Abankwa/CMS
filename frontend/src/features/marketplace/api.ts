@@ -85,8 +85,7 @@ export interface Order {
     fee: number;
     dispatcherId: string | null;
     problemNote: string | null;
-    dispatcher: { transport: string; student: { firstName: string; lastName: string; phone: string | null } } | null;
-  };
+    dispatcher: { transport: string; student: { firstName: string; lastName: string; phone: string | null }; location?: { lat: number; lng: number; accuracy: number | null; at: string } | null } | null;  };
 }
 
 export interface MyVendor extends VendorPublic {

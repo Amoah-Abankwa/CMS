@@ -1,5 +1,6 @@
 'use client';
 
+import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -13,7 +14,6 @@ import { errorMessage } from '@/lib/axios';
 import { authApi } from '../api';
 import { studentLoginSchema } from '../schemas';
 import { useCompleteSignIn } from '../use-complete-sign-in';
-import { Input } from '@/components/ui/input';
 
 type Values = z.infer<typeof studentLoginSchema>;
 

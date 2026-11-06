@@ -13,11 +13,11 @@ export function GradeDistribution({ summary, order }: { summary: SheetSummary; o
         </div>
         <div>
           <dt className="text-xs text-muted">Pass rate</dt>
-          <dd className="text-xl font-semibold tabular-nums">{summary.passRate === null ? '—' : `${summary.passRate}%`}</dd>
+          <dd className="text-xl font-semibold tabular-nums">{summary.passRate === null ? '-' : `${summary.passRate}%`}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted">Average total</dt>
-          <dd className="text-xl font-semibold tabular-nums">{summary.mean ?? '—'}</dd>
+          <dd className="text-xl font-semibold tabular-nums">{summary.mean ?? '-'}</dd>
         </div>
       </dl>
       <ul className="flex flex-1 flex-col gap-1.5" aria-label="Number of students per grade">

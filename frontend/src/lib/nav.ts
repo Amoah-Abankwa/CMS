@@ -1,4 +1,4 @@
-import { Coins, ArrowLeftRight, BadgeAlert, FilePenLine, ClipboardList as RegisterIcon, Images, UserCheck, Network, Hash, Tags, Banknote, Landmark, Users2, Receipt, Bike, Wallet, UserRoundCheck, Activity, Award, Ban, BedDouble, ChefHat, HandCoins, Store, Utensils, UtensilsCrossed, BookCopy, BookMarked, ScanBarcode, TimerOff, Wrench, Bell, Building, Home, MapPinned, Shuffle, BadgeCheck, Church, MonitorPlay, SlidersHorizontal, Trophy, ChartColumn, ClipboardPen, Hospital, Settings2, Building2, CalendarClock, ClipboardList, BookOpenCheck, FileCheck2, Scale, BriefcaseBusiness, CalendarRange, ClipboardCheck, Code2, History, LayoutDashboard, Library, ListChecks, ScrollText, ShieldCheck, UserPlus, Users, type LucideIcon, FileText, DoorOpen, HeartOff, GraduationCap, Star, Ticket, Megaphone, Clock, Upload, MessageSquareWarning, Archive } from 'lucide-react';
+import { Coins, ArrowLeftRight, BadgeAlert, FilePenLine, ClipboardList as RegisterIcon, Images, UserCheck, Network, Hash, Tags, Banknote, Landmark, Users2, Receipt, Bike, Wallet, UserRoundCheck, Activity, Award, Ban, BedDouble, ChefHat, HandCoins, Store, Utensils, UtensilsCrossed, BookCopy, BookMarked, ScanBarcode, TimerOff, Wrench, Bell, Building, Home, MapPinned, Shuffle, BadgeCheck, Church, MonitorPlay, SlidersHorizontal, Trophy, ChartColumn, ClipboardPen, Hospital, Settings2, Building2, CalendarClock, ClipboardList, BookOpenCheck, FileCheck2, Scale, BriefcaseBusiness, CalendarRange, ClipboardCheck, Code2, History, LayoutDashboard, Library, ListChecks, ScrollText, ShieldCheck, UserPlus, Users, type LucideIcon, FileText, DoorOpen, HeartOff, GraduationCap, Star, Ticket, Megaphone, Clock, Upload, MessageSquareWarning, Archive, CircleMinus, FolderSearch, ShieldAlert } from 'lucide-react';
 import { PERMISSIONS } from '@anu/shared';
 
 export interface NavItem {
@@ -60,6 +60,8 @@ export const NAV: NavSection[] = [
     items: [
       { href: '/academics/offerings', label: 'Course offerings', icon: Library, permission: PERMISSIONS.OFFERINGS_MANAGE },
       { href: '/academics/registrations', label: 'Registration approvals', icon: ClipboardCheck, permission: PERMISSIONS.REGISTRATIONS_REVIEW },
+      { href: '/academics/course-drops', label: 'Course drop requests', icon: CircleMinus, permission: PERMISSIONS.COURSE_DROPS_APPROVE },
+      { href: '/academics/registration-records', label: 'Registration records', icon: FolderSearch, permission: PERMISSIONS.REGISTRATION_RECORDS_READ },
       { href: '/academics/dues-marker', label: 'Dues on exam registers', icon: BadgeAlert, permission: PERMISSIONS.RESULTS_APPROVE_DEPARTMENT },
       { href: '/dues-patron', label: 'Departmental dues', icon: Receipt, permission: PERMISSIONS.RESULTS_APPROVE_DEPARTMENT },
       { href: '/academics/advisors', label: 'Academic advisors', icon: UserCheck, permission: PERMISSIONS.ADVISORS_ASSIGN },
@@ -85,10 +87,13 @@ export const NAV: NavSection[] = [
       { href: '/vendor/profile', label: 'Shop settings', icon: Store, permission: PERMISSIONS.VENDOR_OWN },
     ],
   },
-  {
+    {
     label: 'Registry',
     items: [
+      { href: '/students', label: 'Students', icon: Users, permission: PERMISSIONS.STUDENTS_READ },
+      { href: '/students/new', label: 'Register student', icon: UserPlus, permission: PERMISSIONS.STUDENTS_REGISTER },
       { href: '/registry/structure', label: 'Academic structure', icon: Network, permission: PERMISSIONS.ACADEMICS_MANAGE },
+      { href: '/registry/curriculum', label: 'Courses and curriculum', icon: BookCopy, permission: PERMISSIONS.CURRICULUM_MANAGE },
       { href: '/registry/import', label: 'Import data', icon: Upload, permission: PERMISSIONS.DATA_IMPORT },
       { href: '/registry/programme-types', label: 'Programme types', icon: Hash, permission: PERMISSIONS.ACADEMICS_MANAGE },
     ],
@@ -167,17 +172,11 @@ export const NAV: NavSection[] = [
       { href: '/exams/timetable', label: 'Exam timetable', icon: CalendarClock, permission: PERMISSIONS.EXAMS_MANAGE },
       { href: '/exams/eligibility', label: 'Exam eligibility', icon: ClipboardList, permission: PERMISSIONS.EXAMS_MANAGE },
       { href: '/exams/register', label: 'Exam register', icon: RegisterIcon, audience: 'STAFF' },
+      { href: '/exams/malpractice', label: 'Exam malpractice', icon: ShieldAlert, permission: PERMISSIONS.EXAMS_MANAGE },
       { href: '/results/amendments', label: 'Result amendments', icon: FilePenLine, audience: 'STAFF' },
       { href: '/exams/venues', label: 'Exam venues', icon: Building2, permission: PERMISSIONS.EXAMS_MANAGE },
       { href: '/exams/clearance', label: 'Fee clearance', icon: Receipt, permission: PERMISSIONS.FINANCE_CLEARANCE_MANAGE },
       { href: '/exams/holds', label: 'Exam holds', icon: Ban, permission: PERMISSIONS.EXAM_HOLDS_MANAGE },
-    ],
-  },
-  {
-    label: 'Registry',
-    items: [
-      { href: '/students', label: 'Students', icon: Users, permission: PERMISSIONS.STUDENTS_READ },
-      { href: '/students/new', label: 'Register student', icon: UserPlus, permission: PERMISSIONS.STUDENTS_REGISTER },
     ],
   },
   {

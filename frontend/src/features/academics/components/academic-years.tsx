@@ -17,13 +17,13 @@ import { academicsApi, type AcademicYearRow } from '../api';
  * The Registrar's academic calendar: academic years and their semesters. Registration dates, credit
  * limits and which semester is current are then set on each semester in the list below.
  */
-export function AcademicYears({ onChangedAction }: { onChangedAction: () => void }) {
+export function AcademicYears({ onChanged }: { onChanged: () => void }) {
   const [years, setYears] = useState<AcademicYearRow[] | null>(null);
   const [f, setF] = useState({ label: '', startDate: '', endDate: '' });
   const [msg, setMsg] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
   const load = useCallback(() => { academicsApi.years().then(setYears).catch((err) => setMsg({ tone: 'danger', text: errorMessage(err) })); }, []);
   useEffect(() => { load(); }, [load]);
-  const done = (text: string) => { setMsg({ tone: 'success', text }); load(); onChangedAction(); };
+  const done = (text: string) => { setMsg({ tone: 'success', text }); load(); onChanged(); };
   const fail = (err: unknown) => setMsg({ tone: 'danger', text: errorMessage(err) });
   const suggest = (label: string) => {
     const m = /^(\d{4})\/(\d{4})$/.exec(label.trim());
@@ -32,7 +32,7 @@ export function AcademicYears({ onChangedAction }: { onChangedAction: () => void
   if (!years) return msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : <Spinner />;
   return (
     <Card>
-      <CardHeader title="Academic years" description="Each academic year has Fall (September to December), Spring (January to May) and Summer (June to August); for each summer, choose promotional or upgrade. Create each year and its terms. Then, in the list below, set each semester's registration dates and credit limits, and mark the one that is current." />
+      <CardHeader title="Academic years" description="Each academic year has Fall (September to December), Spring (January to May) and Summer (June to August); for each summer, choose promotional (registered like Fall and Spring) or upgrade (any course, to improve the grade). Create each year and its terms. Then, in the list below, set each semester's registration dates and credit limits, and mark the one that is current." />
       <CardBody className="flex flex-col gap-4">
         {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
@@ -82,9 +82,9 @@ function YearRow({ y, onDone, onFail }: { y: AcademicYearRow; onDone: (t: string
             <li key={m.id} className="flex items-center justify-between gap-2">
               <span className="flex flex-wrap items-center gap-2">{termName(m.number)}: {formatDate(m.startDate)} to {formatDate(m.endDate)} {m.isCurrent && <Badge tone="primary">Current</Badge>}
                 {m.number === 3 && (
-                  <Select aria-label="Summer type" className="h-8 w-52" value={m.summerKind ?? ''} onChange={(e) => academicsApi.setSummerKind(m.id, e.target.value as 'PROMOTIONAL').then(() => onDone(`${y.label} Summer is now ${SUMMER_KIND_LABEL[e.target.value as 'PROMOTIONAL'].toLowerCase()}.`)).catch(onFail)}>
+                  <Select aria-label="Summer type" className="h-8 w-52" value={m.summerKind ?? ''} onChange={(e) => academicsApi.setSummerKind(m.id, e.target.value as 'PROMOTIONAL' | 'UPGRADE').then(() => onDone(`${y.label} Summer is now a ${SUMMER_KIND_LABEL[e.target.value as 'PROMOTIONAL' | 'UPGRADE'].toLowerCase()}.`)).catch(onFail)}>
                     <option value="" disabled>Choose summer type</option>
-                    <option value="PROMOTIONAL">Promotional (failed or not yet taken)</option>
+                    <option value="PROMOTIONAL">Promotional (classes as in Fall and Spring)</option>
                     <option value="UPGRADE">Upgrade (any course, to improve)</option>
                   </Select>
                 )}

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
-import { Select, Textarea } from '@/components/ui/input';
+import { Input, Select, Textarea } from '@/components/ui/input';
 import { errorMessage } from '@/lib/axios';
 import { formatDateTime } from '@/lib/format';
 import { accommodationApi, type MyAccommodation } from '../api';
@@ -19,6 +19,9 @@ export function UniversityPanel({ data, onChange }: { data: MyAccommodation; onC
   const app = data.application;
   const [prefs, setPrefs] = useState<Pref[]>([]);
   const [acceptAny, setAcceptAny] = useState(true);
+  const [mateIndex, setMateIndex] = useState('');
+  const [mate, setMate] = useState<{ roommateIndex: string | null; mutual: boolean } | null>(null);
+  useEffect(() => { accommodationApi.roommate().then((m) => { setMate(m); setMateIndex(m.roommateIndex ?? ''); }).catch(() => undefined); }, []);
   const [needs, setNeeds] = useState('');
   const [gender, setGender] = useState<'' | 'Female' | 'Male'>('');
   const [editing, setEditing] = useState(false);
@@ -119,6 +122,7 @@ export function UniversityPanel({ data, onChange }: { data: MyAccommodation; onC
                   acceptAny,
                   specialNeeds: needs.trim() || undefined,
                   gender: gender || undefined,
+                  roommateIndex: mateIndex.trim().toUpperCase() || null,
                 }),
                 'Application submitted.',
               );
@@ -168,6 +172,10 @@ export function UniversityPanel({ data, onChange }: { data: MyAccommodation; onC
               <Textarea id="app-needs" value={needs} maxLength={500} onChange={(e) => setNeeds(e.target.value)} />
             </Field>
             <div className="flex gap-2">
+              <Field label="Roommate (optional)" htmlFor="ha-mate" hint="Their index number. You are placed together only if they name you too, and a room with two free beds is available.">
+                <Input id="ha-mate" value={mateIndex} maxLength={20} placeholder="ANU25400001" onChange={(e) => setMateIndex(e.target.value)} />
+              </Field>
+              {mate?.roommateIndex && <p className="-mt-2 text-xs text-muted">{mate.mutual ? `Matched: you and ${mate.roommateIndex} named each other.` : `Waiting for ${mate.roommateIndex} to name you too.`}</p>}
               <Button type="submit" loading={busy === 'apply'} disabled={!prefs[0]?.hostelId && !acceptAny}>{app && status !== 'WITHDRAWN' ? 'Save changes' : 'Apply'}</Button>
               {editing && <Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>}
             </div>

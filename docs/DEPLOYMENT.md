@@ -68,3 +68,65 @@ Migrations only move forward. To undo a bad release, deploy the previous build; 
 - Run `pnpm install` (the backend now uses `@pdf-lib/fontkit` to put the cedi sign in PDFs; the DejaVu Sans fonts and their licence are in `backend/assets/fonts`, and must be deployed with the backend).
 - `pnpm db:deploy` now also applies `prisma/sql/03_audit_retention.sql`.
 - Pages are rendered per request because of the content security policy nonce; allow for this when sizing the frontend server.
+
+
+## First academic year
+
+On a new installation the Registrar creates the current academic year and its semesters under **Academics, Academic calendar**, marks the current semester, and sets its registration dates, before anything else (fees, registration, devotion and attendance all follow the current semester).
+
+## Visitors' IP addresses
+
+Sessions and the activity log record each visitor's IP address, and request limits are counted per person. If every address shows as `::1` (or `127.0.0.1`), the backend is seeing a proxy on the same machine instead of the visitor.
+
+- **On your own computer (development)** `::1` is correct: you are visiting from the same machine.
+- **On a server**, the backend must be told how many proxies sit in front of it (`TRUST_PROXY`), and each proxy must pass the visitor's address on in `X-Forwarded-For`.
+
+**Recommended: send `/api` straight to the backend.** The Next.js server relays `/api` to the backend when nothing else does, but it may not pass the visitor's address on. Let the web server route `/api` directly instead. On a single server with Nginx:
+
+```nginx
+server {
+  server_name portal.anu.edu.gh;
+  # (TLS settings as usual)
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+and set `TRUST_PROXY="loopback"` for the backend (trust only Nginx on the same machine, so an address a visitor makes up is ignored).
+
+**Other setups:**
+
+| Setup | `TRUST_PROXY` |
+| --- | --- |
+| Nginx on the same machine sends `/api` to the backend (above) | `loopback` |
+| A hosting load balancer (Render, Railway, a cloud load balancer) sends `/api` to the backend | `1` |
+| Load balancer, then Nginx, then the backend | `2` |
+| Requests go through the Next.js relay | Add 1 for the relay, but only if you confirm it passes the address on; otherwise use the recommended setup |
+
+**To check:** sign in from a phone on mobile data, then open **Account and security**: the session should show the phone's public address, not `::1` or a server's address. As superadmin, **All activity** shows the same.
+
+Request limits are counted per signed-in account, and on sign-in pages per address and account tried, so the many students who share the campus's public address do not block one another.
+
+
+## Troubleshooting: "link expired" straight away, or "Cannot GET/POST /api/v1/..."
+
+The website calls the API at `/api/v1/...` on its own address. Something must pass those requests to the backend unchanged, **without redirecting them**: a redirect (301 or 302) turns the browser's POST into a GET, which the API refuses ("Cannot GET"), and the set-up page then reports the link as invalid or expired. Forgot password, sign-in and every form fail the same way.
+
+1. **Check `API_URL` for the frontend.** It must be the backend's own address, never the public website address: `http://127.0.0.1:4000` when both run on one server, or the backend service's internal address on a hosting service. It is read **when the frontend is built**, so rebuild the frontend after changing it (`pnpm --filter @anu/frontend build`, then restart).
+2. **Or send `/api` straight to the backend** from Nginx (see "Visitors' IP addresses" above); then `API_URL` is not used for browser requests at all.
+3. **Check `WEB_ORIGIN` for the backend.** It must be the exact public address people use, with `https://` and the same `www.` or not; it goes into the links in emails.
+4. **Test it:** `curl -i -X POST https://portal.anu.edu.gh/api/v1/auth/setup/verify -H "Content-Type: application/json" -H "X-Requested-With: XMLHttpRequest" -d '{"token":"test"}'` should answer **404 with "This setup link is invalid..."**. A `301`, `302` or a `Location:` header means a redirect is in the way. In the browser, the Network tab shows the same: the request to `/api/v1/auth/setup/verify` must be a POST with no redirect before it.
+
+A set-up link also stops working when a newer one is sent for the same account (the Registry resending it, or the person using "Forgot password" before setting up, which sends a fresh set-up link). Always use the newest email.

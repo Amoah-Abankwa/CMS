@@ -100,6 +100,7 @@ export function RegistrationPlanner() {
       <div className="hidden print:block">
         <p className="text-lg font-bold">All Nations University</p>
         <p className="font-semibold">Course registration slip, {data.semester.label}</p>
+        {data.registration?.reference && <p className="text-sm">Reference: {data.registration.reference}</p>}
         <p className="text-sm">
           {me && fullName(me)}, {me?.indexNumber}. {data.profile.programme.name}, level {data.profile.level}.
         </p>
@@ -114,10 +115,14 @@ export function RegistrationPlanner() {
         <p className="text-sm text-muted">
           {data.semester.label}. {data.profile.programme.name}, level {data.profile.level}. Credits allowed: {minCredits} to {maxCredits}.
         </p>
-        {status === 'APPROVED' && (
-          <Button variant="secondary" size="sm" onClick={() => window.print()}>
-            <Printer className="size-4" aria-hidden /> Print registration slip
-          </Button>
+        {(status === 'APPROVED' || status === 'SUBMITTED') && (
+          <span className="flex flex-wrap items-center gap-2">
+            {data.registration?.reference && <span className="text-xs text-muted">Reference {data.registration.reference}</span>}
+            <a href="/api/v1/me/registration/slip.pdf" download className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm font-medium text-white hover:opacity-90">Download slip (PDF)</a>
+            <Button variant="secondary" size="sm" onClick={() => window.print()}>
+              <Printer className="size-4" aria-hidden /> Print
+            </Button>
+          </span>
         )}
       </div>
 
@@ -156,19 +161,20 @@ export function RegistrationPlanner() {
                 <li key={o.id}>
                   <label className={cn('flex items-start gap-3 px-4 py-3 sm:px-5', editable && !full && 'cursor-pointer hover:bg-surface-muted', checked && editable && 'bg-primary-soft/40')}>
                     {editable && (
-                      <input type="checkbox" className="mt-1 size-4 shrink-0 print:hidden" checked={checked} disabled={full && !checked} onChange={() => toggle(o.id)} />
+                      <input type="checkbox" className="mt-1 size-4 shrink-0 print:hidden" checked={checked} disabled={(full || !!o.missingPrerequisites?.length) && !checked} onChange={() => toggle(o.id)} aria-describedby={o.missingPrerequisites?.length ? `pre-${o.id}` : undefined} />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <span className="text-sm font-medium">
                           <span className="font-mono">{o.course.code}</span> {o.course.title}
-                          {o.passed ? <span className="ml-2"><Badge tone="success">Passed</Badge></span> : o.carryOver ? <span className="ml-2"><Badge tone="danger">Failed</Badge></span> : null}
-                          {o.isElective && <span className="ml-2 text-xs text-muted">elective</span>}
+                          {o.passed ? <Badge tone="success" className="ml-2">Passed</Badge> : o.carryOver ? <Badge tone="danger" className="ml-2">Trailing</Badge> : null}
+                          <Badge tone={o.isElective ? 'neutral' : 'primary'} className="ml-2">{o.approvedForYou ? 'Approved for you' : o.isElective ? 'Elective' : 'Core'}</Badge>
                         </span>
                         <span className="text-sm tabular-nums text-muted">{o.course.creditHours} credits</span>
                       </span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
-                        <span>Semester {o.stage}{o.isMain ? ' (main)' : ''}</span>
+                        {o.stage > 0 && <span>Semester {o.stage}{o.isMain ? ' (main)' : ''}</span>}
+                        {o.prerequisites && o.prerequisites.length > 0 && <span className={o.missingPrerequisites?.length ? 'text-danger' : ''}>{o.missingPrerequisites?.length ? `Needs ${o.missingPrerequisites.join(' and ')} taken first` : `Prerequisite: ${o.prerequisites.join(', ')} (taken)`}</span>}
                         {lead ? lead.name : 'Lecturer to be announced'}
                         {o.capacity !== null && <span>{Math.max(0, o.capacity - o.seatsTaken)} seats left</span>}
                         {full && <Badge tone="danger">Full</Badge>}

@@ -9,7 +9,7 @@ export default function Page() {
   const student = useAuthStore((s) => s.me?.type === 'STUDENT');
   return (
     <>
-      <PageHeader title="My courses" description="Every course you have registered for. Passed courses are in green, failed ones in red." />
+      <PageHeader title="My courses" description="Your registered courses, once approved. Passed courses are in green, failed ones in red; trailing courses (failed and not yet passed) are listed apart." />
       {student ? <MyCourses /> : <EmptyState title="This page is for students" />}
     </>
   );

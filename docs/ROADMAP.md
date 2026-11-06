@@ -13,14 +13,17 @@
 | 9 | Quality assurance: static checks (schema, wiring, design rules, open-route review), rule tests, end-to-end smoke test; see `docs/QA.md` | In progress: checks that need no packages done; first real run pending |
 | 10 | Security hardening and launch preparation: production safety checks, production seed and first-admin command, account suspension, reset-code limits, housekeeping, website security headers, CI pipeline, go-live runbook (`docs/DEPLOYMENT.md`), security review (`docs/SECURITY.md`) | Built; launch waits for the first CI run (Phase 9) |
 
-## Open questions for ANU
+## Open questions for ANU (current)
 
-- Index number level codes: degree is assumed to be `4` (ANU25**4**00001). Diploma (`2`) and postgraduate (`6`) are placeholders until the Registry confirms them.
-- Which SMS provider ANU already has a contract with (Arkesel is implemented; Hubtel or mNotify can be added).
-- Student employment: the minimum CGPA (2.50 assumed), whether first-year students without results may work (assumed yes), how many jobs a student may hold (1 assumed), and the dispatcher fee per delivery (GH₵ 4.00 assumed). All are settings in Employment rules.
-- Payments: whether ANU has a Paystack account (or prefers Hubnet, ExpressPay or a bank gateway), whether the university takes a commission from vendors, and how often vendors are paid.
-- Morning devotion: how the 5.00 score is used (a standalone record or part of a course result), and who is exempt.
-- Library fine amounts (currently GH₵ 1.00 a day, capped at GH₵ 50.00; changeable in Library rules).
+Decisions only ANU can make; the platform has a sensible default for each until then.
+
+1. **Index numbers:** what follows the diploma initials (now DCE260001: year and a 4-digit number), and the Graduate School format (now ANUGS260001).
+2. **Carry-overs:** whether CGPA counts every attempt (now), or only the best or latest.
+3. **Paystack:** the university's account, whether US dollar payments are enabled, whether transfers need OTP approval (switch it off for automatic payouts), and confirmation of the mobile money codes (MTN, VOD, ATL).
+4. **Data protection:** registration with the Data Protection Commission (Act 843), records retention periods (defaults are set), and who holds the production keys (at least two people).
+5. **Security contact:** the email address for reporting security problems.
+6. **Penetration test:** commissioning an independent firm (scope in `docs/SECURITY.md`).
+7. **Policy numbers now at defaults:** work CGPA minimum 2.50, dispatcher fee GH₵ 4.00, library fines GH₵ 1.00 a day (cap GH₵ 50), exam clearance share 70%, marketplace commission. Each is changeable by its office.
 
 ## Known simplifications in Phase 2a
 
@@ -70,7 +73,7 @@
 - Private hostels are created by owners with partner accounts (same setup link and authenticator sign-in as staff) and are hidden from students until the Hostel Office verifies them. Accepting a booking takes a bed off the free count in a way two acceptances cannot both take the last bed.
 - A student can hold one place a semester: accepting a university room is blocked while they have a confirmed private booking, and the other way round.
 - Owners see a student's name, index number, phone and email, nothing academic.
-- Not yet: roommate requests and complaints about private hostels (hostel fees, photos, check-in and check-out are done; see later sections).
+- Done since: hostel fees, photos, check-in and check-out, roommate requests and complaints (see later sections).
 
 ## Phase 6 notes (library)
 
@@ -103,7 +106,7 @@
 - Deliveries: vendors choose to use campus dispatchers. Those orders must be paid online, so students never carry cash. When the vendor marks an order ready, online dispatchers are told; the first to take it gets it (a single conditional update). Only the hall is shown until a delivery is taken. The dispatcher confirms collection, then completes the order with the customer's 4-digit code. They can hand a delivery back before collecting it, or report a problem to the vendor. A dispatcher carries at most 2 deliveries at once and cannot deliver their own order. Vendors are alerted if nobody takes an order within 15 minutes, and can send it with their own staff. Dispatchers who stop opening the Deliveries page are taken offline after 20 minutes.
 - Pay: dispatchers earn a fixed fee per completed delivery (GH₵ 4.00 by default), deducted from the vendor's settlement. Finance records mobile money payouts to dispatchers on Vendor settlements; the student is told by SMS. Cancelled deliveries earn nothing, even if the food had been collected.
 - Also in this phase: every password field has a show/hide button.
-- Not yet: timesheets and payroll for hourly campus jobs, internships and external job listings, dispatcher ratings, live location tracking, and automatic payouts through Paystack transfers.
+- Done since: timesheets and payroll, internships and assistantships, dispatcher ratings, live delivery tracking and Paystack transfers (see later sections).
 
 ## Phase 9 notes (quality assurance)
 
@@ -118,7 +121,7 @@
 - `pnpm db:deploy` now applies migrations and then re-applies the database hardening (append-only activity log, row-level security), which new tables from Phases 4 to 8 needed.
 - New: administrators can suspend, deactivate and reactivate staff and partner accounts (signs them out everywhere at once). Reset codes are limited to three per account per hour. Old sessions and codes are cleaned up nightly.
 - `.github/workflows/ci.yml` installs everything, type-checks, tests, builds, and runs the smoke test against a real database. Pushing the project to GitHub gives the first real run that Phase 9 is waiting for.
-- Not yet: independent penetration test, nonce-based content security policy, records-retention periods (an ANU decision; see `docs/SECURITY.md`). Suspending student accounts is done.
+- Done since: nonce-based content security policy, records retention settings, suspending student accounts. Still for ANU: the independent penetration test and the retention periods (see `docs/SECURITY.md`).
 
 ## Fees and departmental dues (added after Phase 10)
 
@@ -126,7 +129,7 @@
 - **Automatic fee clearance.** Once a student has paid the set percentage (70% by default, set by Finance) they are cleared for exams; if a reversal or charge takes them below it, that automatic clearance is withdrawn. Clearances Finance sets by hand are never changed by the rule.
 - **Departmental dues.** Associations (EHASSA, BACA and others) are linked to departments by the Dean of Students office, which records each elected president and treasurer for a term. Officers get an **Association dues** screen for their term only (an add-on to their student account, like dispatchers), set dues, see who has paid, and record cash. Every payment, cash or online, has a numbered receipt sent to the student by SMS; only the Dean of Students office can cancel one. Online dues are held by the university and paid out to the association's account by Finance.
 - Confirmed by ANU: the Registrar's office sets the clearance percentage; international students are billed in US dollars; EHASSA is the Engineering and Health and Allied Science Students Association and BACA the Business and Accounting Students Association; dues are compulsory.
-- Not yet: fee instalment plans with deadlines, late-payment penalties and bank statement import (PDF receipts are done).
+- Done since: instalments, optional late charges and bank statement import (see later sections).
 
 ## Registry and fee updates
 
@@ -146,7 +149,7 @@
 - **Hall fees are charged on the fee bill** when a student accepts a university hall place (the room's price), adjusted by the price difference on a move, and credited back on cancellation. Students pay them like other fees, and they count towards the exam clearance percentage. Bills in US dollars are skipped (logged) because room prices are in cedis; charge those at the hostel office.
 - **Academic advisors.** Heads of Department (and the Registry) assign students to their own advisor. An advisor with advisees reviews only those students' registrations; one without advisees still reviews the whole department.
 - **Photos through Cloudinary (signed uploads).** Vendors add a photo to each dish; private hostel owners add up to 8 photos (first is the cover), shown to students. The browser uploads straight to Cloudinary with a signature the API creates for a fixed folder and image formats; the API only accepts photos from that folder.
-- Not yet: deleting replaced photos from Cloudinary (they stay in the account), a size limit enforced by Cloudinary (the browser checks 5 MB; set an upload preset limit in Cloudinary for full enforcement), profile photos.
+- Done since: replaced photos are deleted from Cloudinary, sizes are checked with Cloudinary, and profile photos (see later sections).
 
 ## Results and exams (second round after the first run)
 
@@ -222,3 +225,36 @@
 
 - **School fees** are set by the Finance Office (Finance Officer): fee schedules per semester (using the Accounts office's fee item names), bills, payments, instalments and, if turned on, late charges. The Registrar sets only the share of fees needed for exam clearance.
 - **Departmental dues** are set by the association's **patron**: one Head of Department of one of its departments, named by the Dean of Students office (for example the Head of Computer Science for EHASSA). The patron sets each semester's dues and opens or closes collection. The elected student officers collect cash, issue receipts and see who has paid; they no longer set dues. The Dean of Students office still alone cancels receipts. The patron must remain Head of Department of one of the association's departments; otherwise the Dean names a new one.
+
+## Academic calendar
+
+- The **Registrar** creates academic years (for example 2026/2027, with start and end dates) and their semesters (1, 2 or 3, inside the year and not overlapping) under **Academics, Academic calendar**. On each semester they set registration dates and credit limits, and mark the one that is current; its academic year becomes the current year. A semester or year added by mistake can be deleted until anything (courses, registrations, fees...) uses it. Before this, years and semesters came only from the demo data or the import of past results, so a new installation could not start its first semester.
+
+## Terms, curriculum semesters and registration
+
+- **Terms.** Each academic year has Fall (September to December), Spring (January to May) and Summer (June to August), shown by name everywhere ("2026/2027 Fall"). For each Summer the academic office chooses **promotional** (courses failed or not yet taken) or **upgrade** (any course, to improve the grade) on the Academic calendar. Regular students (Bachelor's and Diploma) study in Fall and Spring, with Summer optional; weekend students have compulsory classes in all three.
+- **Curriculum semesters.** A programme's curriculum is set out in semesters: 8 for a regular Bachelor's degree (two a year), 12 for a weekend degree (three a year), 4 for a Diploma. A curriculum entry's level and semester in the year give its programme semester (level 300, semester 1 of a regular programme is semester 5).
+- **Registration.** The student chooses their main semester (semester 5, say); its courses are ticked for them (electives left to choose), and they may add any course from the semesters below it, passed or not, within the term's maximum credits. In a regular student's summer the summer type decides instead. Students see only their own programme's curriculum. Every curriculum course can be taken every term: its class is opened when needed. Approval moves the student up to their main semester's level.
+- **My courses** lists every course the student has registered for: passed in green, failed in red, in progress or awaiting approval, with filters for passed, failed and this term.
+
+## Courses, curriculum and registration rules
+
+- **Courses and curriculum** (Registry, new permission `curriculum.manage`): add, edit and delete courses (a course already taught is deactivated rather than deleted, so students' records stay); set prerequisites; and place each course in a programme's semesters (1 to 8 of a regular Bachelor's degree) as core or elective. The permission comes with the new **Curriculum Officer** role, which can be given to any staff member, and with the Registrar. Like other academic decisions it is not given to the Super Admin automatically.
+- **Prerequisites:** a course can be registered once each prerequisite has been taken before, with any grade. Courses whose prerequisites are missing are shown but cannot be ticked, and saving refuses them with the reason. Courses already passed can be taken again, as before.
+- **Core and elective** are labelled on the registration page. Core courses of the main semester are ticked for the student, who may remove them.
+- **Courses outside the programme:** students see only their own programme's courses. An advisor, Head of Department or the Registry can approve another course for one student for the term (Registration approvals); it then shows on the student's registration, marked as approved for them.
+- **Registration slip** with a reference number (for example REG-2026F-3F9A2C1B) and registration date, as a PDF generated by the server, as well as printing.
+- **Export:** Registration approvals exports the registrations a reviewer can see to CSV (opens in Excel).
+- **Student dashboard** shows the student's index number, programme, department, level, academic year, current semester and registration status, beside the fees and results cards.
+
+## Trailing courses and the registered courses list
+
+- **My courses** lists a student's registered courses only once their registration is approved (registrations waiting for approval stay on the Course registration page). Passed courses are in green, failed attempts in red, with filters for all, passed, failed, trailing and this term.
+- **Trailing courses** are courses failed at the latest attempt and not passed since (incomplete results are not trailing). They are listed apart at the top of My courses, with the grade and term of the latest attempt, and marked "Registered this term" when the student is retaking them. A later pass removes a course from the list. On Course registration they are marked **Trailing**.
+
+## Dropping courses, registration records and malpractice
+
+- **Dropping a course.** On **My courses**, a student can ask to drop a course on this term's approved registration, with a reason, until the drop deadline the Registrar sets on the semester (Academic calendar). A drop cannot leave fewer than the term's minimum credits (requests already waiting count), and is refused once results for the course have been submitted. Staff with the new permission `course_drops.approve` decide on **Course drop requests**; approving removes the course from the registration and class list, and the student is told either way.
+- **Registration records** (permission `registration_records.read`): dropped courses, rejected registrations, rejected drop requests and exam malpractice cases, for a chosen semester, each exportable to CSV. Heads of Department see their own department only.
+- **Exam malpractice.** The Exams Office (`exams.manage`) records cases (student, course, date, what happened, sanction) on **Exam malpractice**.
+- **Who has what:** the Registrar has both new permissions; Heads of Department and the Exam Coordinator can view the records; the new **Registration Officer** role carries both and can be given to any staff member. Approving drops is an academic decision, so the Super Admin does not get it automatically.

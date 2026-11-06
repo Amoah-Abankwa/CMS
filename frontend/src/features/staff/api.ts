@@ -71,6 +71,7 @@ export const staffApi = {
   create: (input: CreateStaffInput) => api.post<StaffMember>('/staff', input).then((r) => r.data),
   updateRoles: (id: string, selection: RoleSelection) => api.put<StaffMember>(`/staff/${id}/roles`, selection).then((r) => r.data),
   resendSetup: (id: string) => api.post(`/staff/${id}/resend-setup`),
+  resetMfa: (id: string) => api.post(`/staff/${id}/mfa/reset`),
   setStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED', reason: string) => api.post<{ status: string }>(`/staff/${id}/status`, { status, reason }).then((r) => r.data),
 };
 

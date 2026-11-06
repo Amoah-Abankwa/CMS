@@ -33,8 +33,8 @@ export function ActivityTable({ items, showActor }: { items: AuditEntry[]; showA
                 <td className="px-4 py-2.5">
                   <Badge tone={e.result === 'SUCCESS' ? 'success' : 'danger'}>{e.result === 'SUCCESS' ? 'Succeeded' : 'Failed'}</Badge>
                 </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-muted">{e.ipAddress ?? '—'}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-muted">{e.correlationId?.slice(0, 8) ?? '—'}</td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-muted">{e.ipAddress ?? '-'}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted">{e.correlationId?.slice(0, 8) ?? '-'}</td>
               </tr>
             ))}
           </tbody>

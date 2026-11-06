@@ -21,6 +21,7 @@ type Values = z.infer<typeof staffLoginSchema>;
 /** Step 1: email and password. Step 2: MFA (or first-time MFA setup). There is no way to skip step 2. */
 export function StaffLoginForm({ onStepChange }: { onStepChange?: (step: 'password' | 'mfa' | 'enrol') => void }) {
   const [challenge, setChallenge] = useState<StaffPasswordResult | null>(null);
+  const [replacing, setReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState, reset } = useForm<Values>({ resolver: zodResolver(staffLoginSchema) });
 
@@ -41,8 +42,13 @@ export function StaffLoginForm({ onStepChange }: { onStepChange?: (step: 'passwo
     }
   });
 
-  if (challenge?.status === 'mfa_required') return <MfaCodeForm challengeToken={challenge.challengeToken} onRestart={restart} />;
-  if (challenge?.status === 'mfa_enrolment_required') return <MfaEnrolment challengeToken={challenge.challengeToken} onRestart={restart} />;
+  if (challenge?.status === 'mfa_required') return <MfaCodeForm challengeToken={challenge.challengeToken} onRestart={restart} onEnrolInstead={(t) => { setReplacing(true); setChallenge({ status: 'mfa_enrolment_required', challengeToken: t }); onStepChange?.('enrol'); }} />;
+  if (challenge?.status === 'mfa_enrolment_required') return (
+    <div className="flex flex-col gap-4">
+      {replacing && <Alert tone="warning">Your old authenticator has been removed. Set up a new one now to finish signing in.</Alert>}
+      <MfaEnrolment challengeToken={challenge.challengeToken} onRestart={restart} />
+    </div>
+  );
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">

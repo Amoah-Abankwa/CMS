@@ -6,9 +6,10 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import { EmptyState, Spinner } from '@/components/ui/states';
-import { errorMessage } from '@/lib/axios';
+import { api, errorMessage } from '@/lib/axios';
 import { formatDateTime, fullName } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { downloadCsv } from '@/lib/csv';
 import { useSemesters } from '@/features/academics/use-semesters';
 import { SemesterSelect } from '@/features/academics/components/semester-select';
 import { registrationApi, type RegistrationStatus, type ReviewItem, type ReviewPage } from '../api';
@@ -49,13 +50,16 @@ export function ReviewList() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        {semesters && <SemesterSelect semesters={semesters} value={semesterId} onChangeAction={(v) => { setSemesterId(v); setPage(1); }} />}
+        {semesters && <SemesterSelect semesters={semesters} value={semesterId} onChange={(v) => { setSemesterId(v); setPage(1); }} />}
         <div>
           <label htmlFor="rev-search" className="sr-only">
             Search students
           </label>
           <Input id="rev-search" type="search" placeholder="Search by name or index number" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
         </div>
+      </div>
+      <div className="flex justify-end">
+        <Button variant="secondary" size="sm" onClick={() => api.get<{ semester: string; rows: Array<Record<string, string | number | null>> }>('/registrations/export', { params: { semesterId: semesterId || undefined, status, search: search || undefined } }).then(({ data: d }) => downloadCsv(`registrations-${d.semester.replace(/[^\w]+/g, '-')}-${status.toLowerCase()}.csv`, [['Index number', 'Name', 'Email', 'Programme', 'Level', 'Main semester', 'Status', 'Submitted', 'Reviewed', 'Courses', 'Credits'], ...d.rows.map((r) => [r.indexNumber, r.name, r.email, r.programme, r.level, r.mainSemester, r.status, r.submittedAt ? String(r.submittedAt).slice(0, 10) : '', r.reviewedAt ? String(r.reviewedAt).slice(0, 10) : '', r.courses, r.credits])])).catch(() => undefined)}>Export to CSV</Button>
       </div>
 
       <div role="tablist" aria-label="Registration status" className="flex gap-1 border-b border-border">

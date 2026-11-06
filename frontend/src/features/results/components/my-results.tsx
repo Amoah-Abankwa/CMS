@@ -74,7 +74,7 @@ export function MyResults() {
       <section className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border border-border bg-surface px-4 py-3">
           <p className="text-xs text-muted">Cumulative GPA</p>
-          <p className="text-3xl font-semibold tabular-nums">{results.cgpa?.toFixed(2) ?? '—'}</p>
+          <p className="text-3xl font-semibold tabular-nums">{results.cgpa?.toFixed(2) ?? '-'}</p>
         </div>
         <div className="rounded-lg border border-border bg-surface px-4 py-3">
           <p className="text-xs text-muted">Credits passed</p>
@@ -99,7 +99,7 @@ export function MyResults() {
           </div>
           {[...results.semesters].reverse().map((s) => (
             <Card key={s.id} className="break-inside-avoid">
-              <CardHeader title={s.label} actions={<span className="text-sm">GPA <span className="font-semibold tabular-nums">{s.gpa?.toFixed(2) ?? '—'}</span></span>} />
+              <CardHeader title={s.label} actions={<span className="text-sm">GPA <span className="font-semibold tabular-nums">{s.gpa?.toFixed(2) ?? '-'}</span></span>} />
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-border text-xs text-muted">
@@ -118,9 +118,9 @@ export function MyResults() {
                           <span className="font-mono">{c.code}</span> {c.title}
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums">{c.credits}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '—' : c.total}{!c.incomplete && (c.devotionExempt ? <span className="block text-xs text-muted">scaled from 95</span> : c.devotionScore != null ? <span className="block text-xs text-muted">incl. devotion {c.devotionScore.toFixed(2)}</span> : null)}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '-' : c.total}{!c.incomplete && (c.devotionExempt ? <span className="block text-xs text-muted">scaled from 95</span> : c.devotionScore != null ? <span className="block text-xs text-muted">incl. devotion {c.devotionScore.toFixed(2)}</span> : null)}</td>
                         <td className={cn('px-4 py-2 font-medium', c.incomplete ? 'text-warning' : !c.isPass && 'text-danger')}>{c.grade}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '—' : c.gradePoint.toFixed(1)}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{c.incomplete ? '-' : c.gradePoint.toFixed(1)}</td>
                       </tr>
                     ))}
                   </tbody>

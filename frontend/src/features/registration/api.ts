@@ -5,6 +5,9 @@ import type { Offering } from '@/features/offerings/api';
 export type RegistrationStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export interface AvailableOffering extends Offering {
+  approvedForYou?: boolean;
+  prerequisites?: string[];
+  missingPrerequisites?: string[];
   stage: number;
   isMain: boolean;
   isElective: boolean;
@@ -16,7 +19,7 @@ export interface AvailableOffering extends Offering {
 
 export interface MyRegistration {
   semester: Semester;
-  profile: { level: number; programme: { code: string; name: string } };
+  profile: { level: number; department?: string; programme: { code: string; name: string } };
   available: AvailableOffering[];
   mode: 'REGULAR' | 'PROMOTIONAL' | 'UPGRADE' | 'SUMMER_NOT_SET';
   mainStage: number | null;
@@ -24,6 +27,7 @@ export interface MyRegistration {
   totalStages: number;
   weekend: boolean;
   registration: {
+    reference?: string;
     mainStage?: number | null;
     id: string;
     status: RegistrationStatus;
@@ -66,7 +70,7 @@ export interface ReviewPage {
 export const registrationApi = {
   mine: (mainStage?: number) => api.get<MyRegistration>('/me/registration', { params: mainStage ? { mainStage } : {} }).then((r) => r.data),
   save: (offeringIds: string[], mainStage?: number | null) => api.put<MyRegistration>('/me/registration', { offeringIds, mainStage: mainStage ?? undefined }).then((r) => r.data),
-  courses: () => api.get<MyCourse[]>('/me/registration/courses').then((r) => r.data),
+  courses: () => api.get<{ courses: MyCourse[]; trailing: TrailingCourse[] }>('/me/registration/courses').then((r) => r.data),
   submit: () => api.post<MyRegistration>('/me/registration/submit').then((r) => r.data),
   withdraw: () => api.post<MyRegistration>('/me/registration/withdraw').then((r) => r.data),
 
@@ -82,7 +86,17 @@ export interface MyCourse {
   course: { id: string; code: string; title: string; creditHours: number };
   term: string;
   startDate: string;
-  status: 'PASSED' | 'FAILED' | 'INCOMPLETE' | 'IN_PROGRESS' | 'AWAITING_APPROVAL';
+  status: 'PASSED' | 'FAILED' | 'INCOMPLETE' | 'IN_PROGRESS';
+  current: boolean;
   grade: string | null;
   total: number | null;
+}
+
+/** A course failed at the latest attempt and not passed since. */
+export interface TrailingCourse {
+  course: { id: string; code: string; title: string; creditHours: number };
+  term: string;
+  grade: string | null;
+  total: number | null;
+  registeredThisTerm: boolean;
 }

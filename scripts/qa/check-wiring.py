@@ -125,7 +125,10 @@ actions = 0
 for path in files('backend/src/**/*.ts'):
     text = read(path)
     for m in re.finditer(r"action:\s*([`'])([^`']+)\1", text):
-        a = m.group(2); actions += 1
+        a = m.group(2)
+        # Activity actions are always "module.action"; other `action:` fields (e.g. check 'in' / 'out') are not.
+        if '.' not in a and '${' not in a: continue
+        actions += 1
         if '${' in a:
             prefix = a.split('${')[0]
             if not any(l.startswith(prefix) for l in labelled): problems.append(f'Activity label: nothing labelled for {a} ({os.path.relpath(path, ROOT)})')

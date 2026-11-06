@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -22,7 +23,7 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className="mt-0.5 text-sm">{value || '—'}</dd>
+      <dd className="mt-0.5 text-sm">{value || '-'}</dd>
     </div>
   );
 }
@@ -67,6 +68,15 @@ function StaffDetail() {
               <div className="flex flex-col gap-3 rounded-md border border-warning/40 bg-warning-soft px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm">They have not set their password yet. Setup links expire after 72 hours.</p>
                 {canManageUsers && <ResendSetupButton send={() => staffApi.resendSetup(member.id)} />}
+              </div>
+            )}
+            {canManageUsers && member.status === 'ACTIVE' && (
+              <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">Lost phone, or authenticator not working? Reset it: they are signed out and set up a new one at their next sign-in.</p>
+                <Button variant="secondary" size="sm" onClick={() => {
+                  if (!window.confirm(`Reset ${member.firstName}'s authenticator? They will be signed out and set up a new one at their next sign-in.`)) return;
+                  staffApi.resetMfa(member.id).then(() => window.alert('Authenticator reset. They set up a new one at their next sign-in.')).catch((err) => window.alert(errorMessage(err)));
+                }}>Reset authenticator</Button>
               </div>
             )}
           </CardBody>

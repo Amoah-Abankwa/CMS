@@ -82,6 +82,7 @@ const walk = (dir: string) => {
 };
 walk(join(root, 'backend', 'src'));
 walk(join(root, 'shared', 'src'));
+walk(join(root, 'frontend', 'src'));
 walk(join(root, 'scripts', 'qa'));
 
 (async () => {

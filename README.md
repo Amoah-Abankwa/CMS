@@ -2,7 +2,7 @@
 
 A modern university management and campus services platform for All Nations University (ANU), Koforidua, Ghana. This repository is a working prototype built to propose a replacement path for the current CMS. It does not copy the existing system; it is designed to integrate with it, or replace it module by module, once ANU grants authorised technical access.
 
-**Status:** Phases 1 to 7 are complete: foundation (accounts, MFA, roles, activity logs, notifications), academic management (registration, results and GPA, exam timetable and eligibility), class attendance, morning devotion, accommodation, library, and the food marketplace with online payments. Phase 8 (student employment and dispatchers) is next. See `docs/ROADMAP.md`.
+**Status:** Phases 1 to 10 are built, plus school fees and departmental dues. The platform has not yet been installed and run end to end: push it to GitHub so the CI pipeline (`.github/workflows/ci.yml`) does the first real run, or follow the first-run checklist in `docs/QA.md`. Going live is described in `docs/DEPLOYMENT.md`, security in `docs/SECURITY.md`, and every phase in `docs/ROADMAP.md`.
 
 ## Stack
 
@@ -120,3 +120,19 @@ Run commands from the repository root; `pnpm dev` starts both. To work on one si
 - **Frontend**: Vercel or any Node host. Set `API_URL` to the API's internal or public URL.
 - Use separate Supabase projects for staging and production.
 - Set `NODE_ENV=production`, `DEMO_MODE=false`, real SMTP and `SMS_PROVIDER=arkesel`. The API refuses to start in production without them.
+
+## Going live
+
+- `NODE_ENV=production pnpm db:seed`: reference data only (roles, templates, grading scale); demo data is refused in production.
+- `pnpm admin:create --email ... --first ... --last ... --staff-number ...`: the first Super Admin.
+- `pnpm db:deploy`: migrations, then database hardening. Always use this rather than migrating on its own.
+
+The full runbook is `docs/DEPLOYMENT.md`.
+
+## Quality checks
+
+- `pnpm qa`: static checks (database schema, frontend-to-API wiring, design rules, open-route review) and business-rule tests. The static checks need only Python 3, so they work even before `pnpm install`; the rule tests need `tsx`, which `pnpm install` provides.
+- `pnpm qa:smoke`: end-to-end test against a running API with demo data (`pnpm dev` in another terminal).
+- `pnpm typecheck`, `pnpm test`, `pnpm build`: the full checks once packages are installed.
+
+See `docs/QA.md` for what each covers and the results so far.
